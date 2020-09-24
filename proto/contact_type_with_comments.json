@@ -1,0 +1,47 @@
+{
+  "table_name": "contact_type", // required
+
+  // Ushered over to security kernel. permissions will likely be associated with lab and/or companie.
+  // e.g. of something more realistic: `company:buildinstuff:read,write`
+  "table_role": { // optional, will default to tenant wide permissions if not specified
+    "cii_staff": "write",
+    "benchmarking_associate": "read",
+    "project_manager": "read"
+  },
+  "root_url": "contact-types", // required, creates the following urls by default:
+  // `/contact-types/`: GET ALL (LIST), POST (CREATE),
+  // `/contact-types/{id}`: GET ONE (LIST), UPDATE, DELETE
+  "no_delete": true, // means delete endpoint will not be created for this table.
+
+  // SQL statement generated from this and table name to create the tables.
+  "columns": {
+    "value": {
+      "null": true,
+      "type": "varchar",
+      "max_length": 255
+    },
+    "parent_contract_type_id": {
+      "null": true,
+      "type": "integer",
+      "max_length": 4
+    },
+    "sub_level": {
+      "null": true,
+      "type": "integer",
+      "max_length": 4
+    },
+    "display": {
+      "null": true,
+      "type": "boolean",
+      "default": true,
+      "column_role": { // optional, but now benchmarking associate role cannot view or update this column.
+        "benchmarking_associate": "none"
+      }
+    },
+    "value_mapping": {
+      "null": true,
+      "type": "varchar",
+      "max_length": 255
+    }
+  }
+}

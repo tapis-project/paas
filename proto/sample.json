@@ -1,0 +1,33 @@
+{
+  "table_name": "sample table",
+  "table_role": {
+    "cii_staff": "write",
+    "ben": "read",
+    "pm": "write"
+  },
+  "root_url": "sample",
+  "no_delete": true,  // no delete endpoint allowed
+  "columns": {
+    "project_size": {
+      "null": true,
+      "type": "int",
+      "col_role": {
+        "project_size_admin": "write",
+        "pm": "none"
+      },
+    },
+    "project_type": {
+      "null": false,
+      "type": "string",
+      "max_length": 255
+    }
+  }
+}
+
+// this would create a table called "sample table" that requires role "user". It would be accessible by
+// `/sample` and `/sample/{id}`. Would have two columns, project_size and project_type. project_size requires admin
+// role, which overrules the user role for the table.
+
+
+
+

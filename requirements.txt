@@ -1,0 +1,4 @@
+django==2.0
+djangorestframework==3.8.2
+requests
+psycopg2
