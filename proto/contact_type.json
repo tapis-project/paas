@@ -10,22 +10,22 @@
   "columns": {
     "value": {
       "null": true,
-      "type": "varchar",
+      "data_type": "varchar",
       "max_length": 255
     },
     "parent_contract_type_id": {
       "null": true,
-      "type": "integer",
+      "data_type": "integer",
       "max_length": 4
     },
     "sub_level": {
       "null": true,
-      "type": "integer",
+      "data_type": "integer",
       "max_length": 4
     },
     "display": {
       "null": true,
-      "type": "boolean",
+      "data_type": "boolean",
       "default": true,
       "column_role": {
         "benchmarking_associate": "none"
@@ -33,7 +33,7 @@
     },
     "value_mapping": {
       "null": true,
-      "type": "varchar",
+      "data_type": "varchar",
       "max_length": 255
     }
   }

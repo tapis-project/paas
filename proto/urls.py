@@ -21,9 +21,9 @@ urlpatterns = [
 
     # ---- dynamic views --- #
     # GET SINGLE, PUT, DELETE
-    url('^(?P<root_url>.+)/(?P<primary_id>.+)', views.DynamicViewById.as_view()),
+    url('^dv/(?P<root_url>.+)/(?P<primary_id>.+)', views.DynamicViewById.as_view()),
     # GET ALL, POST
-    url('^(?P<root_url>.+)', views.DynamicView.as_view()),
+    url('^dv/(?P<root_url>.+)', views.DynamicView.as_view()),
 
 ]
 urlpatterns = format_suffix_patterns(urlpatterns)
