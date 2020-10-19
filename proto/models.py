@@ -1,3 +1,5 @@
+
+
 from django.db import models
 from django.contrib.postgres.fields import JSONField, ArrayField
 
@@ -18,7 +20,7 @@ class ManageTables(models.Model):
     # Schema generated from the column_definitions to be used against user input.
     validate_json = JSONField()
     # default is all 5, but will remove specific endpoints if specified in json.
-    endpoints = ArrayField()
+    endpoints = ArrayField(models.CharField(max_length=255))
     # Table level roles. If not specified, we default to tenant level role.
     # required_roles = ArrayField(null=True, blank=True)
     tenant_id = models.CharField(max_length=255)
