@@ -6,11 +6,11 @@ logger = logging.getLogger(__name__)
 
 
 # TODO create exceptions
-def create_table(table_name, columns):
+def create_table(table_name, columns, tenant):
     """Create table in the PostgreSQL database"""
-    logger.info(f"Creating table {table_name}...")
+    logger.info(f"Creating table {tenant}.{table_name}...")
 
-    command = "CREATE TABLE %s (%s_id SERIAL PRIMARY KEY, " % (table_name, table_name)
+    command = "CREATE TABLE %s.%s (%s_id SERIAL PRIMARY KEY, " % (tenant, table_name, table_name)
     for key, val in columns.items():
         column_name = key.upper()
         column_args = val
@@ -64,25 +64,25 @@ def create_table(table_name, columns):
         cur.close()
         conn.commit()
         # Success.
-        logger.info(f"Table {table_name} successfully created in postgres db.")
+        logger.info(f"Table {tenant}.{table_name} successfully created in postgres db.")
     except psycopg2.DatabaseError as e:
+        conn.close()
         msg = f"Error accessing database: {e}"
         logger.error(msg)
         raise Exception(msg)
     except Exception as e:
-        msg = f"Error creating table {table_name}: {e}"
+        conn.close()
+        msg = f"Error creating table {tenant}.{table_name}: {e}"
         logger.error(msg)
         raise Exception(msg)
 
 
-def delete_table(table_name):
+def delete_table(table_name, tenant):
     """ Drop table in the PostgreSQL database"""
-    logger.info(f"Dropping table {table_name}...")
+    logger.info(f"Dropping table {tenant}.{table_name}...")
+    command = "DROP TABLE %s.%s CASCADE;" % (tenant, table_name)
 
-    command = "DROP TABLE %s CASCADE;" % table_name
-
-    logger.info(f"Drop table command for {table_name}: {command}")
-
+    logger.info(f"Drop table command for {tenant}.{table_name}: {command}")
     conn = None
     try:
         # Read the connection parameters and connect to database.
@@ -93,15 +93,19 @@ def delete_table(table_name):
         cur.close()
         conn.commit()
         # Success.
-        logger.info(f"Table {table_name} successfully dropped from postgres db.")
+        logger.info(f"Table {tenant}.{table_name} successfully dropped from postgres db.")
     except psycopg2.DatabaseError as e:
+        conn.close()
         msg = f"Error accessing database: {e}"
         logger.error(msg)
         raise Exception(msg)
     except Exception as e:
-        msg = f"Error dropping table {table_name}: {e}"
+        conn.close()
+        msg = f"Error dropping table {tenant}.{table_name}: {e}"
         logger.error(msg)
         raise Exception(msg)
+
+
 
 
 

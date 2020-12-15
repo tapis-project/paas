@@ -3,3 +3,5 @@ djangorestframework==3.8.2
 requests
 psycopg2
 cerberus
+postgres
+docker
