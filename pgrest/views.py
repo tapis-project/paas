@@ -8,8 +8,11 @@ from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseServer
 
 from rest_framework.views import APIView
 
-from proto.models import ManageTables, ManageTablesTransition
-from proto.db_transactions import manage_tables, table_data, bulk_data
+from pgrest.models import ManageTables, ManageTablesTransition
+from pgrest.db_transactions import manage_tables, table_data, bulk_data
+from pgrest.pycommon.auth import t
+# do something with t, like
+# t.sk.getUserRoles(user='jstubbs', tenant='tacc')
 
 logger = logging.getLogger(__name__)
 

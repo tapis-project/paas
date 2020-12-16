@@ -1,0 +1,25 @@
+{
+  "$id": "http://github.com/tapis-project/tenants-api/tenants-api/configschema.json",
+  "$schema": "http://json-schema.org/schema#",
+  "properties": {
+    "sql_db_url": {
+      "type": "string",
+      "description": "URL to postgres db, including port and database.",
+      "default": "postgres:5432/pgrest"
+    },
+    "service_tenant_base_url": {
+      "type": "string",
+      "default": "https://admin.develop.tapis.io"
+    },
+    "postgres_user": {
+      "type": "string",
+      "description": "user for the SQL db.",
+      "default": "pguser"
+    },
+    "postgres_password": {
+      "type": "string",
+      "description": "password to the SQL db.",
+      "default": "pgpass"
+    }
+  }
+}

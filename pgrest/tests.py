@@ -6,7 +6,7 @@ from django.test import TestCase
 
 from rest_framework.test import APIClient
 
-from proto import test_data
+from pgrest import test_data
 
 
 class ResponseTestCase(TestCase):
