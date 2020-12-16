@@ -1,0 +1,7 @@
+{
+  "service_name": "pgrest",
+  "service_password": "<from k8s>",
+  "tenants": ["dev"],
+  "log_level": "DEBUG",
+  "show_traceback": false
+}

@@ -2,7 +2,7 @@
 from configparser import ConfigParser
 
 
-def config(filename='proto/db_transactions/database.ini', section='postgresql'):
+def config(filename='pgrest/db_transactions/database.ini', section='postgresql'):
     # create a parser
     parser = ConfigParser()
     # read config file

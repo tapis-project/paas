@@ -19,6 +19,6 @@ from django.urls import path
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    url(r'^', include('proto.urls'))
+    url(r'^', include('pgrest.urls'))
 
 ]

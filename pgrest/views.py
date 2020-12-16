@@ -11,9 +11,10 @@ from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseServer
 
 from rest_framework.views import APIView
 
-from proto.models import ManageTables, ManageTablesTransition
-from proto.db_transactions import manage_tables, table_data, bulk_data
-from proto.utils import create_validate_schema, is_admin, can_read, can_write
+from pgrest.models import ManageTables, ManageTablesTransition
+from pgrest.db_transactions import manage_tables, table_data, bulk_data
+from pgrest.pycommon.auth import t
+
 
 logger = logging.getLogger(__name__)
 
