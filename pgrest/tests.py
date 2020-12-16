@@ -15,11 +15,11 @@ class ResponseTestCase(TestCase):
     init_resp_2 = {}
 
     def createTable(self):
-        init_resp_1 = self.client.post('/paas/manage-tables', data=json.dumps(test_data.init_table_1),
+        init_resp_1 = self.client.post('/pgrest/manage', data=json.dumps(test_data.init_table_1),
                                      content_type='application/json')
         self.init_resp_1 = init_resp_1.json()
 
-        init_resp_2 = self.client.post('/paas/manage-tables', data=json.dumps(test_data.init_table_2),
+        init_resp_2 = self.client.post('/pgrest/manage', data=json.dumps(test_data.init_table_2),
                                        content_type='application/json')
         self.init_resp_2 = init_resp_2.json()
 
@@ -28,8 +28,8 @@ class ResponseTestCase(TestCase):
         self.createTable()
 
     def tearDown(self):
-        self.client.delete(f'/paas/manage-tables/{self.init_resp_1["table_id"]}')
-        self.client.delete(f'/paas/manage-tables/{self.init_resp_2["table_id"]}')
+        self.client.delete(f'/pgrest/manage/{self.init_resp_1["table_id"]}')
+        self.client.delete(f'/pgrest/manage/{self.init_resp_2["table_id"]}')
 
 
     #######################
@@ -38,12 +38,12 @@ class ResponseTestCase(TestCase):
 
     # ---- LIST ALL TABLES ---- #
     def test_list_tables(self):
-        response = self.client.get('/paas/manage-tables')
+        response = self.client.get('/pgrest/manage')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"].lower(), "application/json")
 
     def test_list_tables_details(self):
-        response = self.client.get('/paas/manage-tables?details=true')
+        response = self.client.get('/pgrest/manage?details=true')
         self.assertEqual(response["Content-Type"].lower(), "application/json")
         try:
             response.json()[0]["columns"]
@@ -52,73 +52,73 @@ class ResponseTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_list_tables_for_correct_tenant_only(self):
-        response = self.client.get('/paas/manage-tables')
+        response = self.client.get('/pgrest/manage')
         self.assertEqual(response["Content-Type"].lower(), "application/json")
         for resp in response.json():
             self.assertEqual(resp["tenant"], "public")
 
     # ---- CREATE TABLES ---- #
     def test_simple_create(self):
-        response = self.client.post('/paas/manage-tables', data=json.dumps(test_data.create_table_1),
+        response = self.client.post('/pgrest/manage', data=json.dumps(test_data.create_table_1),
                                     content_type='application/json')
         self.assertEqual(response.status_code, 200)
-        self.client.delete(f'/paas/manage-tables/{response.json()["table_id"]}')
+        self.client.delete(f'/pgrest/manage/{response.json()["table_id"]}')
 
     def test_existing_root_url(self):
-        response = self.client.post('/paas/manage-tables', data=json.dumps(test_data.create_table_2),
+        response = self.client.post('/pgrest/manage', data=json.dumps(test_data.create_table_2),
                                     content_type='application/json')
         self.assertEqual(response.status_code, 400)
 
     def test_existing_table(self):
-        response = self.client.post('/paas/manage-tables', data=json.dumps(test_data.create_table_3),
+        response = self.client.post('/pgrest/manage', data=json.dumps(test_data.create_table_3),
                                     content_type='application/json')
         self.assertEqual(response.status_code, 400)
 
     def test_no_columns(self):
-        response = self.client.post('/paas/manage-tables', data=json.dumps(test_data.create_table_4),
+        response = self.client.post('/pgrest/manage', data=json.dumps(test_data.create_table_4),
                                     content_type='application/json')
         self.assertEqual(response.status_code, 400)
 
     def test_char_len_required_on_varchar(self):
-        response = self.client.post('/paas/manage-tables', data=json.dumps(test_data.create_table_5),
+        response = self.client.post('/pgrest/manage', data=json.dumps(test_data.create_table_5),
                                     content_type='application/json')
         self.assertEqual(response.status_code, 400)
 
     # ---- DELETE TABLES ---- #
     def test_delete_existing_table(self):
-        response = self.client.post('/paas/manage-tables', data=json.dumps(test_data.create_table_6),
+        response = self.client.post('/pgrest/manage', data=json.dumps(test_data.create_table_6),
                                     content_type='application/json')
-        self.client.delete(f'/paas/manage-tables/{response.json()["table_id"]}')
+        self.client.delete(f'/pgrest/manage/{response.json()["table_id"]}')
         self.assertEqual(response.status_code, 200)
 
     def test_delete_nonexistent_table(self):
-        response = self.client.delete('/paas/manage-tables/100000000000007473774')
+        response = self.client.delete('/pgrest/manage/100000000000007473774')
         self.assertEqual(response.status_code, 404)
 
     # ---- LIST SINGLE TABLE ---- #
     def test_list_single_tables(self):
-        response = self.client.post('/paas/manage-tables', data=json.dumps(test_data.create_table_6),
+        response = self.client.post('/pgrest/manage', data=json.dumps(test_data.create_table_6),
                                     content_type='application/json')
-        self.client.get(f'/paas/manage-tables/{response.json()["table_id"]}')
+        self.client.get(f'/pgrest/manage/{response.json()["table_id"]}')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"].lower(), "application/json")
-        self.client.delete(f'/paas/manage-tables/{response.json()["table_id"]}')
+        self.client.delete(f'/pgrest/manage/{response.json()["table_id"]}')
 
     def test_list_single_tables_detail(self):
-        response = self.client.post('/paas/manage-tables', data=json.dumps(test_data.create_table_6),
+        response = self.client.post('/pgrest/manage', data=json.dumps(test_data.create_table_6),
                                     content_type='application/json')
         table_id = response.json()["table_id"]
-        get_response = self.client.get(f'/paas/manage-tables/{table_id}?details=true')
+        get_response = self.client.get(f'/pgrest/manage/{table_id}?details=true')
         self.assertEqual(response["Content-Type"].lower(), "application/json")
         try:
             get_response.json()["columns"]
         except KeyError:
             self.fail("Details did not return columns")
         self.assertEqual(response.status_code, 200)
-        self.client.delete(f'/paas/manage-tables/{response.json()["table_id"]}')
+        self.client.delete(f'/pgrest/manage/{response.json()["table_id"]}')
 
     def test_list_nonexistent_table(self):
-        response = self.client.get('/paas/manage-tables/5999999993999999')
+        response = self.client.get('/pgrest/manage/5999999993999999')
         self.assertEqual(response.status_code, 404)
 
     # ---- UPDATE TABLE ---- #
@@ -130,45 +130,45 @@ class ResponseTestCase(TestCase):
     # ---- LIST ALL ROWS ---- #
     def test_list_table_contents(self):
         root_url = self.init_resp_1["root_url"]
-        response = self.client.get(f'/paas/{root_url}')
+        response = self.client.get(f'/pgrest/data/{root_url}')
         self.assertEqual(response.status_code, 200)
 
     def test_list_nonexistent_table_contents(self):
-        response = self.client.get(f'/paas/nope')
+        response = self.client.get(f'/pgrest/data/nope')
         self.assertEqual(response.status_code, 404)
 
     # ---- CREATE ROW ---- #
     def test_create_object_in_table(self):
         root_url = self.init_resp_1["root_url"]
         data = {"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}
-        response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": data}), content_type='application/json')
+        response = self.client.post(f'/pgrest/data/{root_url}', data=json.dumps({"data": data}), content_type='application/json')
         self.assertEqual(response.status_code, 200)
-        response = self.client.get(f'/paas/{root_url}')
+        response = self.client.get(f'/pgrest/data/{root_url}')
         self.assertEqual(len(response.json()), 1)
 
     def test_create_object_in_table_nulls_no_needed(self):
         root_url = self.init_resp_1["root_url"]
         data = {"col_four": False, "col_five": "hehe"}
-        response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": data}), content_type='application/json')
+        response = self.client.post(f'/pgrest/data/{root_url}', data=json.dumps({"data": data}), content_type='application/json')
         self.assertEqual(response.status_code, 200)
-        response = self.client.get(f'/paas/{root_url}')
+        response = self.client.get(f'/pgrest/data/{root_url}')
         self.assertEqual(len(response.json()), 1)
 
     def test_create_object_in_table_without_required_field_400(self):
         root_url = self.init_resp_1["root_url"]
         data = {"col_five": "hehe"}
-        response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": data}), content_type='application/json')
+        response = self.client.post(f'/pgrest/data/{root_url}', data=json.dumps({"data": data}), content_type='application/json')
         self.assertEqual(response.status_code, 400)
 
     def test_create_object_in_table_wrong_data_type_400(self):
         root_url = self.init_resp_1["root_url"]
         data = {"col_one": 50, "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}
-        response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": data}), content_type='application/json')
+        response = self.client.post(f'/pgrest/data/{root_url}', data=json.dumps({"data": data}), content_type='application/json')
         self.assertEqual(response.status_code, 400)
 
     def test_create_object_in_nonexistent_table_400(self):
         data = {"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}
-        response = self.client.post(f'/paas/nah', data=json.dumps({"data": data}), content_type='application/json')
+        response = self.client.post(f'/pgrest/data/nah', data=json.dumps({"data": data}), content_type='application/json')
         self.assertEqual(response.status_code, 400)
 
     # ---- UPDATE ROW ---- #
@@ -177,16 +177,16 @@ class ResponseTestCase(TestCase):
         root_url = self.init_resp_1["root_url"]
         table_name = self.init_resp_1["table_name"]
         data = {"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}
-        response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": data}), content_type='application/json')
+        response = self.client.post(f'/pgrest/data/{root_url}', data=json.dumps({"data": data}), content_type='application/json')
         self.assertEqual(response.status_code, 200)
-        response = self.client.get(f'/paas/{root_url}')
+        response = self.client.get(f'/pgrest/data/{root_url}')
         self.assertEqual(len(response.json()), 1)
         self.assertEqual(response.status_code, 200)
         # now, update
         data = {"col_two": 30}
         row_id_int = table_name + "_id"
         row_id = response.json()[0][row_id_int]
-        response = self.client.put(f'/paas/{root_url}/{row_id}', data=json.dumps({"data": data}), content_type='application/json')
+        response = self.client.put(f'/pgrest/data/{root_url}/{row_id}', data=json.dumps({"data": data}), content_type='application/json')
         self.assertEqual(response.status_code, 200)
 
     def test_update_row_wrong_data_type_400(self):
@@ -194,22 +194,22 @@ class ResponseTestCase(TestCase):
         root_url = self.init_resp_1["root_url"]
         table_name = self.init_resp_1["table_name"]
         data = {"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}
-        response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": data}), content_type='application/json')
+        response = self.client.post(f'/pgrest/data/{root_url}', data=json.dumps({"data": data}), content_type='application/json')
         self.assertEqual(response.status_code, 200)
-        response = self.client.get(f'/paas/{root_url}')
+        response = self.client.get(f'/pgrest/data/{root_url}')
         self.assertEqual(len(response.json()), 1)
         self.assertEqual(response.status_code, 200)
         # now, update
         data = {"col_two": "haha"}
         row_id_int = table_name + "_id"
         row_id = response.json()[0][row_id_int]
-        response = self.client.put(f'/paas/{root_url}/{row_id}', data=json.dumps({"data": data}), content_type='application/json')
+        response = self.client.put(f'/pgrest/data/{root_url}/{row_id}', data=json.dumps({"data": data}), content_type='application/json')
         self.assertEqual(response.status_code, 400)
 
     def test_update_row_nonexistent_row_400(self):
         root_url = self.init_resp_1["root_url"]
         data = {"col_two": 100}
-        response = self.client.put(f'/paas/{root_url}/898989', data=json.dumps({"data": data}), content_type='application/json')
+        response = self.client.put(f'/pgrest/data/{root_url}/898989', data=json.dumps({"data": data}), content_type='application/json')
         self.assertEqual(response.status_code, 400)
 
     def test_update_row_nonexistent_column_400(self):
@@ -218,16 +218,16 @@ class ResponseTestCase(TestCase):
         table_name = self.init_resp_1["table_name"]
 
         data = {"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}
-        response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": data}), content_type='application/json')
+        response = self.client.post(f'/pgrest/data/{root_url}', data=json.dumps({"data": data}), content_type='application/json')
         self.assertEqual(response.status_code, 200)
-        response = self.client.get(f'/paas/{root_url}')
+        response = self.client.get(f'/pgrest/data/{root_url}')
         self.assertEqual(len(response.json()), 1)
         self.assertEqual(response.status_code, 200)
         # now, update
         data = {"col_where": 30}
         row_id_int = table_name + "_id"
         row_id = response.json()[0][row_id_int]
-        response = self.client.put(f'/paas/{root_url}/{row_id}', data=json.dumps({"data": data}), content_type='application/json')
+        response = self.client.put(f'/pgrest/data/{root_url}/{row_id}', data=json.dumps({"data": data}), content_type='application/json')
         self.assertEqual(response.status_code, 400)
 
     # ---- DELETE ROW ---- #
@@ -237,24 +237,24 @@ class ResponseTestCase(TestCase):
         table_name = self.init_resp_1["table_name"]
 
         data = {"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}
-        response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": data}), content_type='application/json')
+        response = self.client.post(f'/pgrest/data/{root_url}', data=json.dumps({"data": data}), content_type='application/json')
         self.assertEqual(response.status_code, 200)
-        response = self.client.get(f'/paas/{root_url}')
+        response = self.client.get(f'/pgrest/data/{root_url}')
         self.assertEqual(len(response.json()), 1)
         self.assertEqual(response.status_code, 200)
         # now, delete
         row_id_int = table_name + "_id"
         row_id = response.json()[0][row_id_int]
-        response = self.client.delete(f'/paas/{root_url}/{row_id}')
+        response = self.client.delete(f'/pgrest/data/{root_url}/{row_id}')
         self.assertEqual(response.status_code, 200)
-        response = self.client.delete(f'/paas/{root_url}/{row_id}')
+        response = self.client.delete(f'/pgrest/data/{root_url}/{row_id}')
         self.assertEqual(response.status_code, 400)
-        response = self.client.get(f'/paas/{root_url}')
+        response = self.client.get(f'/pgrest/data/{root_url}')
         self.assertEqual(len(response.json()), 0)
 
     def test_delete_nonexistent_row_400(self):
         root_url = self.init_resp_1["root_url"]
-        response = self.client.delete(f'/paas/{root_url}/89898989')
+        response = self.client.delete(f'/pgrest/data/{root_url}/89898989')
         self.assertEqual(response.status_code, 400)
 
     # ---- LIST SINGLE ROW ---- #
@@ -263,21 +263,21 @@ class ResponseTestCase(TestCase):
         root_url = self.init_resp_1["root_url"]
         table_name = self.init_resp_1["table_name"]
         data = {"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}
-        response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": data}),
+        response = self.client.post(f'/pgrest/data/{root_url}', data=json.dumps({"data": data}),
                                     content_type='application/json')
         self.assertEqual(response.status_code, 200)
-        response = self.client.get(f'/paas/{root_url}')
+        response = self.client.get(f'/pgrest/data/{root_url}')
         self.assertEqual(len(response.json()), 1)
         self.assertEqual(response.status_code, 200)
         # now, list the row
         row_id_int = table_name + "_id"
         row_id = response.json()[0][row_id_int]
-        response = self.client.get(f'/paas/{root_url}/{row_id}')
+        response = self.client.get(f'/pgrest/data/{root_url}/{row_id}')
         self.assertEqual(response.status_code, 200)
 
     def test_list_nonexistent_row_400(self):
         root_url = self.init_resp_1["root_url"]
-        response = self.client.get(f'/paas/{root_url}/9090290392032')
+        response = self.client.get(f'/pgrest/data/{root_url}/9090290392032')
         self.assertEqual(response.status_code, 400)
 
 
@@ -293,11 +293,11 @@ class ResponseTestCase(TestCase):
                 {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": True, "col_five": "hehe"},
                 {"col_one": "bye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}]
         for dt in data:
-            response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": dt}),
+            response = self.client.post(f'/pgrest/data/{root_url}', data=json.dumps({"data": dt}),
                                         content_type='application/json')
             self.assertEqual(response.status_code, 200)
 
-        response = self.client.get(f'/paas/{root_url}?where_col_one=hi')
+        response = self.client.get(f'/pgrest/data/{root_url}?where_col_one=hi')
         self.assertEqual(len(response.json()), 1)
         self.assertEqual(response.status_code, 200)
 
@@ -310,11 +310,11 @@ class ResponseTestCase(TestCase):
                 {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": True, "col_five": "hehe"},
                 {"col_one": "bye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}]
         for dt in data:
-            response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": dt}),
+            response = self.client.post(f'/pgrest/data/{root_url}', data=json.dumps({"data": dt}),
                                         content_type='application/json')
             self.assertEqual(response.status_code, 200)
 
-        response = self.client.get(f'/paas/{root_url}?where_col_one=goodbye&where_col_three=95')
+        response = self.client.get(f'/pgrest/data/{root_url}?where_col_one=goodbye&where_col_three=95')
         self.assertEqual(len(response.json()), 1)
         self.assertEqual(response.status_code, 200)
 
@@ -327,13 +327,13 @@ class ResponseTestCase(TestCase):
                 {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": True, "col_five": "hehe"},
                 {"col_one": "bye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}]
         for dt in data:
-            response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": dt}),
+            response = self.client.post(f'/pgrest/data/{root_url}', data=json.dumps({"data": dt}),
                                         content_type='application/json')
             self.assertEqual(response.status_code, 200)
 
-        response = self.client.get(f'/paas/{root_url}')
+        response = self.client.get(f'/pgrest/data/{root_url}')
         self.assertEqual(len(response.json()), 5)
-        response = self.client.get(f'/paas/{root_url}?where_col_one=goodbye&where_col_four=True')
+        response = self.client.get(f'/pgrest/data/{root_url}?where_col_one=goodbye&where_col_four=True')
         self.assertEqual(len(response.json()), 1)
         self.assertEqual(response.status_code, 200)
 
@@ -346,23 +346,23 @@ class ResponseTestCase(TestCase):
                 {"col_one": "goodbye", "col_two": 100, "col_three": 94, "col_four": True, "col_five": "hehe"},
                 {"col_one": "bye", "col_two": 100, "col_three": 60, "col_four": False, "col_five": "hehe"}]
         for dt in data:
-            response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": dt}),
+            response = self.client.post(f'/pgrest/data/{root_url}', data=json.dumps({"data": dt}),
                                         content_type='application/json')
             self.assertEqual(response.status_code, 200)
 
-        response = self.client.get(f'/paas/{root_url}')
+        response = self.client.get(f'/pgrest/data/{root_url}')
         self.assertEqual(response.json()[0]["col_three"], 80)
         self.assertEqual(response.json()[4]["col_three"], 60)
 
-        response = self.client.get(f'/paas/{root_url}?order=col_three')
+        response = self.client.get(f'/pgrest/data/{root_url}?order=col_three')
         self.assertEqual(response.json()[0]["col_three"], 60)
         self.assertEqual(response.json()[4]["col_three"], 95)
 
-        response = self.client.get(f'/paas/{root_url}?order=col_three,DESC')
+        response = self.client.get(f'/pgrest/data/{root_url}?order=col_three,DESC')
         self.assertEqual(response.json()[0]["col_three"], 95)
         self.assertEqual(response.json()[4]["col_three"], 60)
 
-        response = self.client.get(f'/paas/{root_url}?order=col_three,ASC')
+        response = self.client.get(f'/pgrest/data/{root_url}?order=col_three,ASC')
         self.assertEqual(response.json()[0]["col_three"], 60)
         self.assertEqual(response.json()[4]["col_three"], 95)
 
@@ -375,16 +375,16 @@ class ResponseTestCase(TestCase):
                 {"col_one": "goodbye", "col_two": 100, "col_three": 94, "col_four": True, "col_five": "hehe"},
                 {"col_one": "bye", "col_two": 100, "col_three": 60, "col_four": False, "col_five": "hehe"}]
         for dt in data:
-            response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": dt}),
+            response = self.client.post(f'/pgrest/data/{root_url}', data=json.dumps({"data": dt}),
                                         content_type='application/json')
             self.assertEqual(response.status_code, 200)
 
-        response = self.client.get(f'/paas/{root_url}?where_col_one=goodbye')
+        response = self.client.get(f'/pgrest/data/{root_url}?where_col_one=goodbye')
         print(response.json())
         self.assertEqual(response.json()[0]["col_three"], 95)
         self.assertEqual(response.json()[1]["col_three"], 94)
 
-        response = self.client.get(f'/paas/{root_url}?where_col_one=goodbye&order=col_three,ASC')
+        response = self.client.get(f'/pgrest/data/{root_url}?where_col_one=goodbye&order=col_three,ASC')
         self.assertEqual(response.json()[0]["col_three"], 94)
         self.assertEqual(response.json()[1]["col_three"], 95)
 
@@ -398,15 +398,15 @@ class ResponseTestCase(TestCase):
                 {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": True, "col_five": "hehe"},
                 {"col_one": "bye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}]
         for dt in data:
-            response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": dt}),
+            response = self.client.post(f'/pgrest/data/{root_url}', data=json.dumps({"data": dt}),
                                         content_type='application/json')
             self.assertEqual(response.status_code, 200)
 
         # now, update
         data = {"col_five": "omg"}
-        response = self.client.put(f'/paas/{root_url}', data=json.dumps({"data": data}), content_type='application/json')
+        response = self.client.put(f'/pgrest/data/{root_url}', data=json.dumps({"data": data}), content_type='application/json')
         self.assertEqual(response.status_code, 200)
-        response = self.client.get(f'/paas/{root_url}')
+        response = self.client.get(f'/pgrest/data/{root_url}')
         for resp in response.json():
             self.assertEqual(resp["col_five"], "omg")
 
@@ -419,13 +419,13 @@ class ResponseTestCase(TestCase):
                 {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": True, "col_five": "hehe"},
                 {"col_one": "bye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}]
         for dt in data:
-            response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": dt}),
+            response = self.client.post(f'/pgrest/data/{root_url}', data=json.dumps({"data": dt}),
                                         content_type='application/json')
             self.assertEqual(response.status_code, 200)
 
         # now, update
         data = {"col_where": "omg"}
-        response = self.client.put(f'/paas/{root_url}', data=json.dumps({"data": data}),
+        response = self.client.put(f'/pgrest/data/{root_url}', data=json.dumps({"data": data}),
                                    content_type='application/json')
         self.assertEqual(response.status_code, 400)
 
@@ -438,15 +438,15 @@ class ResponseTestCase(TestCase):
                 {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": True, "col_five": "hehe"},
                 {"col_one": "bye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}]
         for dt in data:
-            response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": dt}),
+            response = self.client.post(f'/pgrest/data/{root_url}', data=json.dumps({"data": dt}),
                                         content_type='application/json')
             self.assertEqual(response.status_code, 200)
 
         # now, update
         data = {"col_five": 40}
-        response = self.client.put(f'/paas/{root_url}', data=json.dumps({"data": data}), content_type='application/json')
+        response = self.client.put(f'/pgrest/data/{root_url}', data=json.dumps({"data": data}), content_type='application/json')
         self.assertEqual(response.status_code, 400)
-        response = self.client.get(f'/paas/{root_url}')
+        response = self.client.get(f'/pgrest/data/{root_url}')
         for resp in response.json():
             self.assertEqual(resp["col_five"], "hehe")
 
@@ -459,7 +459,7 @@ class ResponseTestCase(TestCase):
                 {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": True, "col_five": "hehe"},
                 {"col_one": "bye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "haha"}]
         for dt in data:
-            response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": dt}),
+            response = self.client.post(f'/pgrest/data/{root_url}', data=json.dumps({"data": dt}),
                                         content_type='application/json')
             self.assertEqual(response.status_code, 200)
 
@@ -469,9 +469,9 @@ class ResponseTestCase(TestCase):
             "value": "haha"
         }}
         data = {"col_one": "lata"}
-        response = self.client.put(f'/paas/{root_url}', data=json.dumps({"data": data, "where": where_clause}), content_type='application/json')
+        response = self.client.put(f'/pgrest/data/{root_url}', data=json.dumps({"data": data, "where": where_clause}), content_type='application/json')
         self.assertEqual(response.status_code, 200)
-        response = self.client.get(f'/paas/{root_url}')
+        response = self.client.get(f'/pgrest/data/{root_url}')
         for resp in response.json():
             if resp["col_five"] == 'hehe':
                 self.assertNotEqual(resp["col_one"], "lata")
@@ -487,7 +487,7 @@ class ResponseTestCase(TestCase):
                 {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": True, "col_five": "hehe"},
                 {"col_one": "bye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "haha"}]
         for dt in data:
-            response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": dt}),
+            response = self.client.post(f'/pgrest/data/{root_url}', data=json.dumps({"data": dt}),
                                         content_type='application/json')
             self.assertEqual(response.status_code, 200)
 
@@ -496,9 +496,9 @@ class ResponseTestCase(TestCase):
             "value": 95
         }}
         data = {"col_one": "lata"}
-        response = self.client.put(f'/paas/{root_url}', data=json.dumps({"data": data, "where": where_clause}), content_type='application/json')
+        response = self.client.put(f'/pgrest/data/{root_url}', data=json.dumps({"data": data, "where": where_clause}), content_type='application/json')
         self.assertEqual(response.status_code, 200)
-        response = self.client.get(f'/paas/{root_url}')
+        response = self.client.get(f'/pgrest/data/{root_url}')
         for resp in response.json():
             if resp["col_three"] < 95:
                 self.assertNotEqual(resp["col_one"], "lata")
@@ -514,7 +514,7 @@ class ResponseTestCase(TestCase):
                 {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": True, "col_five": "hehe"},
                 {"col_one": "bye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "haha"}]
         for dt in data:
-            response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": dt}),
+            response = self.client.post(f'/pgrest/data/{root_url}', data=json.dumps({"data": dt}),
                                         content_type='application/json')
             self.assertEqual(response.status_code, 200)
 
@@ -524,9 +524,9 @@ class ResponseTestCase(TestCase):
         }}
 
         data = {"col_one": 90}
-        response = self.client.put(f'/paas/{root_url}', data=json.dumps({"data": data, "where": where_clause}), content_type='application/json')
+        response = self.client.put(f'/pgrest/data/{root_url}', data=json.dumps({"data": data, "where": where_clause}), content_type='application/json')
         self.assertEqual(response.status_code, 400)
-        response = self.client.get(f'/paas/{root_url}')
+        response = self.client.get(f'/pgrest/data/{root_url}')
         for resp in response.json():
             self.assertNotEqual(resp["col_one"], 90)
 

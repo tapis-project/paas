@@ -70,48 +70,51 @@ class Tenants(object):
         This method computes the tenants and sites for the tenants service only. Note that the tenants service is a
         special case because it must retrieve the sites and tenants from its own DB, not from
         """
-        logger.debug("this is the tenants service, pulling sites and tenants from db...")
-        # NOTE: only in the case of the tenants service will we be able to import this function; so this import needs to
-        # stay guarded in this method.
-        if not conf.service_name == 'tenants':
-            raise errors.BaseTapisError("get_tenants_for_tenants_api called by a service other than tenants.")
-        from service.models import get_tenants as tenants_api_get_tenants
-        from service.models import get_sites as tenants_api_get_sites
-        # in the case where the tenants api migrations are running, this call will fail with a sqlalchemy.exc.ProgrammingError
-        # because the tenants table will not exist yet.
-        tenants = []
-        result = []
-        logger.info("calling the tenants api's get_sites() function...")
-        try:
-            sites = tenants_api_get_sites()
-        except Exception as e:
-            logger.info(
-                "WARNING - got an exception trying to compute the sites.. "
-                "this better be the tenants migration container.")
-            return tenants
-        logger.info("calling the tenants api's get_tenants() function...")
-        try:
-            tenants = tenants_api_get_tenants()
-        except Exception as e:
-            logger.info(
-                "WARNING - got an exception trying to compute the tenants.. "
-                "this better be the tenants migration container.")
-            return tenants
-        # for each tenant, look up its corresponding site record and save it on the tenant record--
-        for t in tenants:
-            # Remove datetime objects --
-            t.pop('create_time')
-            t.pop('last_update_time')
-            # convert the tenants to TapisResult objects, and then append the sites object.
-            tn = TapisResult(**t)
-            for s in sites:
-                if 'primary' in s.keys() and s['primary']:
-                    self.primary_site = TapisResult(**s)
-                if s['site_id'] == tn.site_id:
-                    tn.site = TapisResult(**s)
-                    result.append(tn)
-                    break
-        return result
+        # TODO - finish this
+        pass
+
+    #     logger.debug("this is the tenants service, pulling sites and tenants from db...")
+    #     # NOTE: only in the case of the tenants service will we be able to import this function; so this import needs to
+    #     # stay guarded in this method.
+    #     if not conf.service_name == 'tenants':
+    #         raise errors.BaseTapisError("get_tenants_for_tenants_api called by a service other than tenants.")
+    #     from service.models import get_tenants as tenants_api_get_tenants
+    #     from service.models import get_sites as tenants_api_get_sites
+    #     # in the case where the tenants api migrations are running, this call will fail with a sqlalchemy.exc.ProgrammingError
+    #     # because the tenants table will not exist yet.
+    #     tenants = []
+    #     result = []
+    #     logger.info("calling the tenants api's get_sites() function...")
+    #     try:
+    #         sites = tenants_api_get_sites()
+    #     except Exception as e:
+    #         logger.info(
+    #             "WARNING - got an exception trying to compute the sites.. "
+    #             "this better be the tenants migration container.")
+    #         return tenants
+    #     logger.info("calling the tenants api's get_tenants() function...")
+    #     try:
+    #         tenants = tenants_api_get_tenants()
+    #     except Exception as e:
+    #         logger.info(
+    #             "WARNING - got an exception trying to compute the tenants.. "
+    #             "this better be the tenants migration container.")
+    #         return tenants
+    #     # for each tenant, look up its corresponding site record and save it on the tenant record--
+    #     for t in tenants:
+    #         # Remove datetime objects --
+    #         t.pop('create_time')
+    #         t.pop('last_update_time')
+    #         # convert the tenants to TapisResult objects, and then append the sites object.
+    #         tn = TapisResult(**t)
+    #         for s in sites:
+    #             if 'primary' in s.keys() and s['primary']:
+    #                 self.primary_site = TapisResult(**s)
+    #             if s['site_id'] == tn.site_id:
+    #                 tn.site = TapisResult(**s)
+    #                 result.append(tn)
+    #                 break
+    #     return result
 
     def reload_tenants(self):
         self.tenants = self.get_tenants()

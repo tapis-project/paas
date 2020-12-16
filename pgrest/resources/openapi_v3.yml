@@ -1,0 +1,106 @@
+openapi: 3.0.1
+info:
+  title: Tapis Pgrest API
+  description: The Tapis Pgrest API provides a RESTful interface to a manged SQL-db-as-a-service.
+  contact:
+    name: CICSupport
+    email: cicsupport@tacc.utexas.edu
+  license:
+    name: 3-Clause BSD License
+    url: 'https://opensource.org/licenses/BSD-3-Clause'
+  version: '0.1'
+externalDocs:
+  description: Tapis on readthedocs.io
+  url: 'https://tapis.readthedocs.io/en/latest/technical/pgrest.html'
+servers:
+- url: http://localhost:5000
+  description: Local Development
+- url: https://dev.develop.tapis.io
+  description: Develop Instance
+#security:
+#  - TapisJWT: []
+paths:
+  /v3/pgrest/manage/tables:
+    get:
+      tags:
+        - Manage
+      summary: List tables.
+      description: List tables in the tenant's schema.
+      operationId: list_tables
+      x-swagger-router-controller: connexContr
+      parameters:
+        - name: limit
+          in: query
+          description: limit the number of records returned.
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          description: index (offset) to start list.
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BasicResponse'
+                properties:
+                  result:
+                    $ref: '#/components/schemas/arrayOfTables'
+    post:
+      tags:
+        - Manage
+      summary: Create a tale.
+      description: Create a table.
+      operationId: create_table
+      x-swagger-router-controller: connexContr
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewTable'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BasicResponse'
+                properties:
+                  result:
+                    $ref: '#/components/schemas/Table'
+components:
+  schemas:
+    BasicResponse:
+      type: object
+      properties:
+        version:
+          type: string
+          description: Version of the API
+        message:
+          type: string
+          description: Brief description of the response
+        status:
+          type: string
+          description: Whether the request was a success or failure.
+          enum: [success, error]
+    NewTable:
+      type: object
+      properties:
+        table_name:
+          type: string
+          description: The name to be used for the table.
+        root_url:
+          type: string
+          description: The url path to use for the root collection associated with the records in the table.
+        columns:
+          $ref: '#/components/schames/Columns'
+      required: [table_name, root_url, columns]
+    Columns:
+      type: object
+      properties:
