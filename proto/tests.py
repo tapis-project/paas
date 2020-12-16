@@ -127,6 +127,413 @@ class ResponseTestCase(TestCase):
     # DYNAMIC VIEWS TESTS #
     #######################
 
+    # ---- LIST ALL ROWS ---- #
+    def test_list_table_contents(self):
+        root_url = self.init_resp_1["root_url"]
+        response = self.client.get(f'/paas/{root_url}')
+        self.assertEqual(response.status_code, 200)
+
+    def test_list_nonexistent_table_contents(self):
+        response = self.client.get(f'/paas/nope')
+        self.assertEqual(response.status_code, 404)
+
+    # ---- CREATE ROW ---- #
+    def test_create_object_in_table(self):
+        root_url = self.init_resp_1["root_url"]
+        data = {"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}
+        response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": data}), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        response = self.client.get(f'/paas/{root_url}')
+        self.assertEqual(len(response.json()), 1)
+
+    def test_create_object_in_table_nulls_no_needed(self):
+        root_url = self.init_resp_1["root_url"]
+        data = {"col_four": False, "col_five": "hehe"}
+        response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": data}), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        response = self.client.get(f'/paas/{root_url}')
+        self.assertEqual(len(response.json()), 1)
+
+    def test_create_object_in_table_without_required_field_400(self):
+        root_url = self.init_resp_1["root_url"]
+        data = {"col_five": "hehe"}
+        response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": data}), content_type='application/json')
+        self.assertEqual(response.status_code, 400)
+
+    def test_create_object_in_table_wrong_data_type_400(self):
+        root_url = self.init_resp_1["root_url"]
+        data = {"col_one": 50, "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}
+        response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": data}), content_type='application/json')
+        self.assertEqual(response.status_code, 400)
+
+    def test_create_object_in_nonexistent_table_400(self):
+        data = {"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}
+        response = self.client.post(f'/paas/nah', data=json.dumps({"data": data}), content_type='application/json')
+        self.assertEqual(response.status_code, 400)
+
+    # ---- UPDATE ROW ---- #
+    def test_update_row(self):
+        # first, we need to create row
+        root_url = self.init_resp_1["root_url"]
+        table_name = self.init_resp_1["table_name"]
+        data = {"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}
+        response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": data}), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        response = self.client.get(f'/paas/{root_url}')
+        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(response.status_code, 200)
+        # now, update
+        data = {"col_two": 30}
+        row_id_int = table_name + "_id"
+        row_id = response.json()[0][row_id_int]
+        response = self.client.put(f'/paas/{root_url}/{row_id}', data=json.dumps({"data": data}), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+
+    def test_update_row_wrong_data_type_400(self):
+        # first, we need to create row
+        root_url = self.init_resp_1["root_url"]
+        table_name = self.init_resp_1["table_name"]
+        data = {"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}
+        response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": data}), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        response = self.client.get(f'/paas/{root_url}')
+        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(response.status_code, 200)
+        # now, update
+        data = {"col_two": "haha"}
+        row_id_int = table_name + "_id"
+        row_id = response.json()[0][row_id_int]
+        response = self.client.put(f'/paas/{root_url}/{row_id}', data=json.dumps({"data": data}), content_type='application/json')
+        self.assertEqual(response.status_code, 400)
+
+    def test_update_row_nonexistent_row_400(self):
+        root_url = self.init_resp_1["root_url"]
+        data = {"col_two": 100}
+        response = self.client.put(f'/paas/{root_url}/898989', data=json.dumps({"data": data}), content_type='application/json')
+        self.assertEqual(response.status_code, 400)
+
+    def test_update_row_nonexistent_column_400(self):
+        # first, we need to create row
+        root_url = self.init_resp_1["root_url"]
+        table_name = self.init_resp_1["table_name"]
+
+        data = {"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}
+        response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": data}), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        response = self.client.get(f'/paas/{root_url}')
+        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(response.status_code, 200)
+        # now, update
+        data = {"col_where": 30}
+        row_id_int = table_name + "_id"
+        row_id = response.json()[0][row_id_int]
+        response = self.client.put(f'/paas/{root_url}/{row_id}', data=json.dumps({"data": data}), content_type='application/json')
+        self.assertEqual(response.status_code, 400)
+
+    # ---- DELETE ROW ---- #
+    def test_delete_row(self):
+        # first, we need to create row
+        root_url = self.init_resp_1["root_url"]
+        table_name = self.init_resp_1["table_name"]
+
+        data = {"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}
+        response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": data}), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        response = self.client.get(f'/paas/{root_url}')
+        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(response.status_code, 200)
+        # now, delete
+        row_id_int = table_name + "_id"
+        row_id = response.json()[0][row_id_int]
+        response = self.client.delete(f'/paas/{root_url}/{row_id}')
+        self.assertEqual(response.status_code, 200)
+        response = self.client.delete(f'/paas/{root_url}/{row_id}')
+        self.assertEqual(response.status_code, 400)
+        response = self.client.get(f'/paas/{root_url}')
+        self.assertEqual(len(response.json()), 0)
+
+    def test_delete_nonexistent_row_400(self):
+        root_url = self.init_resp_1["root_url"]
+        response = self.client.delete(f'/paas/{root_url}/89898989')
+        self.assertEqual(response.status_code, 400)
+
+    # ---- LIST SINGLE ROW ---- #
+        # first, we need to create row
+    def test_list_single_row(self):
+        root_url = self.init_resp_1["root_url"]
+        table_name = self.init_resp_1["table_name"]
+        data = {"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}
+        response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": data}),
+                                    content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        response = self.client.get(f'/paas/{root_url}')
+        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(response.status_code, 200)
+        # now, list the row
+        row_id_int = table_name + "_id"
+        row_id = response.json()[0][row_id_int]
+        response = self.client.get(f'/paas/{root_url}/{row_id}')
+        self.assertEqual(response.status_code, 200)
+
+    def test_list_nonexistent_row_400(self):
+        root_url = self.init_resp_1["root_url"]
+        response = self.client.get(f'/paas/{root_url}/9090290392032')
+        self.assertEqual(response.status_code, 400)
+
+
+
+    # ---- FILTER ROWS ON LISTING ---- #
+        # first, we need to create rows
+    def test_filter_by_one_column(self):
+        root_url = self.init_resp_1["root_url"]
+
+        data = [{"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
+                {"col_one": "hi", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
+                {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
+                {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": True, "col_five": "hehe"},
+                {"col_one": "bye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}]
+        for dt in data:
+            response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": dt}),
+                                        content_type='application/json')
+            self.assertEqual(response.status_code, 200)
+
+        response = self.client.get(f'/paas/{root_url}?where_col_one=hi')
+        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(response.status_code, 200)
+
+    def test_filter_by_two_columns(self):
+        root_url = self.init_resp_1["root_url"]
+
+        data = [{"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
+                {"col_one": "hi", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
+                {"col_one": "goodbye", "col_two": 100, "col_three": 95, "col_four": False, "col_five": "hehe"},
+                {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": True, "col_five": "hehe"},
+                {"col_one": "bye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}]
+        for dt in data:
+            response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": dt}),
+                                        content_type='application/json')
+            self.assertEqual(response.status_code, 200)
+
+        response = self.client.get(f'/paas/{root_url}?where_col_one=goodbye&where_col_three=95')
+        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(response.status_code, 200)
+
+    def test_filter_by_two_columns_one_boolean(self):
+        root_url = self.init_resp_1["root_url"]
+
+        data = [{"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
+                {"col_one": "hi", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
+                {"col_one": "goodbye", "col_two": 100, "col_three": 95, "col_four": False, "col_five": "hehe"},
+                {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": True, "col_five": "hehe"},
+                {"col_one": "bye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}]
+        for dt in data:
+            response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": dt}),
+                                        content_type='application/json')
+            self.assertEqual(response.status_code, 200)
+
+        response = self.client.get(f'/paas/{root_url}')
+        self.assertEqual(len(response.json()), 5)
+        response = self.client.get(f'/paas/{root_url}?where_col_one=goodbye&where_col_four=True')
+        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(response.status_code, 200)
+
+    def test_order_by(self):
+        root_url = self.init_resp_1["root_url"]
+
+        data = [{"col_one": "hello", "col_two": 100, "col_three": 80, "col_four": False, "col_five": "hehe"},
+                {"col_one": "hi", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
+                {"col_one": "goodbye", "col_two": 100, "col_three": 95, "col_four": False, "col_five": "hehe"},
+                {"col_one": "goodbye", "col_two": 100, "col_three": 94, "col_four": True, "col_five": "hehe"},
+                {"col_one": "bye", "col_two": 100, "col_three": 60, "col_four": False, "col_five": "hehe"}]
+        for dt in data:
+            response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": dt}),
+                                        content_type='application/json')
+            self.assertEqual(response.status_code, 200)
+
+        response = self.client.get(f'/paas/{root_url}')
+        self.assertEqual(response.json()[0]["col_three"], 80)
+        self.assertEqual(response.json()[4]["col_three"], 60)
+
+        response = self.client.get(f'/paas/{root_url}?order=col_three')
+        self.assertEqual(response.json()[0]["col_three"], 60)
+        self.assertEqual(response.json()[4]["col_three"], 95)
+
+        response = self.client.get(f'/paas/{root_url}?order=col_three,DESC')
+        self.assertEqual(response.json()[0]["col_three"], 95)
+        self.assertEqual(response.json()[4]["col_three"], 60)
+
+        response = self.client.get(f'/paas/{root_url}?order=col_three,ASC')
+        self.assertEqual(response.json()[0]["col_three"], 60)
+        self.assertEqual(response.json()[4]["col_three"], 95)
+
+    def test_order_by_with_filters(self):
+        root_url = self.init_resp_1["root_url"]
+
+        data = [{"col_one": "hello", "col_two": 100, "col_three": 80, "col_four": False, "col_five": "hehe"},
+                {"col_one": "hi", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
+                {"col_one": "goodbye", "col_two": 100, "col_three": 95, "col_four": False, "col_five": "hehe"},
+                {"col_one": "goodbye", "col_two": 100, "col_three": 94, "col_four": True, "col_five": "hehe"},
+                {"col_one": "bye", "col_two": 100, "col_three": 60, "col_four": False, "col_five": "hehe"}]
+        for dt in data:
+            response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": dt}),
+                                        content_type='application/json')
+            self.assertEqual(response.status_code, 200)
+
+        response = self.client.get(f'/paas/{root_url}?where_col_one=goodbye')
+        print(response.json())
+        self.assertEqual(response.json()[0]["col_three"], 95)
+        self.assertEqual(response.json()[1]["col_three"], 94)
+
+        response = self.client.get(f'/paas/{root_url}?where_col_one=goodbye&order=col_three,ASC')
+        self.assertEqual(response.json()[0]["col_three"], 94)
+        self.assertEqual(response.json()[1]["col_three"], 95)
+
+    # ---- UPDATING MULTIPLE ROWS ---- #
+    def test_update_entire_table(self):
+        root_url = self.init_resp_1["root_url"]
+
+        data = [{"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
+                {"col_one": "hi", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
+                {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
+                {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": True, "col_five": "hehe"},
+                {"col_one": "bye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}]
+        for dt in data:
+            response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": dt}),
+                                        content_type='application/json')
+            self.assertEqual(response.status_code, 200)
+
+        # now, update
+        data = {"col_five": "omg"}
+        response = self.client.put(f'/paas/{root_url}', data=json.dumps({"data": data}), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        response = self.client.get(f'/paas/{root_url}')
+        for resp in response.json():
+            self.assertEqual(resp["col_five"], "omg")
+
+    def test_update_nonexistent_rows_in_table(self):
+        root_url = self.init_resp_1["root_url"]
+
+        data = [{"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
+                {"col_one": "hi", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
+                {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
+                {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": True, "col_five": "hehe"},
+                {"col_one": "bye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}]
+        for dt in data:
+            response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": dt}),
+                                        content_type='application/json')
+            self.assertEqual(response.status_code, 200)
+
+        # now, update
+        data = {"col_where": "omg"}
+        response = self.client.put(f'/paas/{root_url}', data=json.dumps({"data": data}),
+                                   content_type='application/json')
+        self.assertEqual(response.status_code, 400)
+
+    def test_update_rows_with_wrong_data_type_400(self):
+        root_url = self.init_resp_1["root_url"]
+
+        data = [{"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
+                {"col_one": "hi", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
+                {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
+                {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": True, "col_five": "hehe"},
+                {"col_one": "bye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}]
+        for dt in data:
+            response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": dt}),
+                                        content_type='application/json')
+            self.assertEqual(response.status_code, 200)
+
+        # now, update
+        data = {"col_five": 40}
+        response = self.client.put(f'/paas/{root_url}', data=json.dumps({"data": data}), content_type='application/json')
+        self.assertEqual(response.status_code, 400)
+        response = self.client.get(f'/paas/{root_url}')
+        for resp in response.json():
+            self.assertEqual(resp["col_five"], "hehe")
+
+    def test_update_rows_with_filter_string(self):
+        root_url = self.init_resp_1["root_url"]
+
+        data = [{"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
+                {"col_one": "hi", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "haha"},
+                {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
+                {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": True, "col_five": "hehe"},
+                {"col_one": "bye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "haha"}]
+        for dt in data:
+            response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": dt}),
+                                        content_type='application/json')
+            self.assertEqual(response.status_code, 200)
+
+        # now, update
+        where_clause = {"col_five": {
+            "operator": "=",
+            "value": "haha"
+        }}
+        data = {"col_one": "lata"}
+        response = self.client.put(f'/paas/{root_url}', data=json.dumps({"data": data, "where": where_clause}), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        response = self.client.get(f'/paas/{root_url}')
+        for resp in response.json():
+            if resp["col_five"] == 'hehe':
+                self.assertNotEqual(resp["col_one"], "lata")
+            else:
+                self.assertEqual(resp["col_one"], "lata")
+
+    def test_update_rows_with_filter_int(self):
+        root_url = self.init_resp_1["root_url"]
+
+        data = [{"col_one": "hello", "col_two": 100, "col_three": 95, "col_four": False, "col_five": "hehe"},
+                {"col_one": "hi", "col_two": 100, "col_three": 95, "col_four": False, "col_five": "haha"},
+                {"col_one": "goodbye", "col_two": 100, "col_three": 96, "col_four": False, "col_five": "hehe"},
+                {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": True, "col_five": "hehe"},
+                {"col_one": "bye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "haha"}]
+        for dt in data:
+            response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": dt}),
+                                        content_type='application/json')
+            self.assertEqual(response.status_code, 200)
+
+        where_clause = {"col_three": {
+            "operator": ">=",
+            "value": 95
+        }}
+        data = {"col_one": "lata"}
+        response = self.client.put(f'/paas/{root_url}', data=json.dumps({"data": data, "where": where_clause}), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        response = self.client.get(f'/paas/{root_url}')
+        for resp in response.json():
+            if resp["col_three"] < 95:
+                self.assertNotEqual(resp["col_one"], "lata")
+            else:
+                self.assertEqual(resp["col_one"], "lata")
+
+    def test_update_rows_with_filter_incorrect_data_type(self):
+        root_url = self.init_resp_1["root_url"]
+
+        data = [{"col_one": "hello", "col_two": 100, "col_three": 95, "col_four": False, "col_five": "hehe"},
+                {"col_one": "hi", "col_two": 100, "col_three": 95, "col_four": False, "col_five": "haha"},
+                {"col_one": "goodbye", "col_two": 100, "col_three": 96, "col_four": False, "col_five": "hehe"},
+                {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": True, "col_five": "hehe"},
+                {"col_one": "bye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "haha"}]
+        for dt in data:
+            response = self.client.post(f'/paas/{root_url}', data=json.dumps({"data": dt}),
+                                        content_type='application/json')
+            self.assertEqual(response.status_code, 200)
+
+        where_clause = {"col_three": {
+            "operator": ">=",
+            "value": 95
+        }}
+
+        data = {"col_one": 90}
+        response = self.client.put(f'/paas/{root_url}', data=json.dumps({"data": data, "where": where_clause}), content_type='application/json')
+        self.assertEqual(response.status_code, 400)
+        response = self.client.get(f'/paas/{root_url}')
+        for resp in response.json():
+            self.assertNotEqual(resp["col_one"], 90)
+
+
+
+
+
 
 
 
