@@ -32,6 +32,8 @@ def get_row_from_table(table_name, pk_id, tenant):
         cur = conn.cursor()
         cur.execute(command)
         result = dict_fetch_all(cur)
+        if len(result) == 0:
+            raise Exception
         cur.close()
         conn.commit()
         # Success.
@@ -59,6 +61,7 @@ def get_rows_from_table(table_name, query_dict, tenant, limit, **kwargs):
             first = True
             for key, value in query_dict.items():
                 if first:
+
                     if type(value) == 'int' or type(value) == 'float':
                         query = " WHERE \"%s\" = %d" % (key, value)
                     else:
@@ -150,6 +153,9 @@ def delete_row(table_name, pk_id, tenant):
         conn = psycopg2.connect(**params)
         cur = conn.cursor()
         cur.execute(command)
+        result_count = cur.rowcount
+        if result_count == 0:
+            raise Exception
         cur.close()
         conn.commit()
         # Success.
@@ -159,7 +165,7 @@ def delete_row(table_name, pk_id, tenant):
         logger.error(msg)
         raise Exception(msg)
     except Exception as e:
-        msg = f"Error creating row in table {tenant}.{table_name}: {e}"
+        msg = f"Error deleting row ID {pk_id} in table {tenant}.{table_name}: {e}"
         logger.error(msg)
         raise Exception(msg)
 
@@ -186,6 +192,8 @@ def update_row_with_pk(table_name, pk_id, data, tenant):
         cur.execute(command)
 
         result_count = cur.rowcount
+        if result_count == 0:
+            raise Exception
         cur.close()
         conn.commit()
         # Success.
@@ -196,7 +204,7 @@ def update_row_with_pk(table_name, pk_id, data, tenant):
         logger.error(msg)
         raise Exception(msg)
     except Exception as e:
-        msg = f"Error updating row in table {tenant}.{table_name}: {e}"
+        msg = f"Error updating row ID {pk_id} in table {tenant}.{table_name}: {e}"
         logger.error(msg)
         raise Exception(msg)
 

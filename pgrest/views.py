@@ -1,54 +1,29 @@
 import json
+import requests
 import logging
+
 
 from cerberus import Validator
 
 from django.db import transaction
-from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseServerError, HttpResponseNotFound
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseServerError, HttpResponseNotFound, \
+    HttpResponseForbidden
 
 from rest_framework.views import APIView
 
 from pgrest.models import ManageTables, ManageTablesTransition
 from pgrest.db_transactions import manage_tables, table_data, bulk_data
 from pgrest.pycommon.auth import t
-# do something with t, like
-# t.sk.getUserRoles(user='jstubbs', tenant='tacc')
+
 
 logger = logging.getLogger(__name__)
-
-
-def create_validate_schema(columns):
-    """
-    Takes the column definition of a table and generates two validation schemas, one to be used in row creation
-    and the other to be used in row update.
-    """
-    schema_update = dict()
-    schema_create = dict()
-
-    for key in columns.keys():
-        key_info = columns[key]
-        key_type = key_info["data_type"]
-        info_dict = dict()
-        if key_type.lower() in {"varchar", "char", "text"}:
-            val_length = int(key_info["char_len"])
-            info_dict.update({"type": "string", "maxlength": val_length})
-        else:
-            info_dict.update({"type": key_type.lower()})
-        schema_update.update({key: info_dict})
-
-        if "null" in key_info.keys():
-            if not key_info["null"]:
-                info_dict.update({"required": True})
-            else:
-                info_dict.update({"required": False})
-        schema_create.update({key: info_dict})
-    return schema_create, schema_update
 
 
 class TableManagement(APIView):
     """
     GET: Returns information about all of the tables.
     POST: Creates a new table in ManageTables, and then a new table from the json provided by the user.
+    All of these endpoints are restricted to ADMIN role only.
     """
 
     def get(self, request, *args, **kwargs):
@@ -67,9 +42,9 @@ class TableManagement(APIView):
         # TODO Fix up this format.
         if details:
             for table in tables:
-                result.append({"table name": table.table_name,
+                result.append({"table_name": table.table_name,
                                "table_id": table.pk,
-                               "root url": table.root_url,
+                               "root_url": table.root_url,
                                "tenant": table.tenant_id,
                                "endpoints": table.endpoints,
                                "columns": table.column_definition,
@@ -78,9 +53,9 @@ class TableManagement(APIView):
                                "tenant_id": table.tenant_id})
         else:
             for table in tables:
-                result.append({"table name": table.table_name,
+                result.append({"table_name": table.table_name,
                                "table_id": table.pk,
-                               "root url": table.root_url,
+                               "root_url": table.root_url,
                                "tenant": table.tenant_id,
                                "endpoints": table.endpoints,
                                "tenant_id": table.tenant_id})
@@ -103,8 +78,6 @@ class TableManagement(APIView):
 
         # Parse out optional fields.
         root_url = request.data.get('root_url', table_name)
-        table_role = request.data.get('table_role', None)
-
         list_all = request.data.get('list_all', True)
         list_one = request.data.get('list_one', True)
         create = request.data.get('create', True)
@@ -174,9 +147,9 @@ class TableManagement(APIView):
         manage_tables.create_table(table_name, columns, tenant_id)
 
         result = {
-            "table name": new_table.table_name,
+            "table_name": new_table.table_name,
             "table_id": new_table.pk,
-            "root url": new_table.root_url,
+            "root_url": new_table.root_url,
             "endpoints": new_table.endpoints
         }
 
@@ -186,6 +159,10 @@ class TableManagement(APIView):
 # These are endpoints to manage the tables and contains metadata for the tables.
 class TableManagementById(APIView):
     """
+    GET: Returns the table with the provided ID.
+    PUT: Updates the table with the provided ID. Work in progress.
+    DELETE: Drops the table with the provided ID.
+    All of these endpoints are restricted to ADMIN role only.
     """
     def get(self, request, *args, **kwargs):
         # TODO Check and store role from JWT. Must be an admin.
@@ -217,9 +194,9 @@ class TableManagementById(APIView):
         # TODO Fix up this format.
         if details:
             result = {
-                "table name": table.table_name,
+                "table_name": table.table_name,
                 "table_id": table.pk,
-                "root url": table.root_url,
+                "root_url": table.root_url,
                 "endpoints": table.endpoints,
                 "columns": table.column_definition,
                 "tenant_id": table.tenant_id,
@@ -228,9 +205,9 @@ class TableManagementById(APIView):
             }
         else:
             result = {
-                "table name": table.table_name,
+                "table_name": table.table_name,
                 "table_id": table.pk,
-                "root url": table.root_url,
+                "root_url": table.root_url,
                 "endpoints": table.endpoints,
                 "tenant_id": table.tenant_id
             }
@@ -409,6 +386,7 @@ class TableManagementById(APIView):
 
 class TableManagementDump(APIView):
     """
+    Work in progress.
     """
     def post(self, request, *args, **kwargs):
         # TODO Check and store role from JWT.
@@ -437,9 +415,9 @@ class TableManagementDump(APIView):
         return HttpResponse(200)
 
 
-
 class TableManagementLoad(APIView):
     """
+    Work in progress.
     """
     def post(self, request, *args, **kwargs):
         # TODO Check and store role from JWT.
@@ -452,7 +430,10 @@ class TableManagementLoad(APIView):
 # Once we figure out the table and row, these are just simple SQL crud operations.
 class DynamicView(APIView):
     """
-    Lists the rows in the given table.
+    GET: Lists the rows in the given table based on root url. Restricted to READ and above role.
+    POST: Creates a new row in the table based on root URL. Restricted to WRITE and above role.
+    PUT: Updates the rows in the given table based on filter. If no filter is provided, updates the entire table.
+    Restricted to WRITE and above role.
     """
     def get(self, request, *args, **kwargs):
         # TODO Check and store role from JWT.
@@ -476,7 +457,7 @@ class DynamicView(APIView):
         except ManageTables.DoesNotExist:
             msg = f"Table with root url {root_url} does not exist."
             logger.warning(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseNotFound(msg)
 
         if "GET_ALL" not in table.endpoints:
             msg = "API access to LIST ROWS disabled."
@@ -631,6 +612,9 @@ class DynamicView(APIView):
 
 class DynamicViewById(APIView):
     """
+    GET: Lists a row in a table, based on root url and ID. Restricted to READ and above role.
+    PUT: Updates a single row in a table by the ID. Restricted to WRITE and above role.
+    DELETE: Deletes a single row in a table by the ID. Restricted to WRITE and above role.
     """
     def get(self, request, *args, **kwargs):
         # TODO Check and store role from JWT.
@@ -640,7 +624,7 @@ class DynamicViewById(APIView):
         # Parse out required fields.
         try:
             root_url = self.kwargs['root_url']
-            pk = self.kwargs['primary_id']
+            pk_id = self.kwargs['primary_id']
         except KeyError as e:
             msg = f"\'{e.args}\' is required to get row from a table."
             logger.warning(msg)
@@ -654,12 +638,12 @@ class DynamicViewById(APIView):
             return HttpResponseBadRequest(msg)
 
         if "GET_ONE" not in table.endpoints:
-            msg = "API access to LIST SINGLE ROW disable."
+            msg = "API access to LIST SINGLE ROW disabled."
             logger.warning(msg)
             return HttpResponseBadRequest(msg)
 
         try:
-            result = table_data.get_row_from_table(table.table_name, pk, req_tenant)
+            result = table_data.get_row_from_table(table.table_name, pk_id, req_tenant)
         except Exception as e:
             msg = f"Failed to retrieve row from table {table.table_name} with pk {pk_id} on tenant {req_tenant}. {e}"
             logger.error(msg)
@@ -712,7 +696,14 @@ class DynamicViewById(APIView):
             logger.error(msg)
             return HttpResponseBadRequest(msg)
 
-        return HttpResponse(status=200)
+        try:
+            return_result = table_data.get_row_from_table(table.table_name, pk_id, req_tenant)
+        except Exception as e:
+            msg = f"Failed to retrieve row from table {table.table_name} with pk {pk_id} on tenant {req_tenant}. {e}"
+            logger.error(msg)
+            return HttpResponseBadRequest(msg)
+
+        return HttpResponse(json.dumps(return_result), content_type='application/json', status=200)
 
     def delete(self, request, *args, **kwargs):
         # TODO Check and store role from JWT.
