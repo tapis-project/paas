@@ -48,3 +48,11 @@ def get_service_tapis_client(tenant_id=None,
 # singleton tapipy client which can be imported and used by the service
 # directly
 t = get_service_tapis_client()
+
+
+def get_tenant_id_from_base_url(base_url, tenants):
+    """
+    Return the tenant_id associated with the base URL of a request.
+    """
+    request_tenant = tenants.get_tenant_config(url=base_url)
+    return request_tenant.tenant_id

@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/3.1/ref/settings/
 from pathlib import Path
 
 from paas import settings_secrets
+from paas import get_django_db
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -77,14 +78,16 @@ WSGI_APPLICATION = 'paas.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/3.1/ref/settings/#databases
 
+db_parms = get_django_db()
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'postgres',
-        'USER': 'postgres',
-        'PASSWORD': settings_secrets.db_pwd,
-        'HOST': 'db',
-        'PORT': 5432,
+        'NAME': db_parms['dbname'],
+        'USER': db_parms['dbuser'],
+        'PASSWORD': db_parms['dbpassword'],
+        'HOST': db_parms['dbhost'],
+        'PORT': db_parms['dbport'],
     }
 }
 

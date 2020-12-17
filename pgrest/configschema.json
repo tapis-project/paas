@@ -11,15 +11,45 @@
       "type": "string",
       "default": "https://admin.develop.tapis.io"
     },
-    "postgres_user": {
-      "type": "string",
-      "description": "user for the SQL db.",
-      "default": "pguser"
-    },
-    "postgres_password": {
-      "type": "string",
-      "description": "password to the SQL db.",
-      "default": "pgpass"
+    "databases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "dbinstancename",
+          "dbhost",
+          "dbport",
+          "dbname",
+          "dbuser",
+          "dbpassword"
+        ],
+        "properties": {
+          "dbinstancename": {
+            "type": "string",
+            "description": "A name used to refer to this database configuration."
+          },
+          "dbhost": {
+            "type": "string",
+            "description": "The host to use to connect to this database."
+          },
+          "dbport": {
+            "type": "integer",
+            "description": "The port to use to connect to this database."
+          },
+          "dbname": {
+            "type": "string",
+            "description": "The name of the database to use when connecting to this database."
+          },
+          "dbuser": {
+            "type": "string",
+            "description": "The user to use to connect to this database."
+          },
+          "dbpassword": {
+            "type": "string",
+            "description": "The password to use to connect to this database."
+          }
+        }
+      }
     }
   }
 }

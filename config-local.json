@@ -1,7 +1,17 @@
 {
   "service_name": "pgrest",
-  "service_password": "<from k8s>",
+  "service_password": "1D9Bl69ARJpOj6x27yJ3gSHg",
   "tenants": ["dev"],
   "log_level": "DEBUG",
-  "show_traceback": false
+  "show_traceback": false,
+  "databases": [
+    {
+      "dbinstancename": "local",
+      "dbhost": "db",
+      "dbport":  5432,
+      "dbname": "postgres",
+      "dbuser": "postgres",
+      "dbpassword": "<TODO>"
+    }
+  ]
 }
