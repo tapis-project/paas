@@ -1,7 +1,8 @@
-paas/__pycache__/*
 .idea/*
+sample_jsons/*
+paas/__pycache__/*
 pgrest/__pycache__/*
 pgrest/pycommon/__pycache__/*
-sample_jsons/*
-proto/db_transactions/__pycache__/*
-pass/__pycache__/*
+pgrest/db_transactions/__pycache__/*
+pgrest/migrations/__pycache__/
+
