@@ -13,9 +13,8 @@ from rest_framework.views import APIView
 
 from pgrest.models import ManageTables, ManageTablesTransition
 from pgrest.db_transactions import manage_tables, table_data, bulk_data
-from pgrest.pycommon.auth import t
+from pgrest.pycommon.auth import t, get_tenant_id_from_base_url
 from pgrest.utils import create_validate_schema, can_read, can_write, is_admin
-
 
 logger = logging.getLogger(__name__)
 
@@ -30,21 +29,32 @@ class RoleSessionMixin:
         try:
             # pull token from the request, and decode it to get the user that is sending in request.
             try:
-                # TODO correctly pull token
-                agave_token = request.META['HTTP_AUTHORIZATION']
+                # Pull token from header `tapis-v2-token`
+                # Note: any HTTP headers in the request are converted to META keys by converting all characters to
+                # uppercase, replacing any hyphens with underscores and adding an HTTP_ prefix to the name.
+                v2_token = request.META['HTTP_TAPIS_V2_TOKEN']
             except KeyError as e:
                 logger.warning(f"User not authenticated. Exception: {e}")
                 return HttpResponse('Unauthorized', status=401)
 
             try:
                 url = "https://api.tacc.utexas.edu/profiles/v2/me"
-                head = {'Authorization': f'Bearer {agave_token}'}
+                head = {'Authorization': f'Bearer {v2_token}'}
                 response = requests.get(url, headers=head)
-
-            except Exception as e:
+            except Exception:
                 msg = f"Unable to retrieve user profile from Agave."
                 logger.error(msg)
                 return HttpResponseForbidden(msg)
+
+            try:
+                # Get the base url from the incoming request, and then use the
+                request_url = request.scheme + "://" + request.get_host()
+                # tenant_id = get_tenant_id_from_base_url("https://admin.develop.tapis.io", t.tenant_cache)
+                tenant_id = get_tenant_id_from_base_url(request_url, t.tenant_cache)
+            except Exception as e:
+                msg = f""
+                logger.error(msg)
+                return HttpResponseBadRequest(msg)
 
             try:
                 username = response.json()['result']['username']
@@ -53,31 +63,34 @@ class RoleSessionMixin:
                 logger.error(msg)
                 return HttpResponseForbidden(msg)
 
-            # TODO - decipher tenant and store in session
-            # first portion of the domain is a tenant ID if it comes i directly from user
-            # if come in from another service, will need to grab from header
+            roles = t.sk.getUserRoles(user=username, tenant=tenant_id)
 
-            roles = t.sk.getUserRoles(user=username, tenant='tacc')
-            request.session['roles'] = roles
+            role_list = list()
+            for name in roles.names:
+                role_list.append(name)
+
+            request.session['roles'] = role_list
             request.session['username'] = username
+            request.session['tenant_id'] = tenant_id
 
+            return super().dispatch(request, *args, **kwargs)
 
-            # Store accounts and active status for benchmarking associates.
         except Exception as e:
             logger.error(f"Bad Request. Exception: {e}")
             return HttpResponseBadRequest(f"There was an error while fulfilling user request. Message: {e}")
 
 
-class TableManagement(APIView):
+class TableManagement(RoleSessionMixin, APIView):
     """
     GET: Returns information about all of the tables.
     POST: Creates a new table in ManageTables, and then a new table from the json provided by the user.
     All of these endpoints are restricted to ADMIN role only.
     """
-
+    @is_admin
     def get(self, request, *args, **kwargs):
         # TODO - pull tenant from session
-        req_tenant = "public"
+        # req_tenant = "public"
+        req_tenant = request.session['tenant_id']
 
         # Check for details=true. Decide what a brief description and a detailed description is.
         details = self.request.query_params.get('details')
@@ -110,9 +123,11 @@ class TableManagement(APIView):
 
         return HttpResponse(json.dumps(result), content_type='application/json')
 
+    @is_admin
     def post(self, request, *args, **kwargs):
         # TODO - pull tenant from session
-        req_tenant = "public"
+        # req_tenant = "public"
+        req_tenant = request.session['tenant_id']
 
         # Parse out required fields.
         try:
@@ -209,10 +224,12 @@ class TableManagementById(APIView):
     DELETE: Drops the table with the provided ID.
     All of these endpoints are restricted to ADMIN role only.
     """
+    @is_admin
     def get(self, request, *args, **kwargs):
         # TODO Check and store role from JWT. Must be an admin.
         # TODO Check and store tenant from JWT.
-        req_tenant = "public"
+        # req_tenant = "public"
+        req_tenant = request.session['tenant_id']
 
         # Check for details=true. Decide what a brief description and a detailed description is.
         details = self.request.query_params.get('details')
@@ -259,9 +276,11 @@ class TableManagementById(APIView):
 
         return HttpResponse(json.dumps(result), content_type='application/json')
 
+    @is_admin
     def put(self, request, *args, **kwargs):
         # TODO - pull tenant from session
-        req_tenant = "public"
+        # req_tenant = "public"
+        req_tenant = request.session['tenant_id']
 
         # Parse out required fields.
         try:
@@ -393,9 +412,11 @@ class TableManagementById(APIView):
 
         return HttpResponse(200)
 
+    @is_admin
     def delete(self, request, *args, **kwargs):
         # TODO - pull tenant from session
-        req_tenant = "public"
+        # req_tenant = "public"
+        req_tenant = request.session['tenant_id']
 
         # Parse out required fields.
         try:
@@ -431,9 +452,11 @@ class TableManagementDump(APIView):
     """
     Work in progress.
     """
+    @is_admin
     def post(self, request, *args, **kwargs):
         # TODO - pull tenant from session
-        req_tenant = "public"
+        # req_tenant = "public"
+        req_tenant = request.session['tenant_id']
 
         # Can send in ALL or list of table name(s)
         if request.data == "all":
@@ -461,12 +484,15 @@ class TableManagementLoad(APIView):
     """
     Work in progress.
     """
+    @is_admin
     def post(self, request, *args, **kwargs):
         # TODO - pull tenant from session
-        req_tenant = "public"
+        # req_tenant = "public"
+        req_tenant = request.session['tenant_id']
 
 # For dynamic views, all end users will end up here. We will find the corresponding table
 # based on the url to get here. We then will formulate a SQL statement to do the need actions.
+
 
 # Once we figure out the table and row, these are just simple SQL crud operations.
 class DynamicView(APIView):
@@ -476,9 +502,11 @@ class DynamicView(APIView):
     PUT: Updates the rows in the given table based on filter. If no filter is provided, updates the entire table.
     Restricted to WRITE and above role.
     """
+    @can_read
     def get(self, request, *args, **kwargs):
         # TODO - pull tenant from session
-        req_tenant = "public"
+        # req_tenant = "public"
+        req_tenant = request.session['tenant_id']
 
         params = self.request.query_params
         limit = self.request.query_params.get("limit")
@@ -529,9 +557,11 @@ class DynamicView(APIView):
 
         return HttpResponse(json.dumps(result), content_type='application/json')
 
+    @can_write
     def post(self, request, *args, **kwargs):
         # TODO - pull tenant from session
-        req_tenant = "public"
+        # req_tenant = "public"
+        req_tenant = request.session['tenant_id']
 
         # Parse out required fields.
         try:
@@ -596,10 +626,11 @@ class DynamicView(APIView):
             return HttpResponseBadRequest(msg)
 
         return HttpResponse(json.dumps(result), content_type='application/json')
-
+    @can_write
     def put(self, request, *args, **kwargs):
             # TODO - pull tenant from session
-            req_tenant = "public"
+            # req_tenant = "public"
+            req_tenant = request.session['tenant_id']
 
             # Parse out required fields.
             result_dict = json.loads(request.body.decode())
@@ -654,9 +685,11 @@ class DynamicViewById(APIView):
     PUT: Updates a single row in a table by the ID. Restricted to WRITE and above role.
     DELETE: Deletes a single row in a table by the ID. Restricted to WRITE and above role.
     """
+    @can_read
     def get(self, request, *args, **kwargs):
         # TODO - pull tenant from session
-        req_tenant = "public"
+        # req_tenant = "public"
+        req_tenant = request.session['tenant_id']
 
         # Parse out required fields.
         try:
@@ -688,9 +721,11 @@ class DynamicViewById(APIView):
 
         return HttpResponse(json.dumps(result), content_type='application/json')
 
+    @can_write
     def put(self, request, *args, **kwargs):
         # TODO - pull tenant from session
-        req_tenant = "public"
+        # req_tenant = "public"
+        req_tenant = request.session['tenant_id']
 
         # Parse out required fields.
         try:
@@ -741,9 +776,11 @@ class DynamicViewById(APIView):
 
         return HttpResponse(json.dumps(return_result), content_type='application/json', status=200)
 
+    @can_write
     def delete(self, request, *args, **kwargs):
         # TODO - pull tenant from session
-        req_tenant = "public"
+        # req_tenant = "public"
+        req_tenant = request.session['tenant_id']
 
         # Parse out required fields.
         try:
