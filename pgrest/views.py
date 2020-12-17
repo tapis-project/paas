@@ -217,7 +217,7 @@ class TableManagement(RoleSessionMixin, APIView):
 
 
 # These are endpoints to manage the tables and contains metadata for the tables.
-class TableManagementById(APIView):
+class TableManagementById(RoleSessionMixin, APIView):
     """
     GET: Returns the table with the provided ID.
     PUT: Updates the table with the provided ID. Work in progress.
@@ -448,7 +448,7 @@ class TableManagementById(APIView):
         manage_tables.delete_table(table.table_name, tenant_id)
 
 
-class TableManagementDump(APIView):
+class TableManagementDump(RoleSessionMixin, APIView):
     """
     Work in progress.
     """
@@ -480,22 +480,22 @@ class TableManagementDump(APIView):
         return HttpResponse(200)
 
 
-class TableManagementLoad(APIView):
+class TableManagementLoad(RoleSessionMixin, APIView):
     """
     Work in progress.
     """
     @is_admin
     def post(self, request, *args, **kwargs):
         # TODO - pull tenant from session
-        # req_tenant = "public"
-        req_tenant = request.session['tenant_id']
+        req_tenant = "public"
+        # req_tenant = request.session['tenant_id']
 
 # For dynamic views, all end users will end up here. We will find the corresponding table
 # based on the url to get here. We then will formulate a SQL statement to do the need actions.
 
 
 # Once we figure out the table and row, these are just simple SQL crud operations.
-class DynamicView(APIView):
+class DynamicView(RoleSessionMixin, APIView):
     """
     GET: Lists the rows in the given table based on root url. Restricted to READ and above role.
     POST: Creates a new row in the table based on root URL. Restricted to WRITE and above role.
@@ -679,7 +679,7 @@ class DynamicView(APIView):
             return HttpResponse(status=200)
 
 
-class DynamicViewById(APIView):
+class DynamicViewById(RoleSessionMixin, APIView):
     """
     GET: Lists a row in a table, based on root url and ID. Restricted to READ and above role.
     PUT: Updates a single row in a table by the ID. Restricted to WRITE and above role.

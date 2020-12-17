@@ -59,8 +59,8 @@ def can_write(view):
     Determines if a user has an admin or a write role, and returns a 403 if they do not.
     """
     def wrapper(self, request, *args, **kwargs):
-        roles = request.session["role"]
-        if "admin" not in roles and "write" not in roles:
+        roles = request.session["roles"]
+        if "ADMIN" not in roles and "WRITE" not in roles:
             return HttpResponseForbidden(f"User {request.session['username']} does not have permission to write.")
         else:
             return view(self, request, *args, **kwargs)
@@ -72,8 +72,8 @@ def can_read(view):
     Determines if a user has an admin role, or write role, or read role, and returns a 403 if they do not.
     """
     def wrapper(self, request, *args, **kwargs):
-        roles = request.session["role"]
-        if "admin" not in roles and "write" not in roles and "read" not in roles:
+        roles = request.session["roles"]
+        if "ADMIN" not in roles and "WRITE" not in roles and "READ" not in roles:
             return HttpResponseForbidden(f"User {request.session['username']} does not have permission to read.")
         else:
             return view(self, request, *args, **kwargs)
