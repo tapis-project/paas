@@ -1,6 +1,6 @@
 
 Create initial DB structure:
-from within proto:
+from within pgrest:
 1. docker-compose run api python manage.py makemigrations
 2. docker-compose run api python manage.py migrate
 
