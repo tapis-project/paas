@@ -19,6 +19,54 @@ from pgrest.utils import create_validate_schema, can_read, can_write, is_admin
 logger = logging.getLogger(__name__)
 
 
+class RoleSessionMixin:
+    """
+    Retrieves username from Agave for tacc.prod token, then retrieves roles for this user in SK and stores data
+    in django session.
+    """
+    # Override dispatch to decode token and store variables before routing the request.
+    def dispatch(self, request, *args, **kwargs):
+        try:
+            # pull token from the request, and decode it to get the user that is sending in request.
+            try:
+                # TODO correctly pull token
+                agave_token = request.META['HTTP_AUTHORIZATION']
+            except KeyError as e:
+                logger.warning(f"User not authenticated. Exception: {e}")
+                return HttpResponse('Unauthorized', status=401)
+
+            try:
+                url = "https://api.tacc.utexas.edu/profiles/v2/me"
+                head = {'Authorization': f'Bearer {agave_token}'}
+                response = requests.get(url, headers=head)
+
+            except Exception as e:
+                msg = f"Unable to retrieve user profile from Agave."
+                logger.error(msg)
+                return HttpResponseForbidden(msg)
+
+            try:
+                username = response.json()['result']['username']
+            except KeyError:
+                msg = "Unable to parse Agave token response for username."
+                logger.error(msg)
+                return HttpResponseForbidden(msg)
+
+            # TODO - decipher tenant and store in session
+            # first portion of the domain is a tenant ID if it comes i directly from user
+            # if come in from another service, will need to grab from header
+
+            roles = t.sk.getUserRoles(user=username, tenant='tacc')
+            request.session['roles'] = roles
+            request.session['username'] = username
+
+
+            # Store accounts and active status for benchmarking associates.
+        except Exception as e:
+            logger.error(f"Bad Request. Exception: {e}")
+            return HttpResponseBadRequest(f"There was an error while fulfilling user request. Message: {e}")
+
+
 class TableManagement(APIView):
     """
     GET: Returns information about all of the tables.
@@ -27,8 +75,7 @@ class TableManagement(APIView):
     """
 
     def get(self, request, *args, **kwargs):
-        # TODO Check and store role from JWT. Must be an admin.
-        # TODO Check and store tenant from JWT.
+        # TODO - pull tenant from session
         req_tenant = "public"
 
         # Check for details=true. Decide what a brief description and a detailed description is.
@@ -63,8 +110,7 @@ class TableManagement(APIView):
         return HttpResponse(json.dumps(result), content_type='application/json')
 
     def post(self, request, *args, **kwargs):
-        # TODO Check and store role from JWT. Must be an admin.
-        # TODO Get tenant ID from jwt.
+        # TODO - pull tenant from session
         req_tenant = "public"
 
         # Parse out required fields.
@@ -84,8 +130,6 @@ class TableManagement(APIView):
         update = request.data.get('update', True)
         delete = request.data.get('delete', True)
         endpoints = request.data.get('endpoints', True)
-
-        # TODO Usher table role to SK API
 
         if ManageTables.objects.filter(table_name=table_name).exists():
             msg = f"Table with name \'{table_name}\' already exists in ManageTables table."
@@ -215,8 +259,7 @@ class TableManagementById(APIView):
         return HttpResponse(json.dumps(result), content_type='application/json')
 
     def put(self, request, *args, **kwargs):
-        # TODO Check and store role from JWT. Must be an admin.
-        # TODO Get tenant ID from jwt.
+        # TODO - pull tenant from session
         req_tenant = "public"
 
         # Parse out required fields.
@@ -350,8 +393,7 @@ class TableManagementById(APIView):
         return HttpResponse(200)
 
     def delete(self, request, *args, **kwargs):
-        # TODO Check and store role from JWT. Must be an admin.
-        # TODO Get tenant ID from jwt.
+        # TODO - pull tenant from session
         req_tenant = "public"
 
         # Parse out required fields.
@@ -389,8 +431,7 @@ class TableManagementDump(APIView):
     Work in progress.
     """
     def post(self, request, *args, **kwargs):
-        # TODO Check and store role from JWT.
-        # TODO Check and store tenant from JWT.
+        # TODO - pull tenant from session
         req_tenant = "public"
 
         # Can send in ALL or list of table name(s)
@@ -420,8 +461,7 @@ class TableManagementLoad(APIView):
     Work in progress.
     """
     def post(self, request, *args, **kwargs):
-        # TODO Check and store role from JWT.
-        # TODO Check and store tenant from JWT.
+        # TODO - pull tenant from session
         req_tenant = "public"
 
 # For dynamic views, all end users will end up here. We will find the corresponding table
@@ -436,8 +476,7 @@ class DynamicView(APIView):
     Restricted to WRITE and above role.
     """
     def get(self, request, *args, **kwargs):
-        # TODO Check and store role from JWT.
-        # TODO Check and store tenant from JWT.
+        # TODO - pull tenant from session
         req_tenant = "public"
 
         params = self.request.query_params
@@ -490,8 +529,7 @@ class DynamicView(APIView):
         return HttpResponse(json.dumps(result), content_type='application/json')
 
     def post(self, request, *args, **kwargs):
-        # TODO Check and store role from JWT.
-        # TODO Check and store tenant from JWT.
+        # TODO - pull tenant from session
         req_tenant = "public"
 
         # Parse out required fields.
@@ -559,8 +597,7 @@ class DynamicView(APIView):
         return HttpResponse(json.dumps(result), content_type='application/json')
 
     def put(self, request, *args, **kwargs):
-            # TODO Check and store role from JWT.
-            # TODO Check and store tenant from JWT.
+            # TODO - pull tenant from session
             req_tenant = "public"
 
             # Parse out required fields.
@@ -617,8 +654,7 @@ class DynamicViewById(APIView):
     DELETE: Deletes a single row in a table by the ID. Restricted to WRITE and above role.
     """
     def get(self, request, *args, **kwargs):
-        # TODO Check and store role from JWT.
-        # TODO Check and store tenant from JWT.
+        # TODO - pull tenant from session
         req_tenant = "public"
 
         # Parse out required fields.
@@ -652,8 +688,7 @@ class DynamicViewById(APIView):
         return HttpResponse(json.dumps(result), content_type='application/json')
 
     def put(self, request, *args, **kwargs):
-        # TODO Check and store role from JWT.
-        # TODO Check and store tenant from JWT.
+        # TODO - pull tenant from session
         req_tenant = "public"
 
         # Parse out required fields.
@@ -706,8 +741,7 @@ class DynamicViewById(APIView):
         return HttpResponse(json.dumps(return_result), content_type='application/json', status=200)
 
     def delete(self, request, *args, **kwargs):
-        # TODO Check and store role from JWT.
-        # TODO Check and store tenant from JWT.
+        # TODO - pull tenant from session
         req_tenant = "public"
 
         # Parse out required fields.

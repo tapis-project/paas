@@ -3,7 +3,7 @@ import requests
 
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
 
-#from pgrest.pycommon.auth import t
+from pgrest.pycommon.auth import t
 
 logger = logging.getLogger(__name__)
 

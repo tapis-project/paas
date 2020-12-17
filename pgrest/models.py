@@ -26,7 +26,7 @@ class ManageTables(models.Model):
     endpoints = ArrayField(models.CharField(max_length=255))
     # Table level roles. If not specified, we default to tenant level role.
     # required_roles = ArrayField(null=True, blank=True)
-    tenant_id = models.CharField(max_length=255)
+    tenant_id = models.ForeignKey('Tenants', on_delete=models.CASCADE)
 
     def __str__(self):
         return 'Table ID: %s | Root URL: %s' % (self.manage_table_id, self.root_url)
@@ -40,4 +40,9 @@ class ManageTablesTransition(models.Model):
     validate_json_update_tn = JSONField()
     table_name_tn = models.CharField(max_length=255, unique=True, null=True, blank=True)
     # Status field
+
+
+class Tenants(models.Model):
+    tenant_id = models.AutoField(primary_key=True)
+    db_section = models.CharField(max_length=255, unique=True)
 
