@@ -1,21 +1,26 @@
 #!/usr/bin/python
-from configparser import ConfigParser
+from pgrest.pycommon.config import conf
+PARAMS_MAP = {
+    "dbhost":"host",
+    "dbname": "database",
+    "dbuser": "user",
+    "dbpassword": "password",
+    "dbport": "port",
+    # this key not used and cannot be passed as part of the connection package..
+    # "dbinstancename": "collection"
+}
 
-
-def config(filename='pgrest/db_transactions/database.ini', section='postgresql'):
-    # create a parser
-    parser = ConfigParser()
-    # read config file
-    parser.read(filename)
-
+def config(db_instance='local'):
     # get section, default to postgresql
     db = {}
-    if parser.has_section(section):
-        params = parser.items(section)
-        for param in params:
-            db[param[0]] = param[1]
-    else:
-        raise Exception('Section {0} not found in the {1} file'.format(section, filename))
-
-    return db
+    for db_conf in conf.databases:
+        if db_conf['dbinstancename'] == db_instance:
+            for k,v in db_conf.items():
+                try:
+                    db[PARAMS_MAP[k]] = v
+                except KeyError:
+                    # some param keys are not needed by the psycopg2 connection object.
+                    pass
+            return db
+    raise Exception(f'Database {db_instance} not found in config.')
 
