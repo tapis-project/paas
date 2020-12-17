@@ -1,0 +1,55 @@
+{
+  "$id": "http://github.com/tapis-project/tenants-api/tenants-api/configschema.json",
+  "$schema": "http://json-schema.org/schema#",
+  "properties": {
+    "sql_db_url": {
+      "type": "string",
+      "description": "URL to postgres db, including port and database.",
+      "default": "postgres:5432/pgrest"
+    },
+    "service_tenant_base_url": {
+      "type": "string",
+      "default": "https://admin.develop.tapis.io"
+    },
+    "databases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "dbinstancename",
+          "dbhost",
+          "dbport",
+          "dbname",
+          "dbuser",
+          "dbpassword"
+        ],
+        "properties": {
+          "dbinstancename": {
+            "type": "string",
+            "description": "A name used to refer to this database configuration."
+          },
+          "dbhost": {
+            "type": "string",
+            "description": "The host to use to connect to this database."
+          },
+          "dbport": {
+            "type": "integer",
+            "description": "The port to use to connect to this database."
+          },
+          "dbname": {
+            "type": "string",
+            "description": "The name of the database to use when connecting to this database."
+          },
+          "dbuser": {
+            "type": "string",
+            "description": "The user to use to connect to this database."
+          },
+          "dbpassword": {
+            "type": "string",
+            "description": "The password to use to connect to this database."
+          }
+        }
+      }
+    }
+  }
+}

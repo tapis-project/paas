@@ -1,12 +1,17 @@
 version: '3.3'
 services:
   api:
-    build: .
+#    build: .
+    image: tapis/pgrest-api:dev
     command: bash -c "python /code/manage.py runserver 0.0.0.0:8000"
     volumes:
     - .:/code
+    - ./config-local.json:/code/config-local.json
     ports:
     - "8000:8000"
+    environment:
+      TAPIS_CONFIGSCHEMA_PATH: /code/pgrest/configschema.json
+      TAPIS_CONFIG_PATH: /code/config-local.json
     depends_on:
       - db
   db:
