@@ -45,12 +45,12 @@ def is_admin(view):
     """
     Determines if a user has an admin role, and returns a 403 if they do not.
     """
-    def wrapper(request, *args, **kwargs):
-        if "admin" not in request.session['roles']:
+    def wrapper(self, request, *args, **kwargs):
+        if "ADMIN" not in request.session['roles']:
             return HttpResponseForbidden(f"User {request.session['username']} does not have permission to manage "
                                          f"database tables.")
         else:
-            return view(request, *args, **kwargs)
+            return view(self, request, *args, **kwargs)
     return wrapper
 
 
@@ -58,12 +58,12 @@ def can_write(view):
     """
     Determines if a user has an admin or a write role, and returns a 403 if they do not.
     """
-    def wrapper(request, *args, **kwargs):
+    def wrapper(self, request, *args, **kwargs):
         roles = request.session["role"]
         if "admin" not in roles and "write" not in roles:
             return HttpResponseForbidden(f"User {request.session['username']} does not have permission to write.")
         else:
-            return view(request, *args, **kwargs)
+            return view(self, request, *args, **kwargs)
     return wrapper
 
 
@@ -71,11 +71,11 @@ def can_read(view):
     """
     Determines if a user has an admin role, or write role, or read role, and returns a 403 if they do not.
     """
-    def wrapper(request, *args, **kwargs):
+    def wrapper(self, request, *args, **kwargs):
         roles = request.session["role"]
         if "admin" not in roles and "write" not in roles and "read" not in roles:
             return HttpResponseForbidden(f"User {request.session['username']} does not have permission to read.")
         else:
-            return view(request, *args, **kwargs)
+            return view(self, request, *args, **kwargs)
     return wrapper
 

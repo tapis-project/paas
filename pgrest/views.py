@@ -13,7 +13,7 @@ from rest_framework.views import APIView
 
 from pgrest.models import ManageTables, ManageTablesTransition
 from pgrest.db_transactions import manage_tables, table_data, bulk_data
-from pgrest.pycommon.auth import t
+from pgrest.pycommon.auth import t, get_tenant_id_from_base_url
 from pgrest.utils import create_validate_schema, can_read, can_write, is_admin
 
 logger = logging.getLogger(__name__)
@@ -29,21 +29,31 @@ class RoleSessionMixin:
         try:
             # pull token from the request, and decode it to get the user that is sending in request.
             try:
-                # TODO correctly pull token
-                agave_token = request.META['HTTP_AUTHORIZATION']
+                # Pull token from header `tapis-v2-token`
+                # Note: any HTTP headers in the request are converted to META keys by converting all characters to
+                # uppercase, replacing any hyphens with underscores and adding an HTTP_ prefix to the name.
+                v2_token = request.META['HTTP_TAPIS_V2_TOKEN']
             except KeyError as e:
                 logger.warning(f"User not authenticated. Exception: {e}")
                 return HttpResponse('Unauthorized', status=401)
 
             try:
                 url = "https://api.tacc.utexas.edu/profiles/v2/me"
-                head = {'Authorization': f'Bearer {agave_token}'}
+                head = {'Authorization': f'Bearer {v2_token}'}
                 response = requests.get(url, headers=head)
-
-            except Exception as e:
+            except Exception:
                 msg = f"Unable to retrieve user profile from Agave."
                 logger.error(msg)
                 return HttpResponseForbidden(msg)
+
+            try:
+                # Get the base url from the incoming request, and then use the
+                request_url = request.scheme + "://" + request.get_host()
+                tenant_id = get_tenant_id_from_base_url("https://admin.develop.tapis.io", t.tenant_cache)
+            except Exception as e:
+                msg = f""
+                logger.error(msg)
+                return HttpResponseBadRequest(msg)
 
             try:
                 username = response.json()['result']['username']
@@ -52,16 +62,13 @@ class RoleSessionMixin:
                 logger.error(msg)
                 return HttpResponseForbidden(msg)
 
-            # TODO - decipher tenant and store in session
-            # first portion of the domain is a tenant ID if it comes i directly from user
-            # if come in from another service, will need to grab from header
-
-            roles = t.sk.getUserRoles(user=username, tenant='tacc')
+            roles = t.sk.getUserRoles(user=username, tenant=tenant_id)
             request.session['roles'] = roles
             request.session['username'] = username
+            request.session['tenant_id'] = tenant_id
 
+            return super().dispatch(request, *args, **kwargs)
 
-            # Store accounts and active status for benchmarking associates.
         except Exception as e:
             logger.error(f"Bad Request. Exception: {e}")
             return HttpResponseBadRequest(f"There was an error while fulfilling user request. Message: {e}")
@@ -73,7 +80,6 @@ class TableManagement(APIView):
     POST: Creates a new table in ManageTables, and then a new table from the json provided by the user.
     All of these endpoints are restricted to ADMIN role only.
     """
-
     def get(self, request, *args, **kwargs):
         # TODO - pull tenant from session
         req_tenant = "public"

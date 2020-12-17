@@ -10,6 +10,7 @@ PARAMS_MAP = {
     # "dbinstancename": "collection"
 }
 
+
 def config(db_instance='local'):
     # get section, default to postgresql
     db = {}

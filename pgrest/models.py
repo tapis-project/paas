@@ -26,7 +26,7 @@ class ManageTables(models.Model):
     endpoints = ArrayField(models.CharField(max_length=255))
     # Table level roles. If not specified, we default to tenant level role.
     # required_roles = ArrayField(null=True, blank=True)
-    tenant_id = models.ForeignKey('Tenants', on_delete=models.CASCADE)
+    tenant_id = models.CharField(max_length=255)
 
     def __str__(self):
         return 'Table ID: %s | Root URL: %s' % (self.manage_table_id, self.root_url)
