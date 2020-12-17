@@ -16,7 +16,6 @@ from pgrest.db_transactions import manage_tables, table_data, bulk_data
 from pgrest.pycommon.auth import t
 from pgrest.utils import create_validate_schema, can_read, can_write, is_admin
 
-
 logger = logging.getLogger(__name__)
 
 

@@ -57,6 +57,7 @@ def create_table(table_name, columns, tenant):
     conn = None
     try:
         # Read the connection parameters and connect to database.
+        # TODO -- pass db_instance based on the tenant_id
         params = config.config()
         conn = psycopg2.connect(**params)
         cur = conn.cursor()
