@@ -7,5 +7,9 @@ from within pgrest:
 Create a table:
 curl -H "Content-type: application/json" -d "@table-def.json" localhost:8000/paas/manage-tables
 
-Add a row:
+Add some rows:
 curl -H "Content-type: application/json" -d '{"data": {"name": "sprok", "count": 3, "gizmo": "fuzz"}}' localhost:8000/paas/sprokets
+curl -H "Content-type: application/json" -d '{"data": {"name": "sprok2", "count": 2, "gizmo": "fuzz"}}' localhost:8000/paas/sprokets
+
+List the data:
+curl localhost:8000/paas/sprokets
