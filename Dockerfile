@@ -10,4 +10,6 @@ RUN pip install -r /code/requirements.txt
 COPY . /code/
 WORKDIR /code/
 
+CMD ["/usr/local/bin/uwsgi", "--ini", "paas/uwsgi.ini", ]
+
 EXPOSE 8000

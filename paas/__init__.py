@@ -1,5 +1,6 @@
 from pgrest.pycommon.config import conf
 
+
 def get_django_db():
     """
     Returns the django db parameters for the settings.py file --
@@ -10,7 +11,7 @@ def get_django_db():
     for db in conf.databases:
         if db['dbinstancename'] == "local":
             return db
-        elif db['dbinstancename'] == 'kubernetes':
+        elif db['dbinstancename'] == "kubernetes-postgres":
             kube_db = db
     return kube_db
 

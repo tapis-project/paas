@@ -15,15 +15,15 @@ urlpatterns = [
     # url('^pgrest/manage-tables/dump', views.TableManagementDump.as_view()),
 
     # GET SINGLE, PUT, DELETE
-    url('^pgrest/manage/(?P<manage_table_id>.+)', views.TableManagementById.as_view()),
+    url('^v3/pgrest/manage/(?P<manage_table_id>.+)', views.TableManagementById.as_view()),
     # GET ALL, POST, PUT
-    url('^pgrest/manage', views.TableManagement.as_view()),
+    url('^v3/pgrest/manage', views.TableManagement.as_view()),
 
     # ---- dynamic views --- #
     # GET SINGLE, PUT, DELETE
-    url('^pgrest/data/(?P<root_url>.+)/(?P<primary_id>.+)', views.DynamicViewById.as_view()),
+    url('^v3/pgrest/data/(?P<root_url>.+)/(?P<primary_id>.+)', views.DynamicViewById.as_view()),
     # GET ALL, POST, PUT
-    url('^pgrest/data/(?P<root_url>.+)', views.DynamicView.as_view()),
+    url('^v3/pgrest/data/(?P<root_url>.+)', views.DynamicView.as_view()),
 
 ]
 urlpatterns = format_suffix_patterns(urlpatterns)
