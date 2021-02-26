@@ -168,8 +168,8 @@ create_table_5 = {
 }
 
 create_table_6 = {
-  "table_name": "create_table_10",
-  "root_url": "create-table-10",
+  "table_name": "create_table_6",
+  "root_url": "create-table-6",
   "columns": {
     "col_one": {
       "null": True,
@@ -183,6 +183,166 @@ create_table_6 = {
     "col_three": {
       "null": True,
       "data_type": "integer"
+    },
+    "col_four": {
+      "null": False,
+      "data_type": "boolean",
+      "default": True
+    },
+    "col_five": {
+      "null": True,
+      "data_type": "varchar",
+      "char_len": 255
+    }
+  }
+}
+
+create_table_7 = {
+  "table_name": "create_table_7",
+  "root_url": "create-table-7",
+  "columns": {
+    "col_one": {
+      "null": True,
+      "data_type": "varchar",
+      "char_len": 255
+    },
+    "col_two": {
+      "data_type": "SERIAL"
+    },
+    "col_three": {
+      "null": True,
+      "data_type": "integer"
+    },
+    "col_four": {
+      "null": False,
+      "data_type": "boolean",
+      "default": True
+    },
+    "col_five": {
+      "null": True,
+      "data_type": "varchar",
+      "char_len": 255
+    }
+  }
+}
+
+create_table_8 = {
+  "table_name": "create_table_8",
+  "root_url": "create-table-8",
+  "columns": {
+    "col_one": {
+      "null": True,
+      "data_type": "varchar",
+      "char_len": 255
+    },
+    "col_two": {
+      "null": True,
+      "data_type": "SERIAL"
+    },
+    "col_three": {
+      "null": True,
+      "data_type": "integer"
+    },
+    "col_four": {
+      "null": False,
+      "data_type": "boolean",
+      "default": True
+    },
+    "col_five": {
+      "null": True,
+      "data_type": "varchar",
+      "char_len": 255
+    }
+  }
+}
+
+create_table_9 = {
+  "table_name": "create_table_9",
+  "root_url": "create-table-9",
+  "columns": {
+    "col_one": {
+      "null": True,
+      "data_type": "varchar",
+      "char_len": 255
+    },
+    "col_two": {
+      "data_type": "SERIAL"
+    },
+    "col_three": {
+      "null": True,
+      "FK": True,
+      "data_type": "integer",
+      "reference_table": "initial_table",
+      "reference_column": "initial_table_id",
+      "on_delete": "CASCADE"
+
+    },
+    "col_four": {
+      "null": False,
+      "data_type": "boolean",
+      "default": True
+    },
+    "col_five": {
+      "null": True,
+      "data_type": "varchar",
+      "char_len": 255
+    }
+  }
+}
+
+create_table_10 = {
+  "table_name": "create_table_10",
+  "root_url": "create-table-10",
+  "columns": {
+    "col_one": {
+      "null": True,
+      "data_type": "varchar",
+      "char_len": 255
+    },
+    "col_two": {
+      "data_type": "SERIAL"
+    },
+    "col_three": {
+      "null": False,
+      "FK": True,
+      "data_type": "integer",
+      "reference_table": "initial_table",
+      "reference_column": "initial_table_id",
+      "on_delete": "set null"
+
+    },
+    "col_four": {
+      "null": False,
+      "data_type": "boolean",
+      "default": True
+    },
+    "col_five": {
+      "null": True,
+      "data_type": "varchar",
+      "char_len": 255
+    }
+  }
+}
+
+create_table_11 = {
+  "table_name": "create_table_9",
+  "root_url": "create-table-9",
+  "columns": {
+    "col_one": {
+      "null": True,
+      "data_type": "varchar",
+      "char_len": 255
+    },
+    "col_two": {
+      "data_type": "SERIAL"
+    },
+    "col_three": {
+      "null": True,
+      "FK": True,
+      "data_type": "integer",
+      "reference_table": "initial_table",
+      "reference_column": "initial_table_id",
+      "on_delete": "set null"
     },
     "col_four": {
       "null": False,

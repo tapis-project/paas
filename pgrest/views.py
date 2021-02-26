@@ -11,7 +11,7 @@ from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseServer
 
 from rest_framework.views import APIView
 
-from pgrest.models import ManageTables, ManageTablesTransition
+from pgrest.models import ManageTables, ManageTablesTransition, Tenants
 from pgrest.db_transactions import manage_tables, table_data, bulk_data
 from pgrest.pycommon.auth import t, get_tenant_id_from_base_url
 from pgrest.utils import create_validate_schema, can_read, can_write, is_admin
@@ -49,10 +49,10 @@ class RoleSessionMixin:
             try:
                 # Get the base url from the incoming request, and then use the
                 request_url = request.scheme + "://" + request.get_host()
-                # tenant_id = get_tenant_id_from_base_url("https://admin.develop.tapis.io", t.tenant_cache)
-                tenant_id = get_tenant_id_from_base_url(request_url, t.tenant_cache)
+                tenant_id = get_tenant_id_from_base_url("https://admin.develop.tapis.io", t.tenant_cache)
+                # tenant_id = get_tenant_id_from_base_url(request_url, t.tenant_cache)
             except Exception as e:
-                msg = f""
+                msg = f"Error occurred while calculating tenant ID from the request base URL."
                 logger.error(msg)
                 return HttpResponseBadRequest(msg)
 
@@ -63,15 +63,28 @@ class RoleSessionMixin:
                 logger.error(msg)
                 return HttpResponseForbidden(msg)
 
-            roles = t.sk.getUserRoles(user=username, tenant=tenant_id)
+            try:
+                roles = t.sk.getUserRoles(user=username, tenant=tenant_id)
+                role_list = list()
+                for name in roles.names:
+                    role_list.append(name)
+            except Exception as e:
+                msg = f"Error occurred while retrieving roles from SK: {e}"
+                logger.error(msg)
+                return HttpResponseBadRequest(msg)
 
-            role_list = list()
-            for name in roles.names:
-                role_list.append(name)
+            try:
+                db_instance_name = Tenants.objects.get(tenant_name=tenant_id).db_instance_name
+            except Exception as e:
+                msg = f"Error occurred while retrieving the db instance name for tenant {tenant_id}: {e}. " \
+                      f"Available tenants: {Tenants.objects.all().values()}"
+                logger.error(msg)
+                return HttpResponseBadRequest(msg)
 
             request.session['roles'] = role_list
             request.session['username'] = username
             request.session['tenant_id'] = tenant_id
+            request.session['db_instance_name'] = db_instance_name
 
             return super().dispatch(request, *args, **kwargs)
 
@@ -88,7 +101,6 @@ class TableManagement(RoleSessionMixin, APIView):
     """
     @is_admin
     def get(self, request, *args, **kwargs):
-        # TODO - pull tenant from session
         # req_tenant = "public"
         req_tenant = request.session['tenant_id']
 
@@ -109,8 +121,8 @@ class TableManagement(RoleSessionMixin, APIView):
                                "tenant": table.tenant_id,
                                "endpoints": table.endpoints,
                                "columns": table.column_definition,
-                               "update schema": table.validate_json_update,
-                               "create schema": table.validate_json_create,
+                               "update_schema": table.validate_json_update,
+                               "create_schema": table.validate_json_create,
                                "tenant_id": table.tenant_id})
         else:
             for table in tables:
@@ -125,9 +137,9 @@ class TableManagement(RoleSessionMixin, APIView):
 
     @is_admin
     def post(self, request, *args, **kwargs):
-        # TODO - pull tenant from session
         # req_tenant = "public"
         req_tenant = request.session['tenant_id']
+        db_instance_name = request.session['db_instance_name']
 
         # Parse out required fields.
         try:
@@ -183,7 +195,7 @@ class TableManagement(RoleSessionMixin, APIView):
 
         try:
             result = self.post_transaction(table_name, root_url, columns, validate_json_create, validate_json_update,
-                                           endpoints, req_tenant)
+                                           endpoints, req_tenant, db_instance_name)
         except Exception as e:
             msg = f"Failed to create table {table_name}. {e}"
             logger.error(msg)
@@ -193,7 +205,7 @@ class TableManagement(RoleSessionMixin, APIView):
 
     @transaction.atomic
     def post_transaction(self, table_name, root_url, columns, validate_json_create, validate_json_update,
-                         endpoints, tenant_id):
+                         endpoints, tenant_id, db_instance_name):
 
         new_table = ManageTables.objects.create(table_name=table_name, root_url=root_url, column_definition=columns,
                                                 validate_json_create=validate_json_create,
@@ -204,7 +216,7 @@ class TableManagement(RoleSessionMixin, APIView):
                                               validate_json_create_tn=validate_json_create,
                                               validate_json_update_tn=validate_json_update)
 
-        manage_tables.create_table(table_name, columns, tenant_id)
+        manage_tables.create_table(table_name, columns, tenant_id, db_instance_name)
 
         result = {
             "table_name": new_table.table_name,
@@ -226,8 +238,6 @@ class TableManagementById(RoleSessionMixin, APIView):
     """
     @is_admin
     def get(self, request, *args, **kwargs):
-        # TODO Check and store role from JWT. Must be an admin.
-        # TODO Check and store tenant from JWT.
         # req_tenant = "public"
         req_tenant = request.session['tenant_id']
 
@@ -278,7 +288,6 @@ class TableManagementById(RoleSessionMixin, APIView):
 
     @is_admin
     def put(self, request, *args, **kwargs):
-        # TODO - pull tenant from session
         # req_tenant = "public"
         req_tenant = request.session['tenant_id']
 
@@ -414,9 +423,9 @@ class TableManagementById(RoleSessionMixin, APIView):
 
     @is_admin
     def delete(self, request, *args, **kwargs):
-        # TODO - pull tenant from session
         # req_tenant = "public"
         req_tenant = request.session['tenant_id']
+        db_instance_name = request.session['db_instance_name']
 
         # Parse out required fields.
         try:
@@ -434,7 +443,7 @@ class TableManagementById(RoleSessionMixin, APIView):
             return HttpResponseNotFound(msg)
 
         try:
-            self.delete_transaction(table, req_tenant)
+            self.delete_transaction(table, req_tenant, db_instance_name)
         except Exception as e:
             msg = f"Failed to drop table {table.table_name} from the ManageTables table: {e}"
             logger.error(msg)
@@ -443,9 +452,9 @@ class TableManagementById(RoleSessionMixin, APIView):
         return HttpResponse(200)
 
     @transaction.atomic
-    def delete_transaction(self, table, tenant_id):
+    def delete_transaction(self, table, tenant_id, db_instance_name):
         ManageTables.objects.get(table_name=table.table_name, tenant_id=tenant_id).delete()
-        manage_tables.delete_table(table.table_name, tenant_id)
+        manage_tables.delete_table(table.table_name, tenant_id, db_instance=db_instance_name)
 
 
 class TableManagementDump(RoleSessionMixin, APIView):
@@ -454,7 +463,6 @@ class TableManagementDump(RoleSessionMixin, APIView):
     """
     @is_admin
     def post(self, request, *args, **kwargs):
-        # TODO - pull tenant from session
         # req_tenant = "public"
         req_tenant = request.session['tenant_id']
 
@@ -486,9 +494,8 @@ class TableManagementLoad(RoleSessionMixin, APIView):
     """
     @is_admin
     def post(self, request, *args, **kwargs):
-        # TODO - pull tenant from session
-        req_tenant = "public"
-        # req_tenant = request.session['tenant_id']
+        # req_tenant = "public"
+        req_tenant = request.session['tenant_id']
 
 # For dynamic views, all end users will end up here. We will find the corresponding table
 # based on the url to get here. We then will formulate a SQL statement to do the need actions.
@@ -504,9 +511,9 @@ class DynamicView(RoleSessionMixin, APIView):
     """
     @can_read
     def get(self, request, *args, **kwargs):
-        # TODO - pull tenant from session
         # req_tenant = "public"
         req_tenant = request.session['tenant_id']
+        db_instance = request.session['db_instance_name']
 
         params = self.request.query_params
         limit = self.request.query_params.get("limit")
@@ -547,9 +554,10 @@ class DynamicView(RoleSessionMixin, APIView):
             if limit is None:
                 limit = 10
             if order is not None:
-                result = table_data.get_rows_from_table(table.table_name, query_dict, req_tenant, limit, order=order)
+                result = table_data.get_rows_from_table(table.table_name, query_dict, req_tenant,
+                                                        limit, db_instance, order=order)
             else:
-                result = table_data.get_rows_from_table(table.table_name, query_dict, req_tenant, limit)
+                result = table_data.get_rows_from_table(table.table_name, query_dict, req_tenant, limit, db_instance)
         except Exception as e:
             msg = f"Failed to retrieve rows from table {table.table_name} on tenant {req_tenant}. {e}"
             logger.error(msg)
@@ -559,9 +567,9 @@ class DynamicView(RoleSessionMixin, APIView):
 
     @can_write
     def post(self, request, *args, **kwargs):
-        # TODO - pull tenant from session
         # req_tenant = "public"
         req_tenant = request.session['tenant_id']
+        db_instance = request.session['db_instance_name']
 
         # Parse out required fields.
         try:
@@ -600,7 +608,8 @@ class DynamicView(RoleSessionMixin, APIView):
         except Exception as e:
             msg = f"Error occurred when validating the data from the json validation schema: {e}"
             logger.error(msg)
-            return HttpResponseBadRequest(msg)
+            pass
+            # return HttpResponseBadRequest(msg)
 
         # Separate columns and values out into two lists.
         columns = list()
@@ -613,13 +622,14 @@ class DynamicView(RoleSessionMixin, APIView):
         value_str = value_str[:-2]
 
         try:
-            result_id = table_data.create_row(table.table_name, columns, value_str, values, req_tenant)
+            result_id = table_data.create_row(table.table_name, columns, value_str, values, req_tenant,
+                                              db_instance=db_instance)
         except Exception as e:
             msg = f"Failed to retrieve rows from table {table.table_name} on tenant {req_tenant}. {e}"
             logger.error(msg)
             return HttpResponseBadRequest(msg)
         try:
-            result = table_data.get_row_from_table(table.table_name, result_id, req_tenant)
+            result = table_data.get_row_from_table(table.table_name, result_id, req_tenant, db_instance=db_instance)
         except Exception as e:
             msg = f"Failed to retrieve rows from table {table.table_name} on tenant {req_tenant}. {e}"
             logger.error(msg)
@@ -628,9 +638,9 @@ class DynamicView(RoleSessionMixin, APIView):
         return HttpResponse(json.dumps(result), content_type='application/json')
     @can_write
     def put(self, request, *args, **kwargs):
-            # TODO - pull tenant from session
             # req_tenant = "public"
             req_tenant = request.session['tenant_id']
+            db_instance = request.session['db_instance_name']
 
             # Parse out required fields.
             result_dict = json.loads(request.body.decode())
@@ -668,9 +678,9 @@ class DynamicView(RoleSessionMixin, APIView):
 
             try:
                 if where_clause:
-                    table_data.update_rows_with_where(table.table_name, data, req_tenant, where_clause)
+                    table_data.update_rows_with_where(table.table_name, data, req_tenant, db_instance, where_clause)
                 else:
-                    table_data.update_rows_with_where(table.table_name, data, req_tenant)
+                    table_data.update_rows_with_where(table.table_name, data, req_tenant, db_instance)
             except Exception as e:
                 msg = f"Failed to update row in table {table.table_name} with pk {pk_id} on tenant {req_tenant}. {e}"
                 logger.error(msg)
@@ -687,7 +697,6 @@ class DynamicViewById(RoleSessionMixin, APIView):
     """
     @can_read
     def get(self, request, *args, **kwargs):
-        # TODO - pull tenant from session
         # req_tenant = "public"
         req_tenant = request.session['tenant_id']
 
@@ -723,9 +732,9 @@ class DynamicViewById(RoleSessionMixin, APIView):
 
     @can_write
     def put(self, request, *args, **kwargs):
-        # TODO - pull tenant from session
         # req_tenant = "public"
         req_tenant = request.session['tenant_id']
+        db_instance = request.session['db_instance_name']
 
         # Parse out required fields.
         try:
@@ -761,7 +770,7 @@ class DynamicViewById(RoleSessionMixin, APIView):
             return HttpResponseBadRequest(msg)
 
         try:
-            table_data.update_row_with_pk(table.table_name, pk_id, data, req_tenant)
+            table_data.update_row_with_pk(table.table_name, pk_id, data, req_tenant, db_instance=db_instance)
         except Exception as e:
             msg = f"Failed to update row in table {table.table_name} with pk {pk_id} in tenant {req_tenant}. {e}"
             logger.error(msg)
@@ -778,9 +787,9 @@ class DynamicViewById(RoleSessionMixin, APIView):
 
     @can_write
     def delete(self, request, *args, **kwargs):
-        # TODO - pull tenant from session
         # req_tenant = "public"
         req_tenant = request.session['tenant_id']
+        db_instance = request.session['db_instance_name']
 
         # Parse out required fields.
         try:
@@ -804,10 +813,40 @@ class DynamicViewById(RoleSessionMixin, APIView):
             return HttpResponseBadRequest(msg)
 
         try:
-            table_data.delete_row(table.table_name, pk_id, req_tenant)
+            table_data.delete_row(table.table_name, pk_id, req_tenant, db_instance=db_instance)
         except Exception as e:
             msg = f"Failed to delete row from table {table.table_name} with pk {pk_id} in tenant {req_tenant}. {e}"
             logger.error(msg)
             return HttpResponseBadRequest(msg)
 
         return HttpResponse(status=200)
+
+
+class CreateTenant(APIView):
+    def post(self, request, *args, **kwargs):
+        try:
+            schema_name = request.data['schema_name']
+            db_instance = request.data['db_instance']
+
+        except KeyError as e:
+            msg = f"\'{e.args}\' is required when creating new row in a table."
+            logger.warning(msg)
+            return HttpResponseBadRequest(msg)
+
+        try:
+            Tenants.objects.get_or_create(tenant_name=schema_name, db_instance_name=db_instance)
+        except Exception as e:
+            msg = f"Unable to insert new role into Tenants Django table for tenant " \
+                  f"{schema_name} and db_instance {db_instance}: {e}"
+            logger.warning(msg)
+            return HttpResponseBadRequest(msg)
+
+        try:
+            manage_tables.create_schema(schema_name, db_instance)
+        except Exception as e:
+            msg = f"Failed to create new schema {schema_name} in db_instance {db_instance}. {e}"
+            logger.error(msg)
+            return HttpResponseBadRequest(msg)
+
+        return HttpResponse(200)
+

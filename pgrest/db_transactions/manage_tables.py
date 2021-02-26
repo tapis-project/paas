@@ -5,8 +5,21 @@ from . import config
 logger = logging.getLogger(__name__)
 
 
+def do_transaction(command, db_instance):
+    # Read the connection parameters and connect to database.
+    if db_instance:
+        params = config.config(db_instance)
+    else:
+        params = config.config()
+    conn = psycopg2.connect(**params)
+    cur = conn.cursor()
+    cur.execute(command)
+    cur.close()
+    conn.commit()
+
+
 # TODO create exceptions
-def create_table(table_name, columns, tenant):
+def create_table(table_name, columns, tenant, db_instance=None):
     """Create table in the PostgreSQL database"""
     logger.info(f"Creating table {tenant}.{table_name}...")
 
@@ -29,6 +42,34 @@ def create_table(table_name, columns, tenant):
                 msg = f"Character max size not received for column {column_name}. Cannot create table {table_name}."
                 logger.warning(msg)
                 raise Exception(msg)
+        # Handle foreign keys.
+        if "FK" in column_args and column_args["FK"]:
+            try:
+                # check we have we need
+                ref_table = column_args["reference_table"]
+                ref_column = column_args["reference_column"]
+                on_delete = column_args["on_delete"]
+
+                # Do some input checking on delete action.
+                delete_options = ["SET NULL", "SET DEFAULT", "RESTRICT", "NO ACTION", "CASCADE"]
+                if on_delete.upper() not in delete_options:
+                    msg = f"Invalid delete supplied: {on_delete}. Valid delete actions: {delete_options}."
+                    logger.warning(msg)
+                    raise Exception(msg)
+                # Cannot set on delete action to SET NULL if the column does not allow nulls.
+                if on_delete.upper() == "SET NULL" and "null" in column_args and not column_args["null"]:
+                    msg = f"Cannot set delete action on column {column_name} " \
+                          f"as it does not allow nulls in column definition."
+                    logger.warning(msg)
+                    raise Exception(msg)
+
+                column_type = "%s REFERENCES %s.%s(%s) ON DELETE %s" % (column_type, tenant, ref_table, ref_column, on_delete)
+
+            except KeyError as e:
+                msg = f"Required key {e.args[0]} not received for column {column_name}. " \
+                      f"Cannot create table {table_name}."
+                logger.warning(msg)
+                raise Exception(msg)
 
         col_str_list = list()
         col_string = "%s %s" % (column_name, column_type)
@@ -43,7 +84,7 @@ def create_table(table_name, columns, tenant):
                 col_str_list.append("UNIQUE")
             elif key == "default":
                 col_str_list.append("DEFAULT %s" % val)
-            elif key != "data_type" and key != "char_len":
+            elif key not in ["data_type", "char_len", "FK", "reference_table", "reference_column", "on_delete"]:
                 msg = f"{key} is an invalid argument for column {column_name}. Cannot create table {table_name}"
                 raise Exception(msg)
 
@@ -52,60 +93,71 @@ def create_table(table_name, columns, tenant):
 
     remove = command.rindex(",")
     command = command[:remove] + ")"
-    logger.info(f"Create db command for table {table_name}: {command}")
+    logger.debug(f"Create db command for table {table_name}: {command}")
 
     conn = None
     try:
-        # Read the connection parameters and connect to database.
-        # TODO -- pass db_instance based on the tenant_id
-        params = config.config()
-        conn = psycopg2.connect(**params)
-        cur = conn.cursor()
-        cur.execute(command)
-        cur.close()
-        conn.commit()
-        # Success.
-        logger.info(f"Table {tenant}.{table_name} successfully created in postgres db.")
+        do_transaction(command, db_instance)
+        logger.debug(f"Table {tenant}.{table_name} successfully created in postgres db.")
     except psycopg2.DatabaseError as e:
-        conn.close()
+        if conn:
+            conn.close()
         msg = f"Error accessing database: {e}"
         logger.error(msg)
         raise Exception(msg)
     except Exception as e:
-        conn.close()
+        if conn:
+            conn.close()
         msg = f"Error creating table {tenant}.{table_name}: {e}"
         logger.error(msg)
         raise Exception(msg)
 
 
-def delete_table(table_name, tenant):
+def delete_table(table_name, tenant, db_instance=None):
     """ Drop table in the PostgreSQL database"""
     logger.info(f"Dropping table {tenant}.{table_name}...")
     command = "DROP TABLE %s.%s CASCADE;" % (tenant, table_name)
-
-    logger.info(f"Drop table command for {tenant}.{table_name}: {command}")
     conn = None
+    logger.info(f"Drop table command for {tenant}.{table_name}: {command}")
     try:
-        # Read the connection parameters and connect to database.
-        params = config.config()
-        conn = psycopg2.connect(**params)
-        cur = conn.cursor()
-        cur.execute(command)
-        cur.close()
-        conn.commit()
-        # Success.
+        do_transaction(command, db_instance)
         logger.info(f"Table {tenant}.{table_name} successfully dropped from postgres db.")
     except psycopg2.DatabaseError as e:
-        conn.close()
+        if conn:
+            conn.close()
         msg = f"Error accessing database: {e}"
         logger.error(msg)
         raise Exception(msg)
     except Exception as e:
-        conn.close()
+        if conn:
+            conn.close()
         msg = f"Error dropping table {tenant}.{table_name}: {e}"
         logger.error(msg)
         raise Exception(msg)
 
+
+def create_schema(schema_name, db_instance=None):
+    """Create schema for a tenant in the PostgreSQL database"""
+    logger.info(f"Creating schema {schema_name}...")
+
+    command = "CREATE SCHEMA IF NOT EXISTS %s;" % (schema_name, )
+
+    conn = None
+    try:
+        do_transaction(command, db_instance)
+        logger.info(f"Schema {schema_name} successfully created in postgres db.")
+    except psycopg2.DatabaseError as e:
+        if conn:
+            conn.close()
+        msg = f"Error accessing database: {e}"
+        logger.error(msg)
+        raise Exception(msg)
+    except Exception as e:
+        if conn:
+            conn.close()
+        msg = f"Error creating schema {schema_name}: {e}"
+        logger.error(msg)
+        raise Exception(msg)
 
 
 

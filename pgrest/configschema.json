@@ -9,7 +9,7 @@
     },
     "service_tenant_base_url": {
       "type": "string",
-      "default": "https://admin.develop.tapis.io"
+      "default": "https://admin.staging.tapis.io"
     },
     "databases": {
       "type": "array",

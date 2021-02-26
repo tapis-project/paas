@@ -8,11 +8,9 @@ from pgrest import views
 urlpatterns = [
 
     # ---- table management --- #
-    # TODO - these two are not working right now
-    # # POST
-    # url('^pgrest/manage-tables/load', views.TableManagementLoad.as_view()),
-    # # POST
-    # url('^pgrest/manage-tables/dump', views.TableManagementDump.as_view()),
+
+    # POST
+    url('^v3/pgrest/manage/tenants', views.CreateTenant.as_view()),
 
     # GET SINGLE, PUT, DELETE
     url('^v3/pgrest/manage/(?P<manage_table_id>.+)', views.TableManagementById.as_view()),

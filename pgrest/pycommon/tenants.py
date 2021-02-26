@@ -5,6 +5,7 @@ from pgrest.pycommon import errors
 from pgrest.pycommon.logs import get_logger
 logger = get_logger(__name__)
 
+
 class Tenants(object):
     """
     Class for managing the tenants available in the tenants registry, including metadata associated with the tenant.

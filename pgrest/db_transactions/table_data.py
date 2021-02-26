@@ -16,8 +16,7 @@ def dict_fetch_all(cursor):
     ]
 
 
-# TODO create exceptions
-def get_row_from_table(table_name, pk_id, tenant):
+def get_row_from_table(table_name, pk_id, tenant, db_instance=None):
     """
     Gets the row with given primary key from the specified table.
     """
@@ -27,7 +26,10 @@ def get_row_from_table(table_name, pk_id, tenant):
     logger.info(f"Command: {command}")
     try:
         # Read the connection parameters and connect to database.
-        params = config.config()
+        if db_instance:
+            params = config.config(db_instance)
+        else:
+            params = config.config()
         conn = psycopg2.connect(**params)
         cur = conn.cursor()
         cur.execute(command)
@@ -49,7 +51,7 @@ def get_row_from_table(table_name, pk_id, tenant):
         raise Exception(msg)
 
 
-def get_rows_from_table(table_name, query_dict, tenant, limit, **kwargs):
+def get_rows_from_table(table_name, query_dict, tenant, limit, db_instance, **kwargs):
     """
     Gets all rows from given table with an optional limit and filter.
     """
@@ -86,7 +88,10 @@ def get_rows_from_table(table_name, query_dict, tenant, limit, **kwargs):
     logger.info(f"Command: {command}")
     try:
         # Read the connection parameters and connect to database.
-        params = config.config()
+        if db_instance:
+            params = config.config(db_instance)
+        else:
+            params = config.config()
         conn = psycopg2.connect(**params)
         cur = conn.cursor()
         cur.execute(command)
@@ -106,7 +111,7 @@ def get_rows_from_table(table_name, query_dict, tenant, limit, **kwargs):
         raise Exception(msg)
 
 
-def create_row(table_name, columns, val_str, values, tenant):
+def create_row(table_name, columns, val_str, values, tenant, db_instance=None):
     """
     Creates a new row in the given table. Returns the primary key ID of the new row.
     """
@@ -119,7 +124,10 @@ def create_row(table_name, columns, val_str, values, tenant):
     logger.info(f"Command: {command}")
     try:
         # Read the connection parameters and connect to database.
-        params = config.config()
+        if db_instance:
+            params = config.config(db_instance)
+        else:
+            params = config.config()
         conn = psycopg2.connect(**params)
         cur = conn.cursor()
         cur.execute(command, values)
@@ -139,7 +147,7 @@ def create_row(table_name, columns, val_str, values, tenant):
         raise Exception(msg)
 
 
-def delete_row(table_name, pk_id, tenant):
+def delete_row(table_name, pk_id, tenant, db_instance=None):
     """
     Deletes the specified row in the given table.
     """
@@ -149,7 +157,10 @@ def delete_row(table_name, pk_id, tenant):
     logger.info(f"Command: {command}")
     try:
         # Read the connection parameters and connect to database.
-        params = config.config()
+        if db_instance:
+            params = config.config(db_instance)
+        else:
+            params = config.config()
         conn = psycopg2.connect(**params)
         cur = conn.cursor()
         cur.execute(command)
@@ -170,7 +181,7 @@ def delete_row(table_name, pk_id, tenant):
         raise Exception(msg)
 
 
-def update_row_with_pk(table_name, pk_id, data, tenant):
+def update_row_with_pk(table_name, pk_id, data, tenant, db_instance=None):
     """
     Updates a specified row on a table with the given columns and associated values.
     """
@@ -186,7 +197,10 @@ def update_row_with_pk(table_name, pk_id, data, tenant):
     logger.info(f"Command: {command}")
     try:
         # Read the connection parameters and connect to database.
-        params = config.config()
+        if db_instance:
+            params = config.config(db_instance)
+        else:
+            params = config.config()
         conn = psycopg2.connect(**params)
         cur = conn.cursor()
         cur.execute(command)
@@ -208,7 +222,8 @@ def update_row_with_pk(table_name, pk_id, data, tenant):
         logger.error(msg)
         raise Exception(msg)
 
-def update_rows_with_where(table_name, data, tenant, where_clause=None):
+
+def update_rows_with_where(table_name, data, tenant, db_instance, where_clause=None):
     """
     Updates 1+ row(s) on a table with the given columns and associated values based on a where clause. If a where clause
     is not specified, the entire table is updated.
@@ -226,7 +241,7 @@ def update_rows_with_where(table_name, data, tenant, where_clause=None):
         first = True
         for key, value in where_clause.items():
             if first:
-                if type(value) == int or type(value) ==  float:
+                if type(value) == int or type(value) == float:
                     query = " WHERE \"%s\" %s %d" % (key, value["operator"], value["value"])
                 else:
                     query = " WHERE \"%s\" %s \'%s\'" % (key, value["operator"], value["value"])
@@ -242,7 +257,10 @@ def update_rows_with_where(table_name, data, tenant, where_clause=None):
     logger.info(f"Command: {command}")
     try:
         # Read the connection parameters and connect to database.
-        params = config.config()
+        if db_instance:
+            params = config.config(db_instance)
+        else:
+            params = config.config()
         conn = psycopg2.connect(**params)
         cur = conn.cursor()
         cur.execute(command)

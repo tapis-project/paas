@@ -44,5 +44,6 @@ class ManageTablesTransition(models.Model):
 
 class Tenants(models.Model):
     tenant_id = models.AutoField(primary_key=True)
-    db_section = models.CharField(max_length=255, unique=True)
+    tenant_name = models.CharField(max_length=255)
+    db_instance_name = models.CharField(max_length=255)
 
