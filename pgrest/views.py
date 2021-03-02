@@ -49,8 +49,11 @@ class RoleSessionMixin:
             try:
                 # Get the base url from the incoming request, and then use the
                 request_url = request.scheme + "://" + request.get_host()
-                tenant_id = get_tenant_id_from_base_url("https://admin.develop.tapis.io", t.tenant_cache)
-                # tenant_id = get_tenant_id_from_base_url(request_url, t.tenant_cache)
+
+                # NOTE!!!!! This top one can be uncommented for local dev.
+                # Bottom one HAS to be uncommented for deployed services.
+                # tenant_id = get_tenant_id_from_base_url("https://admin.develop.tapis.io", t.tenant_cache)
+                tenant_id = get_tenant_id_from_base_url(request_url, t.tenant_cache)
             except Exception as e:
                 msg = f"Error occurred while calculating tenant ID from the request base URL."
                 logger.error(msg)
