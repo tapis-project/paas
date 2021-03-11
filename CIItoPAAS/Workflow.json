@@ -1,0 +1,14 @@
+{
+  "table_name": "Workflow",
+  "root_url": "workflow",
+  "delete": false,
+  "columns": {
+    "workflow_name": {
+      "data_type": "varchar",
+      "char_len": 20
+    },
+    "sort": {
+      "data_type": "integer"
+    }
+  }
+}

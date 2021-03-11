@@ -1,0 +1,67 @@
+{
+  "table_name": "LocationLookup",
+  "root_url": "location-lookup",
+  "endpoints": false,
+  "columns": {
+    "value": {
+      "data_type": "varchar",
+      "char_len": 100,
+      "null": true
+    },
+    "country_name": {
+      "data_type": "varchar",
+      "char_len": 100,
+      "null": true
+    },
+    "state_code": {
+      "data_type": "varchar",
+      "char_len": 100,
+      "null": true
+    },
+    "state_name": {
+      "data_type": "varchar",
+      "char_len": 100,
+      "null": true
+    },
+    "level_name": {
+      "data_type": "varchar",
+      "char_len": 100,
+      "null": true
+    },
+    "alternate_names": {
+      "data_type": "varchar",
+      "char_len": 100,
+      "null": true
+    },
+    "cdh_id": {
+      "data_type": "integer"
+    },
+    "country_id": {
+      "data_type": "integer",
+      "null": true
+    },
+    "char2": {
+      "data_type": "varchar",
+      "char_len": 100,
+      "null": true
+    },
+    "char3": {
+      "data_type": "varchar",
+      "char_len": 100,
+      "null": true
+    },
+    "active": {
+      "data_type": "boolean"
+    },
+    "datamining_region": {
+      "data_type": "varchar",
+      "char_len": 100,
+      "null": true
+    },
+    "datamining_subregion": {
+      "data_type": "varchar",
+      "char_len": 100,
+      "null": true
+    }
+  }
+}

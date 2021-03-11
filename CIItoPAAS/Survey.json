@@ -1,0 +1,101 @@
+{
+  "table_name": "Survey",
+  "root_url": "survey",
+  "delete": false,
+  "columns": {
+    "project_id": {
+      "data_type": "integer",
+      "FK": true,
+      "reference_table": "Project",
+      "reference_column": "Project_id",
+      "on_delete": "cascade"
+    },
+    "industry_group_phase": {
+      "data_type": "integer",
+      "FK": true,
+      "reference_table": "IndustryGroupPhase",
+      "reference_column": "IndustryGroupPhase_id",
+      "on_delete": "cascade"
+    },
+    "coordinator_id": {
+      "null": true,
+      "data_type": "varchar",
+      "char_len": 100
+    },
+    "general_workflow_id": {
+      "data_type": "integer",
+      "FK": true,
+      "reference_table": "Workflow",
+      "reference_column": "Workflow_id",
+      "on_delete": "cascade"
+    },
+    "input_workflow_id": {
+      "data_type": "integer",
+      "FK": true,
+      "reference_table": "Workflow",
+      "reference_column": "Workflow_id",
+      "on_delete": "cascade"
+    },
+    "output_workflow_id": {
+      "data_type": "integer",
+      "FK": true,
+      "reference_table": "Workflow",
+      "reference_column": "Workflow_id",
+      "on_delete": "cascade"
+    },
+    "hanscomb_reference_id": {
+      "null": true,
+      "data_type": "integer"
+    },
+    "rs_means_national_reference": {
+      "null": true,
+      "data_type": "integer"
+    },
+    "rs_means_city_reference": {
+      "null": true,
+      "data_type": "integer"
+    },
+    "exchange_rate_to_usd": {
+      "data_type": "float"
+    },
+    "round_begin": {
+      "data_type": "timestamp",
+      "null": true
+    },
+    "round_ended": {
+      "data_type": "timestamp",
+      "null": true
+    },
+    "validation_email_sent": {
+      "data_type": "boolean",
+      "null": true
+    },
+    "country_selection_id": {
+      "data_type": "integer",
+      "null": true
+    },
+    "submitted_date": {
+      "data_type": "timestamp",
+      "null": true
+    },
+    "validated_date": {
+      "data_type": "timestamp",
+      "null": true
+    },
+    "created_date": {
+      "data_type": "timestamp",
+      "null": true
+    },
+    "coordinator_salesforce_id": {
+      "data_type": "varchar",
+      "char_len": 50
+    },
+    "section_id": {
+      "data_type": "integer",
+      "FK": true,
+      "reference_table": "Section",
+      "reference_column": "Section_id",
+      "on_delete": "cascade"
+    }
+  }
+}

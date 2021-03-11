@@ -1,0 +1,12 @@
+{
+  "table_name": "ProjectSize",
+  "root_url": "project-size",
+  "endpoints": false,
+  "columns": {
+    "value": {
+      "data_type": "varchar",
+      "char_len": 100,
+      "null": true
+    }
+  }
+}

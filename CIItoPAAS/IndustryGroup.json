@@ -1,0 +1,12 @@
+{
+  "table_name": "IndustryGroup",
+  "root_url": "industry-group",
+  "endpoints": false,
+  "columns": {
+    "value": {
+      "data_type": "varchar",
+      "char_len": 100,
+      "null": true
+    }
+  }
+}

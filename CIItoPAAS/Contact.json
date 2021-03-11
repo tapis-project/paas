@@ -1,0 +1,42 @@
+{
+  "table_name": "Contact",
+  "root_url": "contact",
+  "delete": false,
+  "columns": {
+    "company_salesforce_id": {
+      "null": true,
+      "data_type": "varchar",
+      "char_len": 100
+    },
+    "salesforce_id": {
+      "data_type": "varchar",
+      "char_len": 100,
+      "null": true
+    },
+    "user_id": {
+      "null": true,
+      "data_type": "integer",
+      "FK": true,
+      "reference_table": "UserProfile",
+      "reference_column": "UserProfile_id",
+      "on_delete": "cascade"
+    },
+    "email": {
+      "null": true,
+      "data_type": "varchar",
+      "char_len": 100
+    },
+    "account_id": {
+      "null": true,
+      "data_type": "integer",
+      "FK": true,
+      "reference_table": "Account",
+      "reference_column": "Account_id",
+      "on_delete": "cascade"
+    },
+    "active": {
+      "data_type": "boolean",
+      "default": true
+    }
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "table_name": "ProjectType",
+  "root_url": "project-type",
+  "endpoints": false,
+  "columns": {
+    "name": {
+      "data_type": "varchar",
+      "char_len": 255,
+      "unique": true
+    },
+    "benchmarking_lab_id": {
+      "data_type": "integer",
+      "FK": true,
+      "reference_table": "BenchmarkingLab",
+      "reference_column": "BenchmarkingLab_id",
+      "on_delete": "cascade"
+    },
+    "parent_id": {
+      "null": true,
+      "data_type": "integer",
+      "FK": true,
+      "reference_table": "ProjectType",
+      "reference_column": "ProjectType_id",
+      "on_delete": "cascade"
+    },
+    "industry_group_id": {
+      "null": true,
+      "data_type": "integer",
+      "FK": true,
+      "reference_table": "IndustryGroup",
+      "reference_column": "IndustryGroup_id",
+      "on_delete": "cascade"
+    }
+  }
+}

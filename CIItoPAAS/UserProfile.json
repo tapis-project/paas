@@ -1,0 +1,41 @@
+{
+  "table_name": "UserProfile",
+  "root_url": "user-profile",
+  "delete": false,
+  "columns": {
+    "username": {
+      "unique": true,
+      "data_type": "varchar",
+      "char_len": 255
+    },
+    "role": {
+      "data_type": "varchar",
+      "char_len": 25
+    },
+    "first_name": {
+      "null": true,
+      "data_type": "varchar",
+      "char_len": 255
+    },
+    "last_name": {
+      "null": true,
+      "data_type": "varchar",
+      "char_len": 255
+    },
+    "created_at": {
+      "data_type": "timestamp"
+    },
+    "last_updated_at": {
+      "data_type": "timestamp"
+    },
+    "active": {
+      "data_type": "boolean",
+      "default": true
+    },
+    "lab_mgr": {
+      "null": true,
+      "data_type": "varchar[]"
+    }
+  }
+}
+

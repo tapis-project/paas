@@ -1,0 +1,102 @@
+{
+  "table_name": "Project",
+  "root_url": "project",
+  "delete": false,
+  "columns": {
+    "identifier": {
+      "data_type": "varchar",
+      "char_len": 9
+    },
+    "name": {
+      "data_type": "varchar",
+      "char_len": 200
+    },
+    "company_id": {
+      "data_type": "varchar",
+      "char_len": 100,
+      "null": true
+    },
+    "industry_group": {
+      "data_type": "varchar",
+      "char_len": 20
+    },
+    "last_modified_by_id": {
+      "data_type": "integer",
+      "FK": true,
+      "reference_table": "UserProfile",
+      "reference_column": "UserProfile_id",
+      "on_delete": "cascade"
+    },
+    "created_by_id": {
+      "data_type": "integer",
+      "FK": true,
+      "reference_table": "UserProfile",
+      "reference_column": "UserProfile_id",
+      "on_delete": "cascade"
+    },
+    "created_at": {
+      "data_type": "timestamp"
+    },
+    "last_modified_at": {
+      "data_type": "timestamp"
+    },
+    "project_size": {
+      "null": true,
+      "data_type": "varchar",
+      "char_len": 50
+    },
+    "account_id": {
+      "null": true,
+      "data_type": "integer",
+      "FK": true,
+      "reference_table": "Account",
+      "reference_column": "Account_id",
+      "on_delete": "cascade"
+    },
+    "work_involvement": {
+      "null": true,
+      "data_type": "varchar",
+      "char_len": 50
+    },
+    "exchange_rate": {
+      "null": true,
+      "data_type": "float"
+    },
+    "status_id": {
+      "null": true,
+      "data_type": "integer",
+      "FK": true,
+      "reference_table": "Workflow",
+      "reference_column": "Workflow_id",
+      "on_delete": "cascade"
+    },
+    "section_id": {
+      "data_type": "integer"
+    },
+    "project_nature": {
+      "null": true,
+      "data_type": "varchar",
+      "char_len": 100
+    },
+    "location": {
+      "null": true,
+      "data_type": "varchar",
+      "char_len": 100
+    },
+    "project_priority": {
+      "null": true,
+      "data_type": "varchar",
+      "char_len": 100
+    },
+    "base_currency": {
+      "null": true,
+      "data_type": "varchar",
+      "char_len": 100
+    },
+    "unit_system": {
+      "null": true,
+      "data_type": "varchar",
+      "char_len": 100
+    }
+  }
+}

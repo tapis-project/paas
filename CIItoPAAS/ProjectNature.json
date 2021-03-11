@@ -1,0 +1,17 @@
+{
+  "table_name": "ProjectNature",
+  "root_url": "project-nature",
+  "endpoints": false,
+  "columns": {
+    "value": {
+      "null": true,
+      "data_type": "varchar",
+      "char_len": 100
+    },
+    "value_mapping": {
+      "data_type": "varchar",
+      "char_len": 100,
+      "null": true
+    }
+  }
+}

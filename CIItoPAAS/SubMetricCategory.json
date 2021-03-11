@@ -1,0 +1,17 @@
+{
+  "table_name": "SubMetricCategory",
+  "root_url": "sub-metric-category",
+  "endpoints": false,
+  "columns": {
+    "name": {
+      "data_type": "varchar",
+      "char_len": 100,
+      "null": true
+    },
+    "metric_category": {
+      "data_type": "integer",
+      "null": true
+    }
+
+  }
+}

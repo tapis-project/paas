@@ -1,0 +1,19 @@
+{
+  "table_name": "QuestionType",
+  "root_url": "question-type",
+  "endpoints": false,
+  "columns": {
+    "code": {
+      "data_type": "varchar",
+      "char_len": 15
+    },
+    "min_value": {
+      "data_type": "integer",
+      "null": true
+    },
+    "max_value": {
+      "data_type": "integer",
+      "null": true
+    }
+  }
+}

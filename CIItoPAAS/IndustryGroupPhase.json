@@ -1,0 +1,28 @@
+{
+  "table_name": "IndustryGroupPhase",
+  "root_url": "industry-group-phase",
+  "endpoints": false,
+  "columns": {
+    "value": {
+      "data_type": "varchar",
+      "char_len": 255
+    },
+    "industry_group_id": {
+      "null": true,
+      "data_type": "integer",
+      "FK": true,
+      "reference_table": "IndustryGroup",
+      "reference_column": "IndustryGroup_id",
+      "on_delete": "cascade"
+    },
+    "phase": {
+      "data_type": "varchar",
+      "char_len": 255
+    },
+    "code": {
+      "data_type": "varchar",
+      "char_len": 255,
+      "null": true
+    }
+  }
+}

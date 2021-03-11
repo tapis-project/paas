@@ -1,0 +1,12 @@
+{
+  "table_name": "RespondentType",
+  "root_url": "respondent-type",
+  "endpoints": false,
+  "columns": {
+    "value": {
+      "null": true,
+      "data_type": "varchar",
+      "char_len": 100
+    }
+  }
+}

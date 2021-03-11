@@ -1,0 +1,12 @@
+{
+  "table_name": "MetricCategory",
+  "root_url": "metric-category",
+  "endpoints": false,
+  "columns": {
+    "name": {
+      "data_type": "varchar",
+      "char_len": 100,
+      "null": true
+    }
+  }
+}

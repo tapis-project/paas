@@ -1,0 +1,19 @@
+{
+  "table_name": "Category",
+  "root_url": "category",
+  "endpoints": false,
+  "columns": {
+    "category_label": {
+      "data_type": "varchar",
+      "char_len": 100
+    },
+    "parent": {
+      "null": true,
+      "data_type": "integer",
+      "FK": true,
+      "reference_table": "Category",
+      "reference_column": "Category_id",
+      "on_delete": "cascade"
+    }
+  }
+}

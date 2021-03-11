@@ -1,0 +1,31 @@
+{
+  "table_name": "Membership",
+  "root_url": "membership",
+  "delete": false,
+  "columns": {
+    "benchmarking_lab_id": {
+      "data_type": "integer",
+      "FK": true,
+      "reference_table": "BenchmarkingLab",
+      "reference_column": "BenchmarkingLab_id",
+      "on_delete": "cascade"
+    },
+    "level": {
+      "data_type": "varchar",
+      "char_len": 25
+    },
+    "account_id": {
+      "data_type": "integer",
+      "FK": true,
+      "reference_table": "Account",
+      "reference_column": "Account_id",
+      "on_delete": "cascade"
+    },
+    "created_at": {
+      "data_type": "timestamp"
+    },
+    "last_updated_at": {
+      "data_type": "timestamp"
+    }
+  }
+}

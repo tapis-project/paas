@@ -1,0 +1,36 @@
+{
+  "table_name": "Account",
+  "root_url": "account",
+  "delete": false,
+  "columns": {
+    "company_name": {
+      "null": true,
+      "data_type": "varchar",
+      "char_len": 255
+    },
+    "imis_id": {
+      "data_type": "varchar",
+      "char_len": 10,
+      "null": true
+    },
+    "salesforce_id": {
+      "null": true,
+      "data_type": "varchar",
+      "char_len": 50
+    },
+    "respondent_type": {
+      "null": true,
+      "data_type": "varchar",
+      "char_len": 1
+    },
+    "main_salesforce_id": {
+      "null": true,
+      "data_type": "varchar",
+      "char_len": 50
+    },
+    "active": {
+      "data_type": "boolean",
+      "default": true
+    }
+  }
+}

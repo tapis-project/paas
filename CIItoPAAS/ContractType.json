@@ -1,0 +1,28 @@
+{
+  "table_name": "ContractType",
+  "root_url": "contract-type",
+  "endpoints": false,
+  "columns": {
+    "name": {
+      "data_type": "varchar",
+      "char_len": 100,
+      "unique": true
+    },
+    "parent_id": {
+      "null": true,
+      "data_type": "integer",
+      "FK": true,
+      "reference_table": "ContractType",
+      "reference_column": "ContractType_id",
+      "on_delete": "cascade"
+    },
+    "display": {
+      "data_type": "boolean"
+    },
+    "value_mapping": {
+      "data_type": "varchar",
+      "char_len": 100,
+      "unique": true
+    }
+  }
+}

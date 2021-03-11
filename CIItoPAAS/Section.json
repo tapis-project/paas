@@ -1,0 +1,6 @@
+{
+  "table_name": "Section",
+  "root_url": "section",
+  "endpoints": false,
+  "columns": {}
+}

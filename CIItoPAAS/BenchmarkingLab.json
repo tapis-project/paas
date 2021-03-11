@@ -1,0 +1,25 @@
+{
+  "table_name": "BenchmarkingLab",
+  "root_url": "benchmarking-lab",
+  "delete": false,
+  "columns": {
+    "lab_abbreviation": {
+      "unique": true,
+      "data_type": "varchar",
+      "char_len": 50
+    },
+    "name": {
+      "unique": true,
+      "data_type": "varchar",
+      "char_len": 255
+    },
+    "description": {
+      "data_type": "text"
+    },
+    "active": {
+      "data_type": "boolean",
+      "default": true
+    }
+  }
+}
+

@@ -1,0 +1,28 @@
+{
+  "table_name": "LkpPotentialAnswer",
+  "root_url": "lkp-potential-answer",
+  "endpoints": false,
+  "columns": {
+    "question_id": {
+      "data_type": "integer",
+      "FK": true,
+      "reference_table": "Question",
+      "reference_column": "Question_id",
+      "on_delete": "cascade"
+    },
+    "label": {
+      "data_type": "text"
+    },
+    "sort": {
+      "null": true,
+      "data_type": "integer"
+    },
+    "initial_score": {
+      "null": true,
+      "data_type": "float"
+    },
+    "entended_definition": {
+      "data_type": "text"
+    }
+  }
+}

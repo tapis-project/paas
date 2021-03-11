@@ -1,0 +1,65 @@
+{
+  "table_name": "Metric",
+  "root_url": "metric",
+  "endpoints": false,
+  "columns": {
+    "name": {
+      "data_type": "varchar",
+      "char_len": 100,
+      "null": true
+    },
+    "is_not_zero": {
+      "data_type": "boolean",
+      "null": true
+    },
+    "unit_imperial": {
+      "data_type": "varchar",
+      "char_len": 100,
+      "null": true
+    },
+    "unit_metric": {
+      "data_type": "varchar",
+      "char_len": 100,
+      "null": true
+    },
+    "order_by": {
+      "data_type": "integer",
+      "null": true
+    },
+    "project_type": {
+      "data_type": "varchar",
+      "char_len": 100,
+      "null": true
+    },
+    "metric_category": {
+      "data_type": "integer",
+      "null": true
+    },
+    "metric_sub_category": {
+      "data_type": "integer",
+      "null": true
+    },
+    "is_multiple": {
+      "data_type": "boolean",
+      "null": true
+    },
+    "formula": {
+      "data_type": "varchar",
+      "char_len": 100,
+      "null": true
+    },
+    "required_variable": {
+      "data_type": "varchar",
+      "char_len": 100,
+      "null": true
+    },
+    "quartile_order": {
+      "data_type": "integer",
+      "null": true
+    },
+    "owner_only": {
+      "data_type": "boolean",
+      "null": true
+    }
+  }
+}

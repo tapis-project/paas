@@ -1,0 +1,80 @@
+{
+  "table_name": "Question",
+  "root_url": "question",
+  "delete": false,
+  "columns": {
+    "code": {
+      "data_type": "varchar",
+      "char_len": 100,
+      "null": true
+    },
+    "question_number": {
+      "data_type": "integer",
+      "null": true
+    },
+    "question_sub": {
+      "data_type": "varchar",
+      "char_len": 5,
+      "null": true
+    },
+    "text": {
+      "data_type": "text"
+    },
+    "question_type_id": {
+      "null": true,
+      "data_type": "integer",
+      "FK": true,
+      "reference_table": "QuestionType",
+      "reference_column": "QuestionType_id",
+      "on_delete": "cascade"
+    },
+    "skip_if_false": {
+      "data_type": "integer",
+      "null": true
+    },
+    "extended_definition": {
+      "data_type": "text",
+      "null": true
+    },
+    "category_id": {
+      "null": true,
+      "data_type": "integer",
+      "FK": true,
+      "reference_table": "Category",
+      "reference_column": "Category_id",
+      "on_delete": "cascade"
+    },
+    "is_healthcare": {
+      "data_type": "boolean",
+      "default": false
+    },
+    "is_upstream": {
+      "data_type": "boolean",
+      "default": false
+    },
+    "is_general_large": {
+      "data_type": "boolean",
+      "default": false
+    },
+    "is_pharma": {
+      "data_type": "boolean",
+      "default": false
+    },
+    "is_coaa": {
+      "data_type": "boolean",
+      "default": false
+    },
+    "is_general_small": {
+      "data_type": "boolean",
+      "default": false
+    },
+    "is_downstream": {
+      "data_type": "boolean",
+      "default": false
+    },
+    "is_survey_ext_1": {
+      "data_type": "boolean",
+      "default": false
+    }
+  }
+}

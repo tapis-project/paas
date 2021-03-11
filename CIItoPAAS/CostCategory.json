@@ -1,0 +1,12 @@
+{
+  "table_name": "CostCategory",
+  "root_url": "cost-category",
+  "endpoints": false,
+  "columns": {
+    "value": {
+      "data_type": "varchar",
+      "char_len": 100,
+      "null": true
+    }
+  }
+}

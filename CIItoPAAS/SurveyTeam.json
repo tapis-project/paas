@@ -1,0 +1,6 @@
+{
+  "table_name": "SurveyTeam",
+  "root_url": "survey-team",
+  "endpoints": false,
+  "columns": {}
+}

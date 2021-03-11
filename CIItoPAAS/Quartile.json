@@ -1,0 +1,78 @@
+{
+  "table_name": "Quartile",
+  "root_url": "quartile",
+  "list_all": false,
+  "list_one": false,
+  "create": true,
+  "update": false,
+  "delete": false,
+  "columns": {
+    "metric_id": {
+      "data_type": "integer",
+      "null": true
+    },
+    "respondent_type": {
+      "data_type": "integer",
+      "null": true
+    },
+    "work_involvement": {
+      "data_type": "integer",
+      "null": true
+    },
+    "project_nature": {
+      "data_type": "integer",
+      "null": true
+    },
+    "location_category": {
+      "data_type": "integer",
+      "null": true
+    },
+    "industry_group": {
+      "data_type": "integer",
+      "null": true
+    },
+    "project_type": {
+      "data_type": "integer",
+      "null": true
+    },
+    "cost_category": {
+      "data_type": "integer",
+      "null": true
+    },
+    "company_num": {
+      "data_type": "integer",
+      "null": true
+    },
+    "project_num": {
+      "data_type": "integer",
+      "null": true
+    },
+    "the_mean": {
+      "data_type": "float",
+      "null": true
+    },
+    "the_median": {
+      "data_type": "float",
+      "null": true
+    },
+    "the_max": {
+      "data_type": "float",
+      "null": true
+    },
+    "the_min": {
+      "data_type": "float",
+      "null": true
+    },
+    "the_q1": {
+      "data_type": "float",
+      "null": true
+    },
+    "the_q3": {
+      "data_type": "float",
+      "null": true
+    },
+    "last_updated_at": {
+      "data_type": "timestamp"
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "table_name": "WorkInvolvement",
+  "root_url": "work-involvement",
+  "endpoints": false,
+  "columns": {
+    "value": {
+      "data_type": "varchar",
+      "char_len": 100,
+      "null": true
+    }
+  }
+}

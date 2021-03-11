@@ -1,0 +1,17 @@
+{
+  "table_name": "ProjectDeliveryMethod",
+  "root_url": "project-delivery-method",
+  "endpoints": false,
+  "columns": {
+    "value": {
+      "null": true,
+      "data_type": "varchar",
+      "char_len": 100
+    },
+    "value_mapping": {
+      "data_type": "varchar",
+      "char_len": 100,
+      "null": true
+    }
+  }
+}
