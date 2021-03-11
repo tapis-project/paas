@@ -1,6 +1,6 @@
 {
   "table_name": "Workflow",
-  "root_url": "workflow",
+  "root_url": "constants",
   "delete": false,
   "columns": {
     "workflow_name": {
