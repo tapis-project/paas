@@ -7,7 +7,7 @@
       "data_type": "integer",
       "FK": true,
       "reference_table": "Question",
-      "reference_column": "Question_id",
+      "reference_column": "question_id",
       "on_delete": "cascade"
     },
     "survey_id": {
@@ -15,14 +15,14 @@
       "data_type": "integer",
       "FK": true,
       "reference_table": "Survey",
-      "reference_column": "Survey_id",
+      "reference_column": "survey_id",
       "on_delete": "cascade"
     },
     "project_id": {
       "data_type": "integer",
       "FK": true,
       "reference_table": "Project",
-      "reference_column": "Project_id",
+      "reference_column": "project_id",
       "on_delete": "cascade"
     },
     "potential_answer_id": {
@@ -30,14 +30,14 @@
       "data_type": "integer",
       "FK": true,
       "reference_table": "LkpPotentialAnswer",
-      "reference_column": "LkpPotentialAnswer_id",
+      "reference_column": "lkp_potential_answer_id",
       "on_delete": "cascade"
     },
     "updated_by_id": {
       "data_type": "integer",
       "FK": true,
       "reference_table": "UserProfile",
-      "reference_column": "UserProfile_id",
+      "reference_column": "user_profile_id",
       "on_delete": "cascade"
     },
     "text_answer": {

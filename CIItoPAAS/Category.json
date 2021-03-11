@@ -12,7 +12,7 @@
       "data_type": "integer",
       "FK": true,
       "reference_table": "Category",
-      "reference_column": "Category_id",
+      "reference_column": "category_id",
       "on_delete": "cascade"
     }
   }

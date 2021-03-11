@@ -12,7 +12,7 @@
       "data_type": "integer",
       "FK": true,
       "reference_table": "IndustryGroup",
-      "reference_column": "IndustryGroup_id",
+      "reference_column": "industry_group_id",
       "on_delete": "cascade"
     },
     "phase": {

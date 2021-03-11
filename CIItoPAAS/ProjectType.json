@@ -12,7 +12,7 @@
       "data_type": "integer",
       "FK": true,
       "reference_table": "BenchmarkingLab",
-      "reference_column": "BenchmarkingLab_id",
+      "reference_column": "benchmarking_lab_id",
       "on_delete": "cascade"
     },
     "parent_id": {
@@ -20,7 +20,7 @@
       "data_type": "integer",
       "FK": true,
       "reference_table": "ProjectType",
-      "reference_column": "ProjectType_id",
+      "reference_column": "project_type_id",
       "on_delete": "cascade"
     },
     "industry_group_id": {
@@ -28,7 +28,7 @@
       "data_type": "integer",
       "FK": true,
       "reference_table": "IndustryGroup",
-      "reference_column": "IndustryGroup_id",
+      "reference_column": "industry_group_id",
       "on_delete": "cascade"
     }
   }

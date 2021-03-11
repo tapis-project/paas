@@ -7,7 +7,7 @@
       "data_type": "integer",
       "FK": true,
       "reference_table": "BenchmarkingLab",
-      "reference_column": "BenchmarkingLab_id",
+      "reference_column": "benchmarking_lab_id",
       "on_delete": "cascade"
     },
     "level": {
@@ -18,7 +18,7 @@
       "data_type": "integer",
       "FK": true,
       "reference_table": "Account",
-      "reference_column": "Account_id",
+      "reference_column": "account_id",
       "on_delete": "cascade"
     },
     "created_at": {

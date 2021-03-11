@@ -29,8 +29,7 @@ these is SurveyTeam.json.
 Category.json, ContractType.json and ProjectType.json house a tree like structure. I did this, for now, by using a foreign key to itself
 for the parent IDs.
 
-Also, at the time of creating these, the foreign key naming conventions were messed up. All foreign keys will need to
-be updated when the foreign key convention is fixed.
+Also, at the time of creating these, the foreign key naming conventions were messed up. These assume this has been fixed.
 
 ===========
 ** Example command (for Questions table on localhost, change as needed) to create these tables:

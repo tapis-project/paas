@@ -18,7 +18,7 @@
       "data_type": "integer",
       "FK": true,
       "reference_table": "UserProfile",
-      "reference_column": "UserProfile_id",
+      "reference_column": "user_profile_id",
       "on_delete": "cascade"
     },
     "email": {
@@ -31,7 +31,7 @@
       "data_type": "integer",
       "FK": true,
       "reference_table": "Account",
-      "reference_column": "Account_id",
+      "reference_column": "account_id",
       "on_delete": "cascade"
     },
     "active": {

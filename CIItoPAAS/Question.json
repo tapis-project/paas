@@ -25,7 +25,7 @@
       "data_type": "integer",
       "FK": true,
       "reference_table": "QuestionType",
-      "reference_column": "QuestionType_id",
+      "reference_column": "question_type_id",
       "on_delete": "cascade"
     },
     "skip_if_false": {
@@ -41,7 +41,7 @@
       "data_type": "integer",
       "FK": true,
       "reference_table": "Category",
-      "reference_column": "Category_id",
+      "reference_column": "category_id",
       "on_delete": "cascade"
     },
     "is_healthcare": {
