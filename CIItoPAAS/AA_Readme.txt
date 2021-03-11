@@ -31,6 +31,14 @@ for the parent IDs.
 
 Also, at the time of creating these, the foreign key naming conventions were messed up. These assume this has been fixed.
 
+I have included the enumes used in CII legacy in the enums.py file in this directory. The following columns will need enforce the given enum:
+
+>> UserProfile
+role: AccountRole
+
+>> Membership
+level: MembershipLevel
+
 ===========
 ** Example command (for Questions table on localhost, change as needed) to create these tables:
 curl -H "tapis-v2-token: $token" localhost:8000/v3/pgrest/manage -X POST -d "@Question.json" -H "Content-type: application/json"
