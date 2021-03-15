@@ -1,7 +1,11 @@
+import logging
+
 from tapipy.tapis import Tapis, TapisResult
 from pgrest.pycommon.config import conf
 from pgrest.pycommon import errors
 from pgrest.pycommon.tenants import tenants as default_tenants
+
+logger = logging.getLogger(__name__)
 
 
 def get_service_tapis_client(tenant_id=None,
@@ -19,6 +23,7 @@ def get_service_tapis_client(tenant_id=None,
     :return: (tapipy.tapis.Tapis) A Tapipy client object.
     """
     # if there is no base_url the primary_site_admin_tenant_base_url configured for the service:
+    logger.debug("top of get_service_tapis_client")
     if not base_url:
         base_url = conf.primary_site_admin_tenant_base_url
     if not tenant_id:
@@ -40,8 +45,11 @@ def get_service_tapis_client(tenant_id=None,
               download_latest_specs=download_latest_specs,
               tenants=tenants,
               is_tapis_service=True)
+    logger.debug("got tapis client")
     if not jwt:
+        logger.debug("calling get_tokens")
         t.get_tokens()
+    logger.debug("returning client")
     return t
 
 

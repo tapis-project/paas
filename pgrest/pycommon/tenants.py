@@ -46,7 +46,8 @@ class Tenants(object):
             # NOTE: we intentionally create a new Tapis client with *no authentication* so that we can call the Tenants
             # API even _before_ the SK is started up. If we pass a JWT, the Tenants will try to validate it as part of
             # handling our request, and this validation will fail if SK is not available.
-            t = Tapis(base_url=conf.primary_site_admin_tenant_base_url, resource_set='local') # TODO -- remove resource_set='local'
+            # t = Tapis(base_url=conf.primary_site_admin_tenant_base_url, resource_set='local') # TODO -- remove resource_set='local'
+            t = Tapis(base_url=conf.primary_site_admin_tenant_base_url)
             try:
                 tenants = t.tenants.list_tenants()
                 sites = t.tenants.list_sites()
@@ -60,7 +61,7 @@ class Tenants(object):
                     if hasattr(s, "primary") and s.primary:
                         self.primary_site = s
                         if s.site_id == conf.service_site_id:
-                            logger.debug(f"this service is running at the primary site: {s.site_id}")
+                            # logger.debug(f"this service is running at the primary site: {s.site_id}")
                             self.service_running_at_primary_site = True
                     if s.site_id == t.site_id:
                         t.site = s
@@ -147,6 +148,9 @@ class Tenants(object):
                 base_url_at_primary_site = self.get_base_url_for_tenant_primary_site(tenant.tenant_id)
                 if base_url_at_primary_site in url:
                     return tenant
+                # assume dev tenant if this is running locally ---
+                if ("localhost" in url or "testserver" in url) and tenant.tenant_id == "dev":
+                    return tenant
             return None
 
         logger.debug(f"top of get_tenant_config; called with tenant_id: {tenant_id}; url: {url}")
@@ -170,6 +174,7 @@ class Tenants(object):
         else:
             raise errors.BaseTapisError("Invalid call to get_tenant_config; either tenant_id or url must be passed.")
         if t:
+            logger.debug(f"found tenant: {t.base_url}")
             return t
         # try one reload and then give up -
         logger.debug(f"did not find tenant; going to reload tenants.")
