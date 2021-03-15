@@ -13,9 +13,9 @@ urlpatterns = [
     url('^v3/pgrest/manage/tenants', views.CreateTenant.as_view()),
 
     # GET SINGLE, PUT, DELETE
-    url('^v3/pgrest/manage/(?P<manage_table_id>.+)', views.TableManagementById.as_view()),
+    url('^v3/pgrest/manage/tables/(?P<manage_table_id>.+)', views.TableManagementById.as_view()),
     # GET ALL, POST, PUT
-    url('^v3/pgrest/manage', views.TableManagement.as_view()),
+    url('^v3/pgrest/manage/tables', views.TableManagement.as_view()),
 
     # ---- dynamic views --- #
     # GET SINGLE, PUT, DELETE

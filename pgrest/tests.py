@@ -7,7 +7,9 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from pgrest import test_data
-from pgrest.test_secrets import b_token
+
+# todo --
+b_token = ''
 
 
 class ResponseTestCase(TestCase):
@@ -16,11 +18,11 @@ class ResponseTestCase(TestCase):
     init_resp_2 = {}
 
     def createTable(self):
-        init_resp_1 = self.client.post('/v3/pgrest/manage', data=json.dumps(test_data.init_table_1),
+        init_resp_1 = self.client.post('/v3/pgrest/manage/tables', data=json.dumps(test_data.init_table_1),
                                      content_type='application/json', HTTP_TAPIS_V2_TOKEN=b_token)
         self.init_resp_1 = init_resp_1.json()
 
-        init_resp_2 = self.client.post('/v3/pgrest/manage', data=json.dumps(test_data.init_table_2),
+        init_resp_2 = self.client.post('/v3/pgrest/manage/tables', data=json.dumps(test_data.init_table_2),
                                        content_type='application/json', HTTP_TAPIS_V2_TOKEN=b_token)
         self.init_resp_2 = init_resp_2.json()
 
@@ -37,8 +39,8 @@ class ResponseTestCase(TestCase):
         self.createTable()
 
     def tearDown(self):
-        self.client.delete(f'/v3/pgrest/manage/{self.init_resp_1["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
-        self.client.delete(f'/v3/pgrest/manage/{self.init_resp_2["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
+        self.client.delete(f'/v3/pgrest/manage/tables/{self.init_resp_1["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
+        self.client.delete(f'/v3/pgrest/manage/tables/{self.init_resp_2["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
 
 
     #######################
@@ -47,13 +49,13 @@ class ResponseTestCase(TestCase):
 
     # ---- LIST ALL TABLES ---- #
     def test_list_tables(self):
-        response = self.client.get('/v3/pgrest/manage', HTTP_TAPIS_V2_TOKEN=b_token)
+        response = self.client.get('/v3/pgrest/manage/tables', HTTP_TAPIS_V2_TOKEN=b_token)
         print(response)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"].lower(), "application/json")
 
     def test_list_tables_details(self):
-        response = self.client.get('/v3/pgrest/manage?details=true', HTTP_TAPIS_V2_TOKEN=b_token)
+        response = self.client.get('/v3/pgrest/manage/tables?details=true', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(response["Content-Type"].lower(), "application/json")
         try:
             response.json()[0]["columns"]
@@ -62,102 +64,102 @@ class ResponseTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_list_tables_for_correct_tenant_only(self):
-        response = self.client.get('/v3/pgrest/manage', HTTP_TAPIS_V2_TOKEN=b_token)
+        response = self.client.get('/v3/pgrest/manage/tables', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(response["Content-Type"].lower(), "application/json")
         for resp in response.json():
             self.assertEqual(resp["tenant"], "admin")
 
     # ---- CREATE TABLES ---- #
     def test_simple_create(self):
-        response = self.client.post('/v3/pgrest/manage', data=json.dumps(test_data.create_table_1),
+        response = self.client.post('/v3/pgrest/manage/tables', data=json.dumps(test_data.create_table_1),
                                     content_type='application/json', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(response.status_code, 200)
-        self.client.delete(f'/v3/pgrest/manage/{response.json()["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
+        self.client.delete(f'/v3/pgrest/manage/tables/{response.json()["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
 
     def test_create_table_with_serial_data_type(self):
-        response = self.client.post('/v3/pgrest/manage', data=json.dumps(test_data.create_table_7),
+        response = self.client.post('/v3/pgrest/manage/tables', data=json.dumps(test_data.create_table_7),
                                     content_type='application/json', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(response.status_code, 200)
-        self.client.delete(f'/v3/pgrest/manage/{response.json()["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
+        self.client.delete(f'/v3/pgrest/manage/tables/{response.json()["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
 
     def test_create_table_with_serial_data_type_with_null_fails(self):
-        response = self.client.post('/v3/pgrest/manage', data=json.dumps(test_data.create_table_8),
+        response = self.client.post('/v3/pgrest/manage/tables', data=json.dumps(test_data.create_table_8),
                                     content_type='application/json', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(response.status_code, 200)
-        self.client.delete(f'/v3/pgrest/manage/{response.json()["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
+        self.client.delete(f'/v3/pgrest/manage/tables/{response.json()["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
 
     def test_existing_root_url(self):
-        response = self.client.post('/v3/pgrest/manage', data=json.dumps(test_data.create_table_2),
+        response = self.client.post('/v3/pgrest/manage/tables', data=json.dumps(test_data.create_table_2),
                                     content_type='application/json', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(response.status_code, 400)
 
     def test_existing_table(self):
-        response = self.client.post('/v3/pgrest/manage', data=json.dumps(test_data.create_table_3),
+        response = self.client.post('/v3/pgrest/manage/tables', data=json.dumps(test_data.create_table_3),
                                     content_type='application/json', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(response.status_code, 400)
 
     def test_no_columns(self):
-        response = self.client.post('/v3/pgrest/manage', data=json.dumps(test_data.create_table_4),
+        response = self.client.post('/v3/pgrest/manage/tables', data=json.dumps(test_data.create_table_4),
                                     content_type='application/json', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(response.status_code, 400)
 
     def test_char_len_required_on_varchar(self):
-        response = self.client.post('/v3/pgrest/manage', data=json.dumps(test_data.create_table_5),
+        response = self.client.post('/v3/pgrest/manage/tables', data=json.dumps(test_data.create_table_5),
                                     content_type='application/json', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(response.status_code, 400)
 
     def test_create_with_foreign_key(self):
-        response = self.client.post('/v3/pgrest/manage', data=json.dumps(test_data.create_table_9),
+        response = self.client.post('/v3/pgrest/manage/tables', data=json.dumps(test_data.create_table_9),
                                     content_type='application/json', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(response.status_code, 200)
-        self.client.delete(f'/v3/pgrest/manage/{response.json()["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
+        self.client.delete(f'/v3/pgrest/manage/tables/{response.json()["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
 
     def test_create_with_foreign_key_no_nulls_with_delete_set_null_400(self):
-        response = self.client.post('/v3/pgrest/manage', data=json.dumps(test_data.create_table_10),
+        response = self.client.post('/v3/pgrest/manage/tables', data=json.dumps(test_data.create_table_10),
                                     content_type='application/json', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(response.status_code, 400)
 
 
     # ---- DELETE TABLES ---- #
     def test_delete_existing_table(self):
-        response = self.client.post('/v3/pgrest/manage', data=json.dumps(test_data.create_table_6),
+        response = self.client.post('/v3/pgrest/manage/tables', data=json.dumps(test_data.create_table_6),
                                     content_type='application/json', HTTP_TAPIS_V2_TOKEN=b_token)
-        del_resp = self.client.delete(f'/v3/pgrest/manage/{response.json()["table_id"]}',
+        del_resp = self.client.delete(f'/v3/pgrest/manage/tables/{response.json()["table_id"]}',
                                       HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(del_resp.status_code, 200)
 
     def test_delete_nonexistent_table(self):
-        response = self.client.delete('/v3/pgrest/manage/100000000000007473774', HTTP_TAPIS_V2_TOKEN=b_token)
+        response = self.client.delete('/v3/pgrest/manage/tables/100000000000007473774', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(response.status_code, 404)
 
     # ---- LIST SINGLE TABLE ---- #
     def test_list_single_tables(self):
-        response = self.client.post('/v3/pgrest/manage', data=json.dumps(test_data.create_table_6),
+        response = self.client.post('/v3/pgrest/manage/tables', data=json.dumps(test_data.create_table_6),
                                     content_type='application/json', HTTP_TAPIS_V2_TOKEN=b_token)
 
         print(response)
-        response = self.client.get(f'/v3/pgrest/manage/{response.json()["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
+        response = self.client.get(f'/v3/pgrest/manage/tables/{response.json()["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"].lower(), "application/json")
 
-        del_resp = self.client.delete(f'/v3/pgrest/manage/{response.json()["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
+        del_resp = self.client.delete(f'/v3/pgrest/manage/tables/{response.json()["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
         print(del_resp)
 
     def test_list_single_tables_detail(self):
-        response = self.client.post('/v3/pgrest/manage', data=json.dumps(test_data.create_table_6),
+        response = self.client.post('/v3/pgrest/manage/tables', data=json.dumps(test_data.create_table_6),
                                     content_type='application/json', HTTP_TAPIS_V2_TOKEN=b_token)
         table_id = response.json()["table_id"]
-        get_response = self.client.get(f'/v3/pgrest/manage/{table_id}?details=true', HTTP_TAPIS_V2_TOKEN=b_token)
+        get_response = self.client.get(f'/v3/pgrest/manage/tables/{table_id}?details=true', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(get_response["Content-Type"].lower(), "application/json")
         try:
             get_response.json()["columns"]
         except KeyError:
             self.fail("Details did not return columns")
         self.assertEqual(get_response.status_code, 200)
-        self.client.delete(f'/v3/pgrest/manage/{get_response.json()["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
+        self.client.delete(f'/v3/pgrest/manage/tables/{get_response.json()["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
 
     def test_list_nonexistent_table(self):
-        response = self.client.get('/v3/pgrest/manage/5999999993999999', HTTP_TAPIS_V2_TOKEN=b_token)
+        response = self.client.get('/v3/pgrest/manage/tables/5999999993999999', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(response.status_code, 404)
 
     # ---- UPDATE TABLE ---- #

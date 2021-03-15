@@ -1,5 +1,7 @@
-
+import logging
 from django.http import HttpResponseForbidden
+
+logger = logging.getLogger(__name__)
 
 
 def create_validate_schema(columns):
@@ -46,6 +48,7 @@ def is_admin(view):
     Determines if a user has an admin role, and returns a 403 if they do not.
     """
     def wrapper(self, request, *args, **kwargs):
+        logger.debug("top of is_admin()")
         if "ADMIN" not in request.session['roles']:
             return HttpResponseForbidden(f"User {request.session['username']} does not have permission to manage "
                                          f"database tables.")

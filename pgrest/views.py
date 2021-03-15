@@ -26,6 +26,7 @@ class RoleSessionMixin:
     """
     # Override dispatch to decode token and store variables before routing the request.
     def dispatch(self, request, *args, **kwargs):
+        logger.debug("top of dispatch")
         try:
             # pull token from the request, and decode it to get the user that is sending in request.
             try:
@@ -45,6 +46,7 @@ class RoleSessionMixin:
                 msg = f"Unable to retrieve user profile from Agave."
                 logger.error(msg)
                 return HttpResponseForbidden(msg)
+            logger.debug(f"got response from profiles API: {response}")
 
             try:
                 # Get the base url from the incoming request, and then use the
@@ -58,6 +60,7 @@ class RoleSessionMixin:
                 msg = f"Error occurred while calculating tenant ID from the request base URL."
                 logger.error(msg)
                 return HttpResponseBadRequest(msg)
+            logger.debug(f"got tenant_id: {tenant_id}")
 
             try:
                 username = response.json()['result']['username']
@@ -65,6 +68,7 @@ class RoleSessionMixin:
                 msg = "Unable to parse Agave token response for username."
                 logger.error(msg)
                 return HttpResponseForbidden(msg)
+            logger.debug(f"got username: {username}")
 
             try:
                 roles = t.sk.getUserRoles(user=username, tenant=tenant_id)
@@ -75,6 +79,7 @@ class RoleSessionMixin:
                 msg = f"Error occurred while retrieving roles from SK: {e}"
                 logger.error(msg)
                 return HttpResponseBadRequest(msg)
+            logger.debug(f"got roles: {role_list}")
 
             try:
                 db_instance_name = Tenants.objects.get(tenant_name=tenant_id).db_instance_name
@@ -83,6 +88,7 @@ class RoleSessionMixin:
                       f"Available tenants: {Tenants.objects.all().values()}"
                 logger.error(msg)
                 return HttpResponseBadRequest(msg)
+            logger.debug(f"got db_instance_name: {db_instance_name}")
 
             request.session['roles'] = role_list
             request.session['username'] = username
@@ -92,7 +98,7 @@ class RoleSessionMixin:
             return super().dispatch(request, *args, **kwargs)
 
         except Exception as e:
-            logger.error(f"Bad Request. Exception: {e}")
+            logger.error(f"Unable to determine roles associated with authenticated user. Exception: {e}")
             return HttpResponseBadRequest(f"There was an error while fulfilling user request. Message: {e}")
 
 
@@ -104,6 +110,7 @@ class TableManagement(RoleSessionMixin, APIView):
     """
     @is_admin
     def get(self, request, *args, **kwargs):
+        logger.debug("top of get /manage/tables")
         # req_tenant = "public"
         req_tenant = request.session['tenant_id']
 
@@ -241,6 +248,7 @@ class TableManagementById(RoleSessionMixin, APIView):
     """
     @is_admin
     def get(self, request, *args, **kwargs):
+        logger.debug("top of get /manage/tables/<id>")
         # req_tenant = "public"
         req_tenant = request.session['tenant_id']
 
