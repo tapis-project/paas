@@ -28,7 +28,7 @@ SECRET_KEY = 'a%3tf5ukq=x@zou)83k@@p8kq#us4(bp3*6fjw3z2^9z7@ih8*'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['localhost', '.tapis.io', '.develop.tapis.io', '.staging.tapis.io']
 
 
 # Application definition
