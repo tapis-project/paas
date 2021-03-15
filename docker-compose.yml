@@ -3,13 +3,12 @@ services:
   api:
     build: .
     image: tapis/pgrest-api:dev
-    #command: bash -c "python /code/manage.py runserver 0.0.0.0:8000"
-    command: bash -c "uwsgi --http :8000 --module paas.wsgi"
+    command: bash -c "uwsgi --http :5000 --module paas.wsgi"
     volumes:
     - .:/code
     - ./config-local.json:/code/config-local.json
     ports:
-    - "8000:8000"
+    - "5000:5000"
     environment:
       TAPIS_CONFIGSCHEMA_PATH: /code/pgrest/configschema.json
       TAPIS_CONFIG_PATH: /code/config-local.json

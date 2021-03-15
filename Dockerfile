@@ -12,4 +12,4 @@ WORKDIR /code/
 
 CMD ["/usr/local/bin/uwsgi", "--ini", "paas/uwsgi.ini", ]
 
-EXPOSE 8000
+EXPOSE 5000
