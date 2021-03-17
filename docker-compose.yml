@@ -12,6 +12,8 @@ services:
     environment:
       TAPIS_CONFIGSCHEMA_PATH: /code/pgrest/configschema.json
       TAPIS_CONFIG_PATH: /code/config-local.json
+# Uncomment to enable django debug --
+#      PGREST_DEBUG: "true"
     depends_on:
       - db
     container_name: pgrest-api

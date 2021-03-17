@@ -19,6 +19,32 @@ from pgrest.utils import create_validate_schema, can_read, can_write, is_admin
 logger = logging.getLogger(__name__)
 
 
+# Error views
+
+def error_404(request, exception, template_name=None):
+    d = {"status": "error",
+         "message": "The HTTP path and/or method are not available from this service.",
+         "version": "dev",
+         "result": None}
+    return HttpResponse(json.dumps(d), content_type='application/json', status=404)
+
+
+def error_400(request, exception, template_name=None):
+    d = {"status": "error",
+         "message": "The HTTP path and/or method are not available from this service.",
+         "version": "dev",
+         "result": None}
+    return HttpResponse(json.dumps(d), content_type='application/json', status=400)
+
+
+def error_500(request):
+    d = {"status": "error",
+         "message": "Something went wrong, Please try your request again later.",
+         "version": "dev",
+         "result": None}
+    return HttpResponse(json.dumps(d), content_type='application/json', status=500)
+
+
 class RoleSessionMixin:
     """
     Retrieves username from Agave for tacc.prod token, then retrieves roles for this user in SK and stores data

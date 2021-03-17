@@ -11,7 +11,7 @@ https://docs.djangoproject.com/en/3.1/ref/settings/
 """
 
 from pathlib import Path
-
+import os
 from paas import settings_secrets
 from paas import get_django_db
 
@@ -26,7 +26,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'a%3tf5ukq=x@zou)83k@@p8kq#us4(bp3*6fjw3z2^9z7@ih8*'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
+if os.environ.get('PGREST_DEBUG', "false") == "true":
+    DEBUG = True
 
 ALLOWED_HOSTS = ['localhost', '.tapis.io', '.develop.tapis.io', '.staging.tapis.io']
 
