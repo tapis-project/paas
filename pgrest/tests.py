@@ -7,10 +7,9 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from pgrest import test_data
+from pgrest.pycommon.config import conf
 
-# todo --
-b_token = ''
-
+b_token=conf.test_token
 
 class ResponseTestCase(TestCase):
 
@@ -27,8 +26,9 @@ class ResponseTestCase(TestCase):
         self.init_resp_2 = init_resp_2.json()
 
     def createTenants(self):
-        self.client.post('/v3/pgrest/manage/tenants', data=json.dumps({"schema_name": "dev", "db_instance": "local"}),
-                                       content_type='application/json', HTTP_TAPIS_V2_TOKEN=b_token)
+        self.client.post('/v3/pgrest/manage/tenants',
+                         data=json.dumps({"schema_name": "dev", "db_instance": "local"}),
+                        content_type='application/json', HTTP_TAPIS_V2_TOKEN=b_token)
         self.client.post('/v3/pgrest/manage/tenants',
                          data=json.dumps({"schema_name": "admin", "db_instance": "local"}),
                          content_type='application/json', HTTP_TAPIS_V2_TOKEN=b_token)
@@ -589,13 +589,3 @@ class ResponseTestCase(TestCase):
         response = self.client.get(f'/v3/pgrest/data/{root_url}', HTTP_TAPIS_V2_TOKEN=b_token)
         for resp in response.json():
             self.assertNotEqual(resp["col_one"], 90)
-
-
-
-
-
-
-
-
-
-

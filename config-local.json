@@ -1,8 +1,10 @@
 {
   "service_name": "pgrest",
   "service_password": "1D9Bl69ARJpOj6x27yJ3gSHg",
+  "test_token": "",
   "tenants": ["dev"],
   "log_level": "DEBUG",
+  "log_file": "/code/pgrest.log",
   "show_traceback": false,
   "databases": [
     {

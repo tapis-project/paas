@@ -7,16 +7,18 @@ services:
     volumes:
     - .:/code
     - ./config-local.json:/code/config-local.json
+    - ./pgrest.log:/code/pgrest.log
     ports:
     - "5000:5000"
     environment:
       TAPIS_CONFIGSCHEMA_PATH: /code/pgrest/configschema.json
       TAPIS_CONFIG_PATH: /code/config-local.json
-# Uncomment to enable django debug --
-#      PGREST_DEBUG: "true"
+      #Uncomment to enable django debug --
+      #PGREST_DEBUG: "true"
     depends_on:
       - db
     container_name: pgrest-api
+
 
   db:
     image: postgres:9.6.5
