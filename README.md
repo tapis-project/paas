@@ -1,14 +1,12 @@
 Local Development
 =================
-
 Before You Begin:
 1. Make sure you are on the TACC VPN.
 2. Make sure you have updated the service_password and dbpassword in the config-local.json
-3. If running test, make sure you have update the test_token in config-local.json with a v2 password for a user which is also in v3
+
 
 Build the containers:
 --------------------
-
 docker-compose build
 
 
@@ -19,10 +17,10 @@ from within the pgrest directory:
 2. docker-compose run api python manage.py migrate
 
 
-
 Start the API container
 -----------------------
 $ docker-compose up -d api
+
 
 Add Tenants
 -----------
@@ -45,6 +43,23 @@ models.Tenants.objects.create(tenant_name="admin", db_instance_name="local")
 (list tenants)
 
 models.Tenants.objects.all().values()
+
+
+Makefile
+--------
+This repository has a Makefile to make your life easier.
+To build and deploy locally:
+make local-deploy
+
+To take down current containers and postgres volume:
+make down-volumes
+
+To run the tests:
+make test
+
+It's also useful to bring it all together to rebuild and test all at once:
+make down-volumes local-deploy test
+
 
 Manual Testing
 --------------
@@ -70,7 +85,7 @@ curl -H "tapis-v2-token: $tok" localhost:5000/v3/pgrest/data/init
 Run the tests
 -------------
 
-1) Add a real token to the b_token variable in pgrest.tests.py. Note: don't push an image build with this token in it (TODO -- this step will change.)
+1) Add a real token to the test_token variable in config-local.json.
 
 2) Run all the tests: docker-compose run api python manage.py test
 
