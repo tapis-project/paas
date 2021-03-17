@@ -17,21 +17,27 @@ class ResponseTestCase(TestCase):
     init_resp_2 = {}
 
     def createTable(self):
-        init_resp_1 = self.client.post('/v3/pgrest/manage/tables', data=json.dumps(test_data.init_table_1),
-                                     content_type='application/json', HTTP_TAPIS_V2_TOKEN=b_token)
+        init_resp_1 = self.client.post('/v3/pgrest/manage/tables',
+                                       data=json.dumps(test_data.init_table_1),
+                                       content_type='application/json',
+                                       HTTP_TAPIS_V2_TOKEN=b_token)
         self.init_resp_1 = init_resp_1.json()
 
-        init_resp_2 = self.client.post('/v3/pgrest/manage/tables', data=json.dumps(test_data.init_table_2),
-                                       content_type='application/json', HTTP_TAPIS_V2_TOKEN=b_token)
+        init_resp_2 = self.client.post('/v3/pgrest/manage/tables',
+                                       data=json.dumps(test_data.init_table_2),
+                                       content_type='application/json',
+                                       HTTP_TAPIS_V2_TOKEN=b_token)
         self.init_resp_2 = init_resp_2.json()
 
     def createTenants(self):
         self.client.post('/v3/pgrest/manage/tenants',
-                         data=json.dumps({"schema_name": "dev", "db_instance": "local"}),
-                        content_type='application/json', HTTP_TAPIS_V2_TOKEN=b_token)
-        self.client.post('/v3/pgrest/manage/tenants',
                          data=json.dumps({"schema_name": "admin", "db_instance": "local"}),
-                         content_type='application/json', HTTP_TAPIS_V2_TOKEN=b_token)
+                         content_type='application/json',
+                         HTTP_TAPIS_V2_TOKEN=b_token)
+        self.client.post('/v3/pgrest/manage/tenants',
+                         data=json.dumps({"schema_name": "dev", "db_instance": "local"}),
+                         content_type='application/json',
+                         HTTP_TAPIS_V2_TOKEN=b_token)
 
     def setUp(self):
         self.client = APIClient()
@@ -67,7 +73,7 @@ class ResponseTestCase(TestCase):
         response = self.client.get('/v3/pgrest/manage/tables', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(response["Content-Type"].lower(), "application/json")
         for resp in response.json():
-            self.assertEqual(resp["tenant"], "admin")
+            self.assertIn(resp["tenant"], ["dev", "admin"])
 
     # ---- CREATE TABLES ---- #
     def test_simple_create(self):

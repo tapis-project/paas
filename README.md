@@ -3,7 +3,8 @@ Local Development
 
 Before You Begin:
 1. Make sure you are on the TACC VPN.
-2. Make sure you have updated the service_password and dbpassword in the config-local.json 
+2. Make sure you have updated the service_password and dbpassword in the config-local.json
+3. If running test, make sure you have update the test_token in config-local.json with a v2 password for a user which is also in v3
 
 Build the containers:
 --------------------
