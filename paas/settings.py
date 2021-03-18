@@ -12,7 +12,6 @@ https://docs.djangoproject.com/en/3.1/ref/settings/
 
 from pathlib import Path
 import os
-from paas import settings_secrets
 from paas import get_django_db
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
