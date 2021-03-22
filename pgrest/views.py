@@ -19,30 +19,57 @@ from pgrest.utils import create_validate_schema, can_read, can_write, is_admin
 logger = logging.getLogger(__name__)
 
 
+def get_version():
+    """
+    Get the version of the API running.
+    """
+    return "dev" # TODO
+
+
+def make_error(msg=None):
+    """
+    Create an error JSON response in the standard Tapis 4-stanza format.
+    """
+    if not msg:
+        msg = "There was an error."
+    d = {"status": "error",
+         "message": msg,
+         "version": get_version(),
+         "result": None}
+    return json.dumps(d)
+
+
+def make_success(result=None, msg=None):
+    """
+    Create an error JSON response in the standard Tapis 4-stanza format.
+    """
+    if not msg:
+        msg = "The request was successful."
+    d = {"status": "success",
+         "message": msg,
+         "version": get_version(),
+         "result": result}
+    return json.dumps(d)
+
+
 # Error views
 
 def error_404(request, exception, template_name=None):
-    d = {"status": "error",
-         "message": "The HTTP path and/or method are not available from this service.",
-         "version": "dev",
-         "result": None}
-    return HttpResponse(json.dumps(d), content_type='application/json', status=404)
+    return HttpResponse(make_error(msg="The HTTP path and/or method are not available from this service."),
+                        content_type='application/json',
+                        status=404)
 
 
 def error_400(request, exception, template_name=None):
-    d = {"status": "error",
-         "message": "The HTTP path and/or method are not available from this service.",
-         "version": "dev",
-         "result": None}
-    return HttpResponse(json.dumps(d), content_type='application/json', status=400)
+    return HttpResponse(make_error(msg="The HTTP path and/or method are not available from this service."),
+                        content_type='application/json',
+                        status=400)
 
 
 def error_500(request):
-    d = {"status": "error",
-         "message": "Something went wrong, Please try your request again later.",
-         "version": "dev",
-         "result": None}
-    return HttpResponse(json.dumps(d), content_type='application/json', status=500)
+    return HttpResponse(make_error(msg="Something went wrong, Please try your request again later."),
+                        content_type='application/json',
+                        status=500)
 
 
 class RoleSessionMixin:
@@ -62,7 +89,8 @@ class RoleSessionMixin:
                 v2_token = request.META['HTTP_TAPIS_V2_TOKEN']
             except KeyError as e:
                 logger.warning(f"User not authenticated. Exception: {e}")
-                return HttpResponse('Unauthorized', status=401)
+                msg = "Unable to authenticate; was the tapis-v2-token header included in the request?"
+                return HttpResponse(make_error(msg=msg), status=401)
 
             try:
                 url = "https://api.tacc.utexas.edu/profiles/v2/me"
@@ -71,7 +99,8 @@ class RoleSessionMixin:
             except Exception:
                 msg = f"Unable to retrieve user profile from Agave."
                 logger.error(msg)
-                return HttpResponseForbidden(msg)
+                msg = "Unable to validate v2 token; could not look up the associated profile."
+                return HttpResponseForbidden(make_error(msg=msg))
             logger.debug(f"got response from profiles API: {response}")
 
             try:
@@ -85,7 +114,7 @@ class RoleSessionMixin:
             except Exception as e:
                 msg = f"Error occurred while calculating tenant ID from the request base URL."
                 logger.error(msg)
-                return HttpResponseBadRequest(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
             logger.debug(f"got tenant_id: {tenant_id}")
 
             try:
@@ -93,7 +122,7 @@ class RoleSessionMixin:
             except KeyError:
                 msg = "Unable to parse Agave token response for username."
                 logger.error(msg)
-                return HttpResponseForbidden(msg)
+                return HttpResponseForbidden(make_error(msg=msg))
             logger.debug(f"got username: {username}")
 
             try:
@@ -104,7 +133,7 @@ class RoleSessionMixin:
             except Exception as e:
                 msg = f"Error occurred while retrieving roles from SK: {e}"
                 logger.error(msg)
-                return HttpResponseBadRequest(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
             logger.debug(f"got roles: {role_list}")
 
             try:
@@ -113,7 +142,7 @@ class RoleSessionMixin:
                 msg = f"Error occurred while retrieving the db instance name for tenant {tenant_id}: {e}. " \
                       f"Available tenants: {Tenants.objects.all().values()}"
                 logger.error(msg)
-                return HttpResponseBadRequest(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
             logger.debug(f"got db_instance_name: {db_instance_name}")
 
             request.session['roles'] = role_list
@@ -125,7 +154,7 @@ class RoleSessionMixin:
 
         except Exception as e:
             logger.error(f"Unable to determine roles associated with authenticated user. Exception: {e}")
-            return HttpResponseBadRequest(f"There was an error while fulfilling user request. Message: {e}")
+            return HttpResponseBadRequest(make_error(msg=f"There was an error while fulfilling user request. Message: {e}"))
 
 
 class TableManagement(RoleSessionMixin, APIView):
@@ -169,7 +198,7 @@ class TableManagement(RoleSessionMixin, APIView):
                                "endpoints": table.endpoints,
                                "tenant_id": table.tenant_id})
 
-        return HttpResponse(json.dumps(result), content_type='application/json')
+        return HttpResponse(make_success(result=result), content_type='application/json')
 
     @is_admin
     def post(self, request, *args, **kwargs):
@@ -184,7 +213,7 @@ class TableManagement(RoleSessionMixin, APIView):
         except KeyError as e:
             msg = f"\'{e.args}\' is required when creating a new table."
             logger.warning(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         # Parse out optional fields.
         root_url = request.data.get('root_url', table_name)
@@ -198,13 +227,13 @@ class TableManagement(RoleSessionMixin, APIView):
         if ManageTables.objects.filter(table_name=table_name).exists():
             msg = f"Table with name \'{table_name}\' already exists in ManageTables table."
             logger.warning(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         if ManageTables.objects.filter(root_url=root_url).exists():
             msg = f"Table with root url \'{root_url}\' already exists in ManageTables table. " \
                   f"Table name: {table_name}"
             logger.warning(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         if endpoints:
             endpoints = ["GET_ONE", "GET_ALL", "CREATE", "UPDATE", "DELETE"]
@@ -227,7 +256,7 @@ class TableManagement(RoleSessionMixin, APIView):
             msg = f"Unable to create json validation schema for table {table_name}: {e}" \
                   f"\nFailed to create table {table_name}. "
             logger.warning(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
             result = self.post_transaction(table_name, root_url, columns, validate_json_create, validate_json_update,
@@ -235,9 +264,9 @@ class TableManagement(RoleSessionMixin, APIView):
         except Exception as e:
             msg = f"Failed to create table {table_name}. {e}"
             logger.error(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
-        return HttpResponse(json.dumps(result), content_type='application/json')
+        return HttpResponse(make_success(result=result), content_type='application/json')
 
     @transaction.atomic
     def post_transaction(self, table_name, root_url, columns, validate_json_create, validate_json_update,
@@ -287,7 +316,14 @@ class TableManagementById(RoleSessionMixin, APIView):
         except KeyError as e:
             msg = f"\'{e.args}\' is required to list a table."
             logger.warning(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        try:
+            table_id = int(table_id)
+        except:
+            msg = "Invalid table id; the table id must be an integer."
+            logger.debug(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         # Display information for each table based on details variable.
         try:
@@ -297,7 +333,11 @@ class TableManagementById(RoleSessionMixin, APIView):
         except ManageTables.DoesNotExist:
             msg = f"Table with id {table_id} does not exist in the ManageTables table."
             logger.warning(msg)
-            return HttpResponseNotFound(msg)
+            return HttpResponseNotFound(make_error(msg=msg))
+        except Exception as e:
+            msg = f"Could not retrieve description of table with id {table_id}. Details: {e}"
+            logger.debug(msg)
+            return HttpResponseNotFound(make_error(msg=msg))
 
         # If details, form information about the columns and endpoints of the table
         # TODO Fix up this format.
@@ -321,7 +361,7 @@ class TableManagementById(RoleSessionMixin, APIView):
                 "tenant_id": table.tenant_id
             }
 
-        return HttpResponse(json.dumps(result), content_type='application/json')
+        return HttpResponse(make_success(result=result), content_type='application/json')
 
     @is_admin
     def put(self, request, *args, **kwargs):
@@ -334,7 +374,7 @@ class TableManagementById(RoleSessionMixin, APIView):
         except KeyError as e:
             msg = f"\'{e.args}\' is required to update a table."
             logger.warning(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
             table = ManageTables.objects.get(pk=table_id)
@@ -342,11 +382,11 @@ class TableManagementById(RoleSessionMixin, APIView):
         except ManageTables.DoesNotExist:
             msg = f"Table with ID {table_id} does not exist in ManageTables table."
             logger.warning(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
         except ManageTablesTransition.DoesNotExist:
             msg = f"Transition table for table with ID {table_id} does not exist."
             logger.warning(msg)
-            return HttpResponseServerError(msg)
+            return HttpResponseServerError(make_error(msg=msg))
 
         # Parse out possible update fields.
         root_url = request.data.get('root_url', None)
@@ -411,7 +451,7 @@ class TableManagementById(RoleSessionMixin, APIView):
                     if "action" not in col_info:
                         msg = f"Action field is required to update column {col_name}"
                         logger.warning(msg)
-                        return HttpResponseBadRequest(msg)
+                        return HttpResponseBadRequest(make_error(msg=msg))
 
                     if col_info["action"] == 'DROP':
                         current_cols.pop(col_name, None)
@@ -423,7 +463,7 @@ class TableManagementById(RoleSessionMixin, APIView):
                     else:
                         msg = f"Invalid action for column {col_name} received: {col_info['action']}"
                         logger.warning(msg)
-                        return HttpResponseBadRequest(msg)
+                        return HttpResponseBadRequest(make_error(msg=msg))
 
                     transition_table.save()
 
@@ -436,7 +476,7 @@ class TableManagementById(RoleSessionMixin, APIView):
                     msg = f"Unable to create json validation schema for updating table {table_name}: {e}" \
                           f"\nFailed to update transition table for {table_name}. "
                     logger.warning(msg)
-                    return HttpResponseBadRequest(msg)
+                    return HttpResponseBadRequest(make_error(msg=msg))
 
                 # generate migration script
                 # apply and roll back, error if it does not work
@@ -470,21 +510,21 @@ class TableManagementById(RoleSessionMixin, APIView):
         except KeyError as e:
             msg = f"\'{e.args}\' is required to drop a table."
             logger.warning(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
             table = ManageTables.objects.get(pk=table_id)
         except ManageTables.DoesNotExist:
             msg = f"Table with ID {table_id} does not exist in ManageTables table."
             logger.warning(msg)
-            return HttpResponseNotFound(msg)
+            return HttpResponseNotFound(make_error(msg=msg))
 
         try:
             self.delete_transaction(table, req_tenant, db_instance_name)
         except Exception as e:
             msg = f"Failed to drop table {table.table_name} from the ManageTables table: {e}"
             logger.error(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         return HttpResponse(200)
 
@@ -513,7 +553,7 @@ class TableManagementDump(RoleSessionMixin, APIView):
                 except KeyError as e:
                     msg = f"file_path is required to dump data from table {table_name}."
                     logger.warning(msg)
-                    return HttpResponseBadRequest(msg)
+                    return HttpResponseBadRequest(make_error(msg=msg))
                 info.get("delimiter", ',')
 
                 try:
@@ -562,19 +602,19 @@ class DynamicView(RoleSessionMixin, APIView):
         except KeyError as e:
             msg = f"\'{e.args}\' is required to list rows in a table."
             logger.warning(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
             table = ManageTables.objects.get(root_url=root_url)
         except ManageTables.DoesNotExist:
             msg = f"Table with root url {root_url} does not exist."
             logger.warning(msg)
-            return HttpResponseNotFound(msg)
+            return HttpResponseNotFound(make_error(msg=msg))
 
         if "GET_ALL" not in table.endpoints:
             msg = "API access to LIST ROWS disabled."
             logger.warning(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         query_dict = dict()
         for param in params:
@@ -585,7 +625,7 @@ class DynamicView(RoleSessionMixin, APIView):
                 else:
                     msg = f"Invalid query parameter: {param[6:]}"
                     logger.warning(msg)
-                    return HttpResponseBadRequest(msg)
+                    return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
             if limit is None:
@@ -598,9 +638,9 @@ class DynamicView(RoleSessionMixin, APIView):
         except Exception as e:
             msg = f"Failed to retrieve rows from table {table.table_name} on tenant {req_tenant}. {e}"
             logger.error(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
-        return HttpResponse(json.dumps(result), content_type='application/json')
+        return HttpResponse(make_success(result=result), content_type='application/json')
 
     @can_write
     def post(self, request, *args, **kwargs):
@@ -614,26 +654,30 @@ class DynamicView(RoleSessionMixin, APIView):
         except KeyError as e:
             msg = f"\'{e.args}\' is required to list rows in a table."
             logger.warning(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
             table = ManageTables.objects.get(root_url=root_url)
         except ManageTables.DoesNotExist:
             msg = f"Table with root url {root_url} does not exist."
             logger.warning(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         if "CREATE" not in table.endpoints:
             msg = "API access to CREATE disabled."
             logger.warning(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
             data = request.data['data']
         except KeyError as e:
             msg = f"\'{e.args}\' is required when creating new row in a table."
             logger.warning(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+        except Exception as e:
+            msg = f"Could not parse the request. Did you include a data attribute? Is it valid JSON? Details: {e}"
+            logger.debug(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         # Validate against the table's json schema.
         try:
@@ -641,12 +685,12 @@ class DynamicView(RoleSessionMixin, APIView):
             if not v.validate(data):
                 msg = f"Data determined invalid from json validation schema: {v.errors}"
                 logger.warning(msg)
-                return HttpResponseBadRequest(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
         except Exception as e:
             msg = f"Error occurred when validating the data from the json validation schema: {e}"
             logger.error(msg)
             pass
-            # return HttpResponseBadRequest(msg)
+            # return HttpResponseBadRequest(make_error(msg=msg))
 
         # Separate columns and values out into two lists.
         columns = list()
@@ -664,15 +708,15 @@ class DynamicView(RoleSessionMixin, APIView):
         except Exception as e:
             msg = f"Failed to retrieve rows from table {table.table_name} on tenant {req_tenant}. {e}"
             logger.error(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
         try:
             result = table_data.get_row_from_table(table.table_name, result_id, req_tenant, db_instance=db_instance)
         except Exception as e:
             msg = f"Failed to retrieve rows from table {table.table_name} on tenant {req_tenant}. {e}"
             logger.error(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
-        return HttpResponse(json.dumps(result), content_type='application/json')
+        return HttpResponse(make_success(result=result), content_type='application/json')
     @can_write
     def put(self, request, *args, **kwargs):
             # req_tenant = "public"
@@ -687,7 +731,7 @@ class DynamicView(RoleSessionMixin, APIView):
             except KeyError as e:
                 msg = f"\'{e.args}\' is required to update rows in a table."
                 logger.warning(msg)
-                return HttpResponseBadRequest(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
             where_clause = result_dict.get("where", None)
 
             try:
@@ -695,23 +739,23 @@ class DynamicView(RoleSessionMixin, APIView):
             except ManageTables.DoesNotExist:
                 msg = f"Table with root url {root_url} does not exist."
                 logger.warning(msg)
-                return HttpResponseBadRequest(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
 
             if "UPDATE" not in table.endpoints:
                 msg = "API access to UPDATE disabled."
                 logger.warning(msg)
-                return HttpResponseBadRequest(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
 
             try:
                 v = Validator(table.validate_json_update)
                 if not v.validate(data):
                     msg = f"Data determined invalid from json validation schema: {v.errors}"
                     logger.warning(msg)
-                    return HttpResponseBadRequest(msg)
+                    return HttpResponseBadRequest(make_error(msg=msg))
             except Exception as e:
                 msg = f"Error occurred when validating the data from the json validation schema: {e}"
                 logger.error(msg)
-                return HttpResponseBadRequest(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
 
             try:
                 if where_clause:
@@ -721,7 +765,7 @@ class DynamicView(RoleSessionMixin, APIView):
             except Exception as e:
                 msg = f"Failed to update row in table {table.table_name} with pk {pk_id} on tenant {req_tenant}. {e}"
                 logger.error(msg)
-                return HttpResponseBadRequest(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
 
             return HttpResponse(status=200)
 
@@ -744,28 +788,28 @@ class DynamicViewById(RoleSessionMixin, APIView):
         except KeyError as e:
             msg = f"\'{e.args}\' is required to get row from a table."
             logger.warning(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
             table = ManageTables.objects.get(root_url=root_url)
         except ManageTables.DoesNotExist:
             msg = f"Table with root url {root_url} does not exist."
             logger.warning(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         if "GET_ONE" not in table.endpoints:
             msg = "API access to LIST SINGLE ROW disabled."
             logger.warning(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
             result = table_data.get_row_from_table(table.table_name, pk_id, req_tenant)
         except Exception as e:
             msg = f"Failed to retrieve row from table {table.table_name} with pk {pk_id} on tenant {req_tenant}. {e}"
             logger.error(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
-        return HttpResponse(json.dumps(result), content_type='application/json')
+        return HttpResponse(make_success(result=result), content_type='application/json')
 
     @can_write
     def put(self, request, *args, **kwargs):
@@ -781,44 +825,44 @@ class DynamicViewById(RoleSessionMixin, APIView):
         except KeyError as e:
             msg = f"\'{e.args}\' is required to update a row in a table."
             logger.warning(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
             table = ManageTables.objects.get(root_url=root_url)
         except ManageTables.DoesNotExist:
             msg = f"Table with root url {root_url} does not exist."
             logger.warning(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         if "UPDATE" not in table.endpoints:
             msg = "API access to UPDATE disabled."
             logger.warning(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
             v = Validator(table.validate_json_update)
             if not v.validate(data):
                 msg = f"Data determined invalid from json validation schema: {v.errors}"
                 logger.warning(msg)
-                return HttpResponseBadRequest(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
         except Exception as e:
             msg = f"Error occurred when validating the data from the json validation schema: {e}"
             logger.error(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
             table_data.update_row_with_pk(table.table_name, pk_id, data, req_tenant, db_instance=db_instance)
         except Exception as e:
             msg = f"Failed to update row in table {table.table_name} with pk {pk_id} in tenant {req_tenant}. {e}"
             logger.error(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
             return_result = table_data.get_row_from_table(table.table_name, pk_id, req_tenant)
         except Exception as e:
             msg = f"Failed to retrieve row from table {table.table_name} with pk {pk_id} on tenant {req_tenant}. {e}"
             logger.error(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         return HttpResponse(json.dumps(return_result), content_type='application/json', status=200)
 
@@ -835,26 +879,26 @@ class DynamicViewById(RoleSessionMixin, APIView):
         except KeyError as e:
             msg = f"\'{e.args}\' is required to delete row from a table."
             logger.warning(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
             table = ManageTables.objects.get(root_url=root_url)
         except ManageTables.DoesNotExist:
             msg = f"Table with root url {root_url} does not exist."
             logger.warning(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         if "DELETE" not in table.endpoints:
             msg = "API access to DELETE disabled."
             logger.warning(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
             table_data.delete_row(table.table_name, pk_id, req_tenant, db_instance=db_instance)
         except Exception as e:
             msg = f"Failed to delete row from table {table.table_name} with pk {pk_id} in tenant {req_tenant}. {e}"
             logger.error(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         return HttpResponse(status=200)
 
@@ -868,7 +912,7 @@ class CreateTenant(APIView):
         except KeyError as e:
             msg = f"\'{e.args}\' is required when creating new row in a table."
             logger.warning(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
             Tenants.objects.get_or_create(tenant_name=schema_name, db_instance_name=db_instance)
@@ -876,14 +920,14 @@ class CreateTenant(APIView):
             msg = f"Unable to insert new role into Tenants Django table for tenant " \
                   f"{schema_name} and db_instance {db_instance}: {e}"
             logger.warning(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
             manage_tables.create_schema(schema_name, db_instance)
         except Exception as e:
             msg = f"Failed to create new schema {schema_name} in db_instance {db_instance}. {e}"
             logger.error(msg)
-            return HttpResponseBadRequest(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         return HttpResponse(200)
 
