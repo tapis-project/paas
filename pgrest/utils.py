@@ -1,8 +1,13 @@
 import logging
 from django.http import HttpResponseForbidden
 
+from pgrest.pycommon import errors as common_errors
+from pgrest.pycommon.auth import t
+
+
 logger = logging.getLogger(__name__)
 
+PGREST_ROLES = ['PGREST_ADMIN', 'PGREST_WRITE', 'PGREST_READ']
 
 def create_validate_schema(columns):
     """
@@ -49,7 +54,7 @@ def is_admin(view):
     """
     def wrapper(self, request, *args, **kwargs):
         logger.debug("top of is_admin()")
-        if "ADMIN" not in request.session['roles']:
+        if "PGREST_ADMIN" not in request.session['roles']:
             return HttpResponseForbidden(f"User {request.session['username']} does not have permission to manage "
                                          f"database tables.")
         else:
@@ -63,7 +68,7 @@ def can_write(view):
     """
     def wrapper(self, request, *args, **kwargs):
         roles = request.session["roles"]
-        if "ADMIN" not in roles and "WRITE" not in roles:
+        if "PGREST_ADMIN" not in roles and "PGREST_WRITE" not in roles:
             return HttpResponseForbidden(f"User {request.session['username']} does not have permission to write.")
         else:
             return view(self, request, *args, **kwargs)
@@ -76,9 +81,56 @@ def can_read(view):
     """
     def wrapper(self, request, *args, **kwargs):
         roles = request.session["roles"]
-        if "ADMIN" not in roles and "WRITE" not in roles and "READ" not in roles:
+        if "PGREST_ADMIN" not in roles and "PGREST_WRITE" not in roles and "PGREST_READ" not in roles:
             return HttpResponseForbidden(f"User {request.session['username']} does not have permission to read.")
         else:
             return view(self, request, *args, **kwargs)
     return wrapper
+
+
+def create_roles(tenants=[]):
+    """
+    Creates the basic set of roles required by PgREST in SK for a given set of tenants.
+    """
+    for tn in tenants:
+        t.sk.createRole(roleName='PGREST_READ',
+                        roleTenant=tn,
+                        description='Role granting read access to all tables in the PgREST API.')
+        t.sk.createRole(roleName='PGREST_WRITE',
+                        roleTenant=tn,
+                        description='Role granting write access to all tables in the PgREST API.')
+
+        t.sk.createRole(roleName='PGREST_ADMIN',
+                        roleTenant=tn,
+                        description='Role granting admin rights to all tables in the PgREST API.')
+
+def grant_role(tenant, username, role):
+    """
+    Grant the role
+    """
+    if not role in PGREST_ROLES:
+        raise common_errors.BaseTapisError(f"Invalid role {role}; role should be in {PGREST_ROLES}")
+    t.sk.grantRole(user=username, tenant=tenant, roleName=role)
+
+
+tenants = ['a2cps', 'cii', 'tacc', 'dev', 'admin']
+
+# make sure roles exist --
+create_roles(tenants)
+
+# set up project admins --
+admins = ['jstubbs', 'cgarcia']
+
+
+for a in admins:
+    for tn in tenants:
+        grant_role(tn, a, 'PGREST_ADMIN')
+
+# additional roles by tenant
+grant_role('a2cps','ctjordan', 'PGREST_ADMIN')
+grant_role('a2cps','pscherer', 'PGREST_ADMIN')
+grant_role('a2cps', 'vaughn', 'PGREST_ADMIN')
+
+grant_role('cii','ctjordan', 'PGREST_ADMIN')
+grant_role('cii','pscherer', 'PGREST_ADMIN')
 
