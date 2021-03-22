@@ -5,6 +5,8 @@
 __pycache__/
 *.py[cod]
 
+pgrest.log
+
 # C extensions
 *.so
 
