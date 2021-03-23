@@ -1,8 +1,7 @@
-import logging
 import psycopg2
 from . import config
-
-logger = logging.getLogger(__name__)
+from pgrest.pycommon.logs import get_logger
+logger = get_logger(__name__)
 
 
 def dict_fetch_all(cursor):

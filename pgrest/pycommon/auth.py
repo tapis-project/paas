@@ -1,11 +1,9 @@
-import logging
-
 from tapipy.tapis import Tapis, TapisResult
 from pgrest.pycommon.config import conf
 from pgrest.pycommon import errors
 from pgrest.pycommon.tenants import tenants as default_tenants
-
-logger = logging.getLogger(__name__)
+from pgrest.pycommon.logs import get_logger
+logger = get_logger(__name__)
 
 
 def get_service_tapis_client(tenant_id=None,

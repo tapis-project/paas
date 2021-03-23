@@ -45,8 +45,8 @@ class ResponseTestCase(TestCase):
         self.createTable()
 
     def tearDown(self):
-        self.client.delete(f'/v3/pgrest/manage/tables/{self.init_resp_1["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
-        self.client.delete(f'/v3/pgrest/manage/tables/{self.init_resp_2["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
+        self.client.delete(f'/v3/pgrest/manage/tables/{self.init_resp_1["result"]["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
+        self.client.delete(f'/v3/pgrest/manage/tables/{self.init_resp_2["result"]["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
 
 
     #######################
@@ -64,7 +64,7 @@ class ResponseTestCase(TestCase):
         response = self.client.get('/v3/pgrest/manage/tables?details=true', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(response["Content-Type"].lower(), "application/json")
         try:
-            response.json()[0]["columns"]
+            response.json()["result"][0]["columns"]
         except KeyError:
             self.fail("Details did not return columns")
         self.assertEqual(response.status_code, 200)
@@ -72,7 +72,7 @@ class ResponseTestCase(TestCase):
     def test_list_tables_for_correct_tenant_only(self):
         response = self.client.get('/v3/pgrest/manage/tables', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(response["Content-Type"].lower(), "application/json")
-        for resp in response.json():
+        for resp in response.json()["result"]:
             self.assertIn(resp["tenant"], ["dev", "admin"])
 
     # ---- CREATE TABLES ---- #
@@ -80,19 +80,19 @@ class ResponseTestCase(TestCase):
         response = self.client.post('/v3/pgrest/manage/tables', data=json.dumps(test_data.create_table_1),
                                     content_type='application/json', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(response.status_code, 200)
-        self.client.delete(f'/v3/pgrest/manage/tables/{response.json()["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
+        self.client.delete(f'/v3/pgrest/manage/tables/{response.json()["result"]["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
 
     def test_create_table_with_serial_data_type(self):
         response = self.client.post('/v3/pgrest/manage/tables', data=json.dumps(test_data.create_table_7),
                                     content_type='application/json', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(response.status_code, 200)
-        self.client.delete(f'/v3/pgrest/manage/tables/{response.json()["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
+        self.client.delete(f'/v3/pgrest/manage/tables/{response.json()["result"]["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
 
     def test_create_table_with_serial_data_type_with_null_fails(self):
         response = self.client.post('/v3/pgrest/manage/tables', data=json.dumps(test_data.create_table_8),
                                     content_type='application/json', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(response.status_code, 200)
-        self.client.delete(f'/v3/pgrest/manage/tables/{response.json()["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
+        self.client.delete(f'/v3/pgrest/manage/tables/{response.json()["result"]["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
 
     def test_existing_root_url(self):
         response = self.client.post('/v3/pgrest/manage/tables', data=json.dumps(test_data.create_table_2),
@@ -118,7 +118,7 @@ class ResponseTestCase(TestCase):
         response = self.client.post('/v3/pgrest/manage/tables', data=json.dumps(test_data.create_table_9),
                                     content_type='application/json', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(response.status_code, 200)
-        self.client.delete(f'/v3/pgrest/manage/tables/{response.json()["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
+        self.client.delete(f'/v3/pgrest/manage/tables/{response.json()["result"]["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
 
     def test_create_with_foreign_key_no_nulls_with_delete_set_null_400(self):
         response = self.client.post('/v3/pgrest/manage/tables', data=json.dumps(test_data.create_table_10),
@@ -130,7 +130,7 @@ class ResponseTestCase(TestCase):
     def test_delete_existing_table(self):
         response = self.client.post('/v3/pgrest/manage/tables', data=json.dumps(test_data.create_table_6),
                                     content_type='application/json', HTTP_TAPIS_V2_TOKEN=b_token)
-        del_resp = self.client.delete(f'/v3/pgrest/manage/tables/{response.json()["table_id"]}',
+        del_resp = self.client.delete(f'/v3/pgrest/manage/tables/{response.json()["result"]["table_id"]}',
                                       HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(del_resp.status_code, 200)
 
@@ -144,25 +144,25 @@ class ResponseTestCase(TestCase):
                                     content_type='application/json', HTTP_TAPIS_V2_TOKEN=b_token)
 
         print(response)
-        response = self.client.get(f'/v3/pgrest/manage/tables/{response.json()["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
+        response = self.client.get(f'/v3/pgrest/manage/tables/{response.json()["result"]["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"].lower(), "application/json")
 
-        del_resp = self.client.delete(f'/v3/pgrest/manage/tables/{response.json()["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
+        del_resp = self.client.delete(f'/v3/pgrest/manage/tables/{response.json()["result"]["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
         print(del_resp)
 
     def test_list_single_tables_detail(self):
         response = self.client.post('/v3/pgrest/manage/tables', data=json.dumps(test_data.create_table_6),
                                     content_type='application/json', HTTP_TAPIS_V2_TOKEN=b_token)
-        table_id = response.json()["table_id"]
+        table_id = response.json()["result"]["table_id"]
         get_response = self.client.get(f'/v3/pgrest/manage/tables/{table_id}?details=true', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(get_response["Content-Type"].lower(), "application/json")
         try:
-            get_response.json()["columns"]
+            get_response.json()["result"]["columns"]
         except KeyError:
             self.fail("Details did not return columns")
         self.assertEqual(get_response.status_code, 200)
-        self.client.delete(f'/v3/pgrest/manage/tables/{get_response.json()["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
+        self.client.delete(f'/v3/pgrest/manage/tables/{get_response.json()["result"]["table_id"]}', HTTP_TAPIS_V2_TOKEN=b_token)
 
     def test_list_nonexistent_table(self):
         response = self.client.get('/v3/pgrest/manage/tables/5999999993999999', HTTP_TAPIS_V2_TOKEN=b_token)
@@ -176,7 +176,7 @@ class ResponseTestCase(TestCase):
 
     # ---- LIST ALL ROWS ---- #
     def test_list_table_contents(self):
-        root_url = self.init_resp_1["root_url"]
+        root_url = self.init_resp_1["result"]["root_url"]
         response = self.client.get(f'/v3/pgrest/data/{root_url}', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(response.status_code, 200)
 
@@ -186,32 +186,32 @@ class ResponseTestCase(TestCase):
 
     # ---- CREATE ROW ---- #
     def test_create_object_in_table(self):
-        root_url = self.init_resp_1["root_url"]
+        root_url = self.init_resp_1["result"]["root_url"]
         data = {"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}
         response = self.client.post(f'/v3/pgrest/data/{root_url}', HTTP_TAPIS_V2_TOKEN=b_token,
                                     data=json.dumps({"data": data}), content_type='application/json')
         self.assertEqual(response.status_code, 200)
         response = self.client.get(f'/v3/pgrest/data/{root_url}', HTTP_TAPIS_V2_TOKEN=b_token)
-        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(len(response.json()["result"]), 1)
 
     def test_create_object_in_table_nulls_no_needed(self):
-        root_url = self.init_resp_1["root_url"]
+        root_url = self.init_resp_1["result"]["root_url"]
         data = {"col_four": False, "col_five": "hehe"}
         response = self.client.post(f'/v3/pgrest/data/{root_url}', HTTP_TAPIS_V2_TOKEN=b_token,
                                     data=json.dumps({"data": data}), content_type='application/json')
         self.assertEqual(response.status_code, 200)
         response = self.client.get(f'/v3/pgrest/data/{root_url}', HTTP_TAPIS_V2_TOKEN=b_token)
-        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(len(response.json()["result"]), 1)
 
     def test_create_object_in_table_without_required_field_400(self):
-        root_url = self.init_resp_1["root_url"]
+        root_url = self.init_resp_1["result"]["root_url"]
         data = {"col_five": "hehe"}
         response = self.client.post(f'/v3/pgrest/data/{root_url}', HTTP_TAPIS_V2_TOKEN=b_token,
                                     data=json.dumps({"data": data}), content_type='application/json')
         self.assertEqual(response.status_code, 400)
 
     def test_create_object_in_table_wrong_data_type_400(self):
-        root_url = self.init_resp_1["root_url"]
+        root_url = self.init_resp_1["result"]["root_url"]
         data = {"col_one": 50, "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}
         response = self.client.post(f'/v3/pgrest/data/{root_url}', HTTP_TAPIS_V2_TOKEN=b_token,
                                     data=json.dumps({"data": data}), content_type='application/json')
@@ -226,44 +226,44 @@ class ResponseTestCase(TestCase):
     # ---- UPDATE ROW ---- #
     def test_update_row(self):
         # first, we need to create row
-        root_url = self.init_resp_1["root_url"]
-        table_name = self.init_resp_1["table_name"]
+        root_url = self.init_resp_1["result"]["root_url"]
+        table_name = self.init_resp_1["result"]["table_name"]
         data = {"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}
         response = self.client.post(f'/v3/pgrest/data/{root_url}', data=json.dumps({"data": data}),
                                     HTTP_TAPIS_V2_TOKEN=b_token, content_type='application/json')
         self.assertEqual(response.status_code, 200)
         response = self.client.get(f'/v3/pgrest/data/{root_url}', HTTP_TAPIS_V2_TOKEN=b_token)
-        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(len(response.json()["result"]), 1)
         self.assertEqual(response.status_code, 200)
         # now, update
         data = {"col_two": 30}
         row_id_int = table_name + "_id"
-        row_id = response.json()[0][row_id_int]
+        row_id = response.json()["result"][0][row_id_int]
         response = self.client.put(f'/v3/pgrest/data/{root_url}/{row_id}', HTTP_TAPIS_V2_TOKEN=b_token,
                                    data=json.dumps({"data": data}), content_type='application/json')
         self.assertEqual(response.status_code, 200)
 
     def test_update_row_wrong_data_type_400(self):
         # first, we need to create row
-        root_url = self.init_resp_1["root_url"]
-        table_name = self.init_resp_1["table_name"]
+        root_url = self.init_resp_1["result"]["root_url"]
+        table_name = self.init_resp_1["result"]["table_name"]
         data = {"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}
         response = self.client.post(f'/v3/pgrest/data/{root_url}', HTTP_TAPIS_V2_TOKEN=b_token,
                                     data=json.dumps({"data": data}), content_type='application/json')
         self.assertEqual(response.status_code, 200)
         response = self.client.get(f'/v3/pgrest/data/{root_url}', HTTP_TAPIS_V2_TOKEN=b_token)
-        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(len(response.json()["result"]), 1)
         self.assertEqual(response.status_code, 200)
         # now, update
         data = {"col_two": "haha"}
         row_id_int = table_name + "_id"
-        row_id = response.json()[0][row_id_int]
+        row_id = response.json()["result"][0][row_id_int]
         response = self.client.put(f'/v3/pgrest/data/{root_url}/{row_id}', HTTP_TAPIS_V2_TOKEN=b_token,
                                    data=json.dumps({"data": data}), content_type='application/json')
         self.assertEqual(response.status_code, 400)
 
     def test_update_row_nonexistent_row_400(self):
-        root_url = self.init_resp_1["root_url"]
+        root_url = self.init_resp_1["result"]["root_url"]
         data = {"col_two": 100}
         response = self.client.put(f'/v3/pgrest/data/{root_url}/898989', HTTP_TAPIS_V2_TOKEN=b_token,
                                    data=json.dumps({"data": data}), content_type='application/json')
@@ -271,20 +271,20 @@ class ResponseTestCase(TestCase):
 
     def test_update_row_nonexistent_column_400(self):
         # first, we need to create row
-        root_url = self.init_resp_1["root_url"]
-        table_name = self.init_resp_1["table_name"]
+        root_url = self.init_resp_1["result"]["root_url"]
+        table_name = self.init_resp_1["result"]["table_name"]
 
         data = {"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}
         response = self.client.post(f'/v3/pgrest/data/{root_url}', HTTP_TAPIS_V2_TOKEN=b_token,
                                     data=json.dumps({"data": data}), content_type='application/json')
         self.assertEqual(response.status_code, 200)
         response = self.client.get(f'/v3/pgrest/data/{root_url}', HTTP_TAPIS_V2_TOKEN=b_token)
-        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(len(response.json()["result"]), 1)
         self.assertEqual(response.status_code, 200)
         # now, update
         data = {"col_where": 30}
         row_id_int = table_name + "_id"
-        row_id = response.json()[0][row_id_int]
+        row_id = response.json()["result"][0][row_id_int]
         response = self.client.put(f'/v3/pgrest/data/{root_url}/{row_id}', HTTP_TAPIS_V2_TOKEN=b_token,
                                    data=json.dumps({"data": data}), content_type='application/json')
         self.assertEqual(response.status_code, 400)
@@ -292,58 +292,58 @@ class ResponseTestCase(TestCase):
     # ---- DELETE ROW ---- #
     def test_delete_row(self):
         # first, we need to create row
-        root_url = self.init_resp_1["root_url"]
-        table_name = self.init_resp_1["table_name"]
+        root_url = self.init_resp_1["result"]["root_url"]
+        table_name = self.init_resp_1["result"]["table_name"]
 
         data = {"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}
         response = self.client.post(f'/v3/pgrest/data/{root_url}', HTTP_TAPIS_V2_TOKEN=b_token,
                                     data=json.dumps({"data": data}), content_type='application/json')
         self.assertEqual(response.status_code, 200)
         response = self.client.get(f'/v3/pgrest/data/{root_url}', HTTP_TAPIS_V2_TOKEN=b_token)
-        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(len(response.json()["result"]), 1)
         self.assertEqual(response.status_code, 200)
         # now, delete
         row_id_int = table_name + "_id"
-        row_id = response.json()[0][row_id_int]
+        row_id = response.json()["result"][0][row_id_int]
         response = self.client.delete(f'/v3/pgrest/data/{root_url}/{row_id}', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(response.status_code, 200)
         response = self.client.delete(f'/v3/pgrest/data/{root_url}/{row_id}', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(response.status_code, 400)
         response = self.client.get(f'/v3/pgrest/data/{root_url}', HTTP_TAPIS_V2_TOKEN=b_token)
-        self.assertEqual(len(response.json()), 0)
+        self.assertEqual(len(response.json()["result"]), 0)
 
     def test_delete_nonexistent_row_400(self):
-        root_url = self.init_resp_1["root_url"]
+        root_url = self.init_resp_1["result"]["root_url"]
         response = self.client.delete(f'/v3/pgrest/data/{root_url}/89898989', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(response.status_code, 400)
 
     # ---- LIST SINGLE ROW ---- #
         # first, we need to create row
     def test_list_single_row(self):
-        root_url = self.init_resp_1["root_url"]
-        table_name = self.init_resp_1["table_name"]
+        root_url = self.init_resp_1["result"]["root_url"]
+        table_name = self.init_resp_1["result"]["table_name"]
         data = {"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}
         response = self.client.post(f'/v3/pgrest/data/{root_url}', data=json.dumps({"data": data}),
                                     content_type='application/json', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(response.status_code, 200)
         response = self.client.get(f'/v3/pgrest/data/{root_url}', HTTP_TAPIS_V2_TOKEN=b_token)
-        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(len(response.json()["result"]), 1)
         self.assertEqual(response.status_code, 200)
         # now, list the row
         row_id_int = table_name + "_id"
-        row_id = response.json()[0][row_id_int]
+        row_id = response.json()["result"][0][row_id_int]
         response = self.client.get(f'/v3/pgrest/data/{root_url}/{row_id}', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(response.status_code, 200)
 
     def test_list_nonexistent_row_400(self):
-        root_url = self.init_resp_1["root_url"]
+        root_url = self.init_resp_1["result"]["root_url"]
         response = self.client.get(f'/v3/pgrest/data/{root_url}/9090290392032', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(response.status_code, 400)
 
     # ---- FILTER ROWS ON LISTING ---- #
         # first, we need to create rows
     def test_filter_by_one_column(self):
-        root_url = self.init_resp_1["root_url"]
+        root_url = self.init_resp_1["result"]["root_url"]
 
         data = [{"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
                 {"col_one": "hi", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
@@ -356,11 +356,11 @@ class ResponseTestCase(TestCase):
             self.assertEqual(response.status_code, 200)
 
         response = self.client.get(f'/v3/pgrest/data/{root_url}?where_col_one=hi', HTTP_TAPIS_V2_TOKEN=b_token)
-        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(len(response.json()["result"]), 1)
         self.assertEqual(response.status_code, 200)
 
     def test_filter_by_two_columns(self):
-        root_url = self.init_resp_1["root_url"]
+        root_url = self.init_resp_1["result"]["root_url"]
 
         data = [{"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
                 {"col_one": "hi", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
@@ -374,11 +374,11 @@ class ResponseTestCase(TestCase):
 
         response = self.client.get(f'/v3/pgrest/data/{root_url}?where_col_one=goodbye&where_col_three=95',
                                    HTTP_TAPIS_V2_TOKEN=b_token)
-        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(len(response.json()["result"]), 1)
         self.assertEqual(response.status_code, 200)
 
     def test_filter_by_two_columns_one_boolean(self):
-        root_url = self.init_resp_1["root_url"]
+        root_url = self.init_resp_1["result"]["root_url"]
 
         data = [{"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
                 {"col_one": "hi", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
@@ -391,14 +391,14 @@ class ResponseTestCase(TestCase):
             self.assertEqual(response.status_code, 200)
 
         response = self.client.get(f'/v3/pgrest/data/{root_url}', HTTP_TAPIS_V2_TOKEN=b_token)
-        self.assertEqual(len(response.json()), 5)
+        self.assertEqual(len(response.json()["result"]), 5)
         response = self.client.get(f'/v3/pgrest/data/{root_url}?where_col_one=goodbye&where_col_four=True',
                                    HTTP_TAPIS_V2_TOKEN=b_token)
-        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(len(response.json()["result"]), 1)
         self.assertEqual(response.status_code, 200)
 
     def test_order_by(self):
-        root_url = self.init_resp_1["root_url"]
+        root_url = self.init_resp_1["result"]["root_url"]
 
         data = [{"col_one": "hello", "col_two": 100, "col_three": 80, "col_four": False, "col_five": "hehe"},
                 {"col_one": "hi", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
@@ -411,23 +411,23 @@ class ResponseTestCase(TestCase):
             self.assertEqual(response.status_code, 200)
 
         response = self.client.get(f'/v3/pgrest/data/{root_url}', HTTP_TAPIS_V2_TOKEN=b_token)
-        self.assertEqual(response.json()[0]["col_three"], 80)
-        self.assertEqual(response.json()[4]["col_three"], 60)
+        self.assertEqual(response.json()["result"][0]["col_three"], 80)
+        self.assertEqual(response.json()["result"][4]["col_three"], 60)
 
         response = self.client.get(f'/v3/pgrest/data/{root_url}?order=col_three', HTTP_TAPIS_V2_TOKEN=b_token)
-        self.assertEqual(response.json()[0]["col_three"], 60)
-        self.assertEqual(response.json()[4]["col_three"], 95)
+        self.assertEqual(response.json()["result"][0]["col_three"], 60)
+        self.assertEqual(response.json()["result"][4]["col_three"], 95)
 
         response = self.client.get(f'/v3/pgrest/data/{root_url}?order=col_three,DESC', HTTP_TAPIS_V2_TOKEN=b_token)
-        self.assertEqual(response.json()[0]["col_three"], 95)
-        self.assertEqual(response.json()[4]["col_three"], 60)
+        self.assertEqual(response.json()["result"][0]["col_three"], 95)
+        self.assertEqual(response.json()["result"][4]["col_three"], 60)
 
         response = self.client.get(f'/v3/pgrest/data/{root_url}?order=col_three,ASC', HTTP_TAPIS_V2_TOKEN=b_token)
-        self.assertEqual(response.json()[0]["col_three"], 60)
-        self.assertEqual(response.json()[4]["col_three"], 95)
+        self.assertEqual(response.json()["result"][0]["col_three"], 60)
+        self.assertEqual(response.json()["result"][4]["col_three"], 95)
 
     def test_order_by_with_filters(self):
-        root_url = self.init_resp_1["root_url"]
+        root_url = self.init_resp_1["result"]["root_url"]
 
         data = [{"col_one": "hello", "col_two": 100, "col_three": 80, "col_four": False, "col_five": "hehe"},
                 {"col_one": "hi", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
@@ -440,18 +440,17 @@ class ResponseTestCase(TestCase):
             self.assertEqual(response.status_code, 200)
 
         response = self.client.get(f'/v3/pgrest/data/{root_url}?where_col_one=goodbye', HTTP_TAPIS_V2_TOKEN=b_token)
-        print(response.json())
-        self.assertEqual(response.json()[0]["col_three"], 95)
-        self.assertEqual(response.json()[1]["col_three"], 94)
+        self.assertEqual(response.json()["result"][0]["col_three"], 95)
+        self.assertEqual(response.json()["result"][1]["col_three"], 94)
 
         response = self.client.get(f'/v3/pgrest/data/{root_url}?where_col_one=goodbye&order=col_three,ASC',
                                    HTTP_TAPIS_V2_TOKEN=b_token)
-        self.assertEqual(response.json()[0]["col_three"], 94)
-        self.assertEqual(response.json()[1]["col_three"], 95)
+        self.assertEqual(response.json()["result"][0]["col_three"], 94)
+        self.assertEqual(response.json()["result"][1]["col_three"], 95)
 
     # ---- UPDATING MULTIPLE ROWS ---- #
     def test_update_entire_table(self):
-        root_url = self.init_resp_1["root_url"]
+        root_url = self.init_resp_1["result"]["root_url"]
 
         data = [{"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
                 {"col_one": "hi", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
@@ -469,11 +468,11 @@ class ResponseTestCase(TestCase):
                                    data=json.dumps({"data": data}), content_type='application/json')
         self.assertEqual(response.status_code, 200)
         response = self.client.get(f'/v3/pgrest/data/{root_url}', HTTP_TAPIS_V2_TOKEN=b_token)
-        for resp in response.json():
+        for resp in response.json()["result"]:
             self.assertEqual(resp["col_five"], "omg")
 
     def test_update_nonexistent_rows_in_table(self):
-        root_url = self.init_resp_1["root_url"]
+        root_url = self.init_resp_1["result"]["root_url"]
 
         data = [{"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
                 {"col_one": "hi", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
@@ -492,7 +491,7 @@ class ResponseTestCase(TestCase):
         self.assertEqual(response.status_code, 400)
 
     def test_update_rows_with_wrong_data_type_400(self):
-        root_url = self.init_resp_1["root_url"]
+        root_url = self.init_resp_1["result"]["root_url"]
 
         data = [{"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
                 {"col_one": "hi", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
@@ -510,11 +509,11 @@ class ResponseTestCase(TestCase):
                                    data=json.dumps({"data": data}), content_type='application/json')
         self.assertEqual(response.status_code, 400)
         response = self.client.get(f'/v3/pgrest/data/{root_url}', HTTP_TAPIS_V2_TOKEN=b_token)
-        for resp in response.json():
+        for resp in response.json()["result"]:
             self.assertEqual(resp["col_five"], "hehe")
 
     def test_update_rows_with_filter_string(self):
-        root_url = self.init_resp_1["root_url"]
+        root_url = self.init_resp_1["result"]["root_url"]
 
         data = [{"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
                 {"col_one": "hi", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "haha"},
@@ -536,14 +535,14 @@ class ResponseTestCase(TestCase):
                                    data=json.dumps({"data": data, "where": where_clause}), content_type='application/json')
         self.assertEqual(response.status_code, 200)
         response = self.client.get(f'/v3/pgrest/data/{root_url}', HTTP_TAPIS_V2_TOKEN=b_token)
-        for resp in response.json():
+        for resp in response.json()["result"]:
             if resp["col_five"] == 'hehe':
                 self.assertNotEqual(resp["col_one"], "lata")
             else:
                 self.assertEqual(resp["col_one"], "lata")
 
     def test_update_rows_with_filter_int(self):
-        root_url = self.init_resp_1["root_url"]
+        root_url = self.init_resp_1["result"]["root_url"]
 
         data = [{"col_one": "hello", "col_two": 100, "col_three": 95, "col_four": False, "col_five": "hehe"},
                 {"col_one": "hi", "col_two": 100, "col_three": 95, "col_four": False, "col_five": "haha"},
@@ -564,14 +563,14 @@ class ResponseTestCase(TestCase):
                                    data=json.dumps({"data": data, "where": where_clause}), content_type='application/json')
         self.assertEqual(response.status_code, 200)
         response = self.client.get(f'/v3/pgrest/data/{root_url}', HTTP_TAPIS_V2_TOKEN=b_token)
-        for resp in response.json():
+        for resp in response.json()["result"]:
             if resp["col_three"] < 95:
                 self.assertNotEqual(resp["col_one"], "lata")
             else:
                 self.assertEqual(resp["col_one"], "lata")
 
     def test_update_rows_with_filter_incorrect_data_type(self):
-        root_url = self.init_resp_1["root_url"]
+        root_url = self.init_resp_1["result"]["root_url"]
 
         data = [{"col_one": "hello", "col_two": 100, "col_three": 95, "col_four": False, "col_five": "hehe"},
                 {"col_one": "hi", "col_two": 100, "col_three": 95, "col_four": False, "col_five": "haha"},
@@ -593,5 +592,5 @@ class ResponseTestCase(TestCase):
                                    data=json.dumps({"data": data, "where": where_clause}), content_type='application/json')
         self.assertEqual(response.status_code, 400)
         response = self.client.get(f'/v3/pgrest/data/{root_url}', HTTP_TAPIS_V2_TOKEN=b_token)
-        for resp in response.json():
+        for resp in response.json()["result"]:
             self.assertNotEqual(resp["col_one"], 90)

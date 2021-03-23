@@ -1,6 +1,5 @@
 import json
 import requests
-import logging
 
 
 from cerberus import Validator
@@ -15,8 +14,8 @@ from pgrest.models import ManageTables, ManageTablesTransition, Tenants
 from pgrest.db_transactions import manage_tables, table_data, bulk_data
 from pgrest.pycommon.auth import t, get_tenant_id_from_base_url
 from pgrest.utils import create_validate_schema, can_read, can_write, is_admin
-
-logger = logging.getLogger(__name__)
+from pgrest.pycommon.logs import get_logger
+logger = get_logger(__name__)
 
 
 def get_version():

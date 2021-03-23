@@ -1,11 +1,10 @@
-import logging
 import requests
 
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
 
 from pgrest.pycommon.auth import t
-
-logger = logging.getLogger(__name__)
+from pgrest.pycommon.logs import get_logger
+logger = get_logger(__name__)
 
 
 class RoleSessionMixin:

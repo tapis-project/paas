@@ -1,10 +1,8 @@
-import logging
 import sys
 
 from subprocess import Popen, check_call, call, PIPE
-
-
-logger = logging.getLogger(__name__)
+from pgrest.pycommon.logs import get_logger
+logger = get_logger(__name__)
 
 
 def dump_data(table_name, file_path, tenant):
