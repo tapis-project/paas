@@ -3,53 +3,11 @@ Local Development
 =================
 Before You Begin:
 1. Make sure you are on the TACC VPN.
-2. Make sure you have updated the service_password and dbpassword in the config-local.json
+2. Make sure you have updated ``service_password`` in the config-local.json with the PgREST
+service password from the Tapis v3 Kuberenetes development environment. 
+   
+(If you don't know what these mean, [ask a friend](https://tacc-cloud.slack.com).) 
 
-
-Build the containers:
---------------------
-```
-docker-compose build
-```
-
-
-Create initial DB structure:
----------------------------
-from within the pgrest directory:
-```
-docker-compose run api python manage.py makemigrations
-docker-compose run api python manage.py migrate
-```
-
-
-Start the API container
------------------------
-```
-docker-compose up -d api
-```
-
-
-Add Tenants
------------
-Once the API container is running, exec into the container to add tenants:
-```
-docker exec -it pgrest-api bash
-```
-from within the container:
-```
-python manage.py shell
-```
-from within the python shell enter the following:
-```
-from pgrest import models
-
-# add tenants
-models.Tenants.objects.create(tenant_name="dev", db_instance_name="local")
-models.Tenants.objects.create(tenant_name="admin", db_instance_name="local")
-
-# list tenants
-models.Tenants.objects.all().values()
-```
 
 
 Makefile
@@ -59,13 +17,23 @@ To build and deploy locally:
 ```
 make local-deploy
 ```
+The first time you start up the containers on a new machine, or any time you remove the
+postrges volume (e.g., with "make down"), you need to add tenants to the Tenants configuration
+table. Do that with the following command, once the API container and database are running:
+```
+make add-tenants
+```
 
-To take down current containers and postgres volume:  
+Speaking of whcih, to take down current containers and postgres volume:  
 ```
 make down-volumes
 ```
 
-To run the tests:  
+The repository has a set of tests, but they require a valid Tapis v2 OAuth token for a user
+with the admin role. You must populate the ``test_token`` attribute in the config-local.json file
+with such a token in order to run the tests.
+
+Once the token is in place, to run the tests:  
 ```
 make test
 ```
@@ -98,6 +66,31 @@ curl -H "tapis-v2-token: $tok" localhost:5000/v3/pgrest/data/init
 ```
 
 
+
+# Old, Manual Instructions (You Probably Want to Use the Makefile)
+
+Build the containers:
+--------------------
+```
+docker-compose build
+```
+
+
+Create initial DB structure:
+---------------------------
+from within the pgrest directory:
+```
+docker-compose run api python manage.py makemigrations
+docker-compose run api python manage.py migrate
+```
+
+
+Start the API container
+-----------------------
+```
+docker-compose up -d api
+```
+
 Run the tests
 -------------
 
@@ -106,3 +99,4 @@ Run the tests
 2) Run all the tests: `docker-compose run api python manage.py test`
 
 3) Run just the createTable test: `docker-compose run api python manage.py test pgrest.tests.ResponseTestCase.createTable`
+

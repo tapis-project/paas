@@ -53,3 +53,10 @@ nuke:
 	@docker rmi -f `docker images -aq`
 	@docker container prune -f
 	@docker volume prune -f
+
+add-tenants:
+	curl -H "content-type: application/json" -d '{"schema_name": "admin", "db_instance": "local"}' -H "tapis-v2-token: $tok" localhost:5000/v3/pgrest/manage/tenants
+	curl -H "content-type: application/json" -d '{"schema_name": "dev", "db_instance": "local"}' -H "tapis-v2-token: $tok" localhost:5000/v3/pgrest/manage/tenants
+	curl -H "content-type: application/json" -d '{"schema_name": "tacc", "db_instance": "local"}' -H "tapis-v2-token: $tok" localhost:5000/v3/pgrest/manage/tenants
+	curl -H "content-type: application/json" -d '{"schema_name": "cii", "db_instance": "local"}' -H "tapis-v2-token: $tok" localhost:5000/v3/pgrest/manage/tenants
+	curl -H "content-type: application/json" -d '{"schema_name": "a2cps", "db_instance": "local"}' -H "tapis-v2-token: $tok" localhost:5000/v3/pgrest/manage/tenants
