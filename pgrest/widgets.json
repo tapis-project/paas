@@ -1,0 +1,26 @@
+{
+  "table_name": "widgets",
+  "root_url": "widgets",
+  "columns": {
+    "name": {
+      "data_type": "varchar",
+      "char_len": 255,
+      "unique": true,
+      "null": false
+    },
+    "widget_type": {
+      "data_type": "varchar",
+      "char_len": 100,
+      "null": true
+    },
+    "count": {
+      "data_type": "integer",
+      "null": true
+    },
+    "is_private": {
+      "data_type": "boolean",
+      "null": "true",
+      "default": "true"
+    }
+  }
+}
