@@ -1,11 +1,9 @@
-import logging
 from django.http import HttpResponseForbidden
 
 from pgrest.pycommon import errors as common_errors
 from pgrest.pycommon.auth import t
-
-
-logger = logging.getLogger(__name__)
+from pgrest.pycommon.logs import get_logger
+logger = get_logger(__name__)
 
 PGREST_ROLES = ['PGREST_ADMIN', 'PGREST_WRITE', 'PGREST_READ']
 
