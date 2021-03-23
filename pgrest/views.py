@@ -1,54 +1,19 @@
 import json
-import requests
-
 
 from cerberus import Validator
-
 from django.db import transaction
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseServerError, HttpResponseNotFound, \
     HttpResponseForbidden
-
+import requests
 from rest_framework.views import APIView
 
 from pgrest.models import ManageTables, ManageTablesTransition, Tenants
 from pgrest.db_transactions import manage_tables, table_data, bulk_data
 from pgrest.pycommon.auth import t, get_tenant_id_from_base_url
-from pgrest.utils import create_validate_schema, can_read, can_write, is_admin
+from pgrest.pycommon import errors
+from pgrest.utils import create_validate_schema, can_read, can_write, is_admin, make_error, make_success
 from pgrest.pycommon.logs import get_logger
 logger = get_logger(__name__)
-
-
-def get_version():
-    """
-    Get the version of the API running.
-    """
-    return "dev" # TODO
-
-
-def make_error(msg=None):
-    """
-    Create an error JSON response in the standard Tapis 4-stanza format.
-    """
-    if not msg:
-        msg = "There was an error."
-    d = {"status": "error",
-         "message": msg,
-         "version": get_version(),
-         "result": None}
-    return json.dumps(d)
-
-
-def make_success(result=None, msg=None):
-    """
-    Create an error JSON response in the standard Tapis 4-stanza format.
-    """
-    if not msg:
-        msg = "The request was successful."
-    d = {"status": "success",
-         "message": msg,
-         "version": get_version(),
-         "result": result}
-    return json.dumps(d)
 
 
 # Error views
@@ -71,7 +36,7 @@ def error_500(request):
                         status=500)
 
 
-def resolve_tapis_v3_token(request):
+def resolve_tapis_v3_token(request, tenant_id):
     """
     Validates a tapis v3 token in the X-Tapis-Token header
     """
@@ -79,8 +44,25 @@ def resolve_tapis_v3_token(request):
     if v3_token:
         try:
             claims = t.tenant_cache.validate_token(v3_token)
+        except errors.NoTokenError as e:
+            msg = "No Tapis token found in the request. Be sure to specify the X-Tapis-Token header."
+            logger.info(msg)
+            return None, HttpResponseForbidden(make_error(msg=msg))
+        except errors.AuthenticationError as e:
+            msg = f"Tapis token validation failed; details: {e}"
+            logger.info(msg)
+            return None, HttpResponseForbidden(make_error(msg=msg))
         except Exception as e:
-            msg = f"Invalid tapis token; details: {e}"
+            msg = f"Unable to validate the Tapis token; details: {e}"
+            logger.info(msg)
+            return None, HttpResponseForbidden(make_error(msg=msg))
+
+        # validate that the tenant claim matches the computed tenant_id
+        # NOTE -- this does not work for service tokens; for those, have to check the OBO header.
+        token_tenant = claims.get('tapis/tenant_id')
+        if not token_tenant == tenant_id:
+            msg = f"Unauthorized; the tenant claim in the token ({token_tenant}) did not match the associated " \
+                  f"tenant in the request ({tenant_id})."
             return None, HttpResponseForbidden(make_error(msg=msg))
         return claims['tapis/username'], None
     else:
@@ -88,7 +70,7 @@ def resolve_tapis_v3_token(request):
     return None, HttpResponseForbidden(make_error(msg=msg))
 
 
-def get_username_for_request(request):
+def get_username_for_request(request, tenant_id):
     """
     Determines the username for the request from possible headers. We support Tapis v2 OAuth tokens via the
     Tapis-v2-token header, and the usual Tapis v3 authentication and headers (e.g., X-Tapis-Token)
@@ -101,10 +83,7 @@ def get_username_for_request(request):
         v2_token = request.META['HTTP_TAPIS_V2_TOKEN']
     except KeyError as e:
         logger.debug("No v2 token header found; will look for a v3 token...")
-        # logger.warning(f"User not authenticated. Exception: {e}")
-        # msg = "Unable to authenticate; was the tapis-v2-token header included in the request?"
-        # return None, HttpResponse(make_error(msg=msg), status=401)
-        return resolve_tapis_v3_token(request)  # TODO --- need to write this!!!!
+        return resolve_tapis_v3_token(request, tenant_id)
 
     try:
         url = "https://api.tacc.utexas.edu/profiles/v2/me"
@@ -135,29 +114,39 @@ class RoleSessionMixin:
     """
     # Override dispatch to decode token and store variables before routing the request.
     def dispatch(self, request, *args, **kwargs):
-        logger.debug("top of dispatch")
+        logger.info(f"top of dispatch; headers: {request.META.keys()}")
         # first, determine tenant_id from base URL --
+        tenant_id = None
         try:
             # Get the base url from the incoming request, and then use that to determine tenant_id
             request_url = request.scheme + "://" + request.get_host()
-            tenant_id = get_tenant_id_from_base_url(request_url, t.tenant_cache)
+            # during local development, we honor a special X-Tapis-local-tenant header, for specifying the
+            # tenant one wants to interact with, but ONLY in local development
+            if 'http://localhost' in request_url or 'http://testserver' in request_url:
+                tapis_local_tenant = request.META.get('HTTP_X_TAPIS_LOCAL_TENANT')
+                logger.warning(f"This is loal development; request_url was: {request_url}; "
+                               f"tapis_local_tenant: {tapis_local_tenant}")
+                if tapis_local_tenant:
+                    tenant_id = tapis_local_tenant
+            if not tenant_id:
+                tenant_id = get_tenant_id_from_base_url(request_url, t.tenant_cache)
         except Exception as e:
             msg = f"Error occurred while calculating tenant ID from the request base URL."
             logger.error(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
-        logger.debug(f"got tenant_id: {tenant_id}")
+        logger.info(f"request tenant_id: {tenant_id}")
 
         # next, determine the username associated with the authentication token --
         try:
             # get user associated with request
-            username, error_response = get_username_for_request(request)
+            username, error_response = get_username_for_request(request, tenant_id)
             if error_response:
                 return error_response
         except Exception as e:
             logger.error(f"Unable to determine username associated with the authentication token. Exception: {e}")
             return HttpResponseBadRequest(
                 make_error(msg=f"There was an error parsing the authentication headers. Details: {e}"))
-
+        logger.info(f"request username: {username}")
 
         try:
             roles = t.sk.getUserRoles(user=username, tenant=tenant_id)
@@ -173,8 +162,8 @@ class RoleSessionMixin:
         try:
             db_instance_name = Tenants.objects.get(tenant_name=tenant_id).db_instance_name
         except Exception as e:
-            msg = f"Error occurred while retrieving the db instance name for tenant {tenant_id}: {e}. " \
-                  f"Available tenants: {Tenants.objects.all().values()}"
+            msg = f"Error occurred while retrieving the db instance name for tenant '{tenant_id}'. " \
+                  f"Details: {e}."
             logger.error(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
         logger.debug(f"got db_instance_name: {db_instance_name}")

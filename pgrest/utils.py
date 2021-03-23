@@ -1,3 +1,5 @@
+import json
+
 from django.http import HttpResponseForbidden
 
 from pgrest.pycommon import errors as common_errors
@@ -6,6 +8,40 @@ from pgrest.pycommon.logs import get_logger
 logger = get_logger(__name__)
 
 PGREST_ROLES = ['PGREST_ADMIN', 'PGREST_WRITE', 'PGREST_READ']
+
+
+def get_version():
+    """
+    Get the version of the API running.
+    """
+    return "dev" # TODO
+
+
+def make_error(msg=None):
+    """
+    Create an error JSON response in the standard Tapis 4-stanza format.
+    """
+    if not msg:
+        msg = "There was an error."
+    d = {"status": "error",
+         "message": msg,
+         "version": get_version(),
+         "result": None}
+    return json.dumps(d)
+
+
+def make_success(result=None, msg=None):
+    """
+    Create an error JSON response in the standard Tapis 4-stanza format.
+    """
+    if not msg:
+        msg = "The request was successful."
+    d = {"status": "success",
+         "message": msg,
+         "version": get_version(),
+         "result": result}
+    return json.dumps(d)
+
 
 def create_validate_schema(columns):
     """
@@ -53,8 +89,8 @@ def is_admin(view):
     def wrapper(self, request, *args, **kwargs):
         logger.debug("top of is_admin()")
         if "PGREST_ADMIN" not in request.session['roles']:
-            return HttpResponseForbidden(f"User {request.session['username']} does not have permission to manage "
-                                         f"database tables.")
+            msg = f"User {request.session['username']} does not have permission to manage database tables."
+            return HttpResponseForbidden(make_error(msg=msg))
         else:
             return view(self, request, *args, **kwargs)
     return wrapper
@@ -67,7 +103,8 @@ def can_write(view):
     def wrapper(self, request, *args, **kwargs):
         roles = request.session["roles"]
         if "PGREST_ADMIN" not in roles and "PGREST_WRITE" not in roles:
-            return HttpResponseForbidden(f"User {request.session['username']} does not have permission to write.")
+            msg = f"User {request.session['username']} does not have permission to write."
+            return HttpResponseForbidden(make_error(msg=msg))
         else:
             return view(self, request, *args, **kwargs)
     return wrapper
@@ -80,7 +117,8 @@ def can_read(view):
     def wrapper(self, request, *args, **kwargs):
         roles = request.session["roles"]
         if "PGREST_ADMIN" not in roles and "PGREST_WRITE" not in roles and "PGREST_READ" not in roles:
-            return HttpResponseForbidden(f"User {request.session['username']} does not have permission to read.")
+            msg = f"User {request.session['username']} does not have permission to read."
+            return HttpResponseForbidden(make_error(msg=msg))
         else:
             return view(self, request, *args, **kwargs)
     return wrapper

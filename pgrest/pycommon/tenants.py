@@ -297,7 +297,7 @@ class Tenants(object):
             claims = jwt.decode(token, public_key_str)
         except Exception as e:
             logger.debug(f"Got exception trying to decode token; exception: {e}")
-            raise errors.AuthenticationError("Invalid Tapis token.")
+            raise errors.AuthenticationError("Token signature validation failed.")
         # if the token is a service token (i.e., this is a service to service request), do additional checks:
         return claims
 
