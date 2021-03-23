@@ -1,3 +1,4 @@
+import jwt
 from tapipy.tapis import Tapis, TapisResult
 
 from pgrest.pycommon.config import conf
@@ -255,6 +256,52 @@ class Tenants(object):
                     admin_tenants.append(t.tenant_id)
         logger.debug(f"site admin tenants for service: {admin_tenants}")
         return admin_tenants
+
+
+    def validate_token(self, token):
+        """
+        Validate a Tapis token. If valid, returns the claims of the associated token.
+        :param token: The token to validate
+        :return:
+        """
+        # first, decode the token data to determine the tenant associated with the token. We are not able to
+        # check the signature until we know which tenant, and thus, which public key, to use for validation.
+        logger.debug("top of validate_token")
+        if not token:
+            raise errors.NoTokenError("No Tapis access token found in the request.")
+        try:
+            data = jwt.decode(token, verify=False)
+        except Exception as e:
+            logger.debug(f"got exception trying to parse data from the access_token jwt; exception: {e}")
+            raise errors.AuthenticationError("Could not parse the Tapis access token.")
+        logger.debug(f"got data from token: {data}")
+        # get the tenant out of the jwt payload and get associated public key
+        try:
+            token_tenant_id = data['tapis/tenant_id']
+        except KeyError:
+            raise errors.AuthenticationError("Unable to process Tapis token; could not parse the tenant_id. It is possible "
+                                             "the token is in a format no longer supported by the platform.")
+        try:
+            token_tenant = self.get_tenant_config(tenant_id=token_tenant_id)
+            public_key_str = token_tenant.public_key
+        except errors.BaseTapisError:
+            logger.error(f"Did not find the public key for tenant_id {token_tenant_id} in the tenant configs.")
+            raise errors.AuthenticationError("Unable to process Tapis token; unexpected tenant_id.")
+        except AttributeError:
+            raise errors.AuthenticationError("Unable to process Tapis token; no public key associated with the "
+                                             "tenant_id.")
+        if not public_key_str:
+            raise errors.AuthenticationError("Could not find the public key for the tenant_id associated with the tenant.")
+        # check signature and decode
+        try:
+            claims = jwt.decode(token, public_key_str)
+        except Exception as e:
+            logger.debug(f"Got exception trying to decode token; exception: {e}")
+            raise errors.AuthenticationError("Invalid Tapis token.")
+        # if the token is a service token (i.e., this is a service to service request), do additional checks:
+        return claims
+
+
 
 # singleton object with all the tenant data and automatic reload functionality.
 # services that override the base Tenants class with a custom class that implements the extend_tenant() method should

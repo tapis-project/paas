@@ -10,3 +10,13 @@ class BaseTapisError(Exception):
         """
         self.msg = msg
         self.code = code
+
+
+class NoTokenError(BaseTapisError):
+    """No access token passed in the request."""
+    pass
+
+
+class AuthenticationError(BaseTapisError):
+    """Error validating access token."""
+    pass
