@@ -72,6 +72,63 @@ def error_500(request):
                         status=500)
 
 
+def resolve_tapis_v3_token(request):
+    """
+    Validates a tapis v3 token in the X-Tapis-Token header
+    """
+    v3_token = request.META.get('HTTP_X_TAPIS_TOKEN')
+    if v3_token:
+        try:
+            claims = t.tenant_cache.validate_token(v3_token)
+        except Exception as e:
+            msg = f"Invalid tapis token; details: {e}"
+            return None, HttpResponseForbidden(make_error(msg=msg))
+        return claims['tapis/username'], None
+    else:
+        msg = "No Tapis token found."
+    return None, HttpResponseForbidden(make_error(msg=msg))
+
+
+def get_username_for_request(request):
+    """
+    Determines the username for the request from possible headers. We support Tapis v2 OAuth tokens via the
+    Tapis-v2-token header, and the usual Tapis v3 authentication and headers (e.g., X-Tapis-Token)
+    """
+    # first look for a v2 token -- if they have passed that, we assume that is what they want to use.
+    try:
+        # Pull token from header `tapis-v2-token`
+        # Note: any HTTP headers in the request are converted to META keys by converting all characters to
+        # uppercase, replacing any hyphens with underscores and adding an HTTP_ prefix to the name.
+        v2_token = request.META['HTTP_TAPIS_V2_TOKEN']
+    except KeyError as e:
+        logger.debug("No v2 token header found; will look for a v3 token...")
+        # logger.warning(f"User not authenticated. Exception: {e}")
+        # msg = "Unable to authenticate; was the tapis-v2-token header included in the request?"
+        # return None, HttpResponse(make_error(msg=msg), status=401)
+        return resolve_tapis_v3_token(request)  # TODO --- need to write this!!!!
+
+    try:
+        url = "https://api.tacc.utexas.edu/profiles/v2/me"
+        head = {'Authorization': f'Bearer {v2_token}'}
+        response = requests.get(url, headers=head)
+    except Exception as e:
+        msg = f"Got exception making request to profiles API. Exception: {e}"
+        logger.error(msg)
+        msg = "Unable to validate v2 token; internal error looking up the associated profile."
+        return None, HttpResponseForbidden(make_error(msg=msg))
+    logger.debug(f"got response from profiles API: {response}")
+    # get username
+    try:
+        username = response.json()['result']['username']
+    except KeyError:
+        msg = "Unable to validate v2 token; either the token is invalid, " \
+              "expired, or does not reoresnt a valid user in the v2 TACC tenant."
+        logger.error(msg)
+        return None, HttpResponseForbidden(make_error(msg=msg))
+    logger.debug(f"got username: {username}")
+    return username, None
+
+
 class RoleSessionMixin:
     """
     Retrieves username from Agave for tacc.prod token, then retrieves roles for this user in SK and stores data
@@ -80,81 +137,55 @@ class RoleSessionMixin:
     # Override dispatch to decode token and store variables before routing the request.
     def dispatch(self, request, *args, **kwargs):
         logger.debug("top of dispatch")
+        # first, determine tenant_id from base URL --
         try:
-            # pull token from the request, and decode it to get the user that is sending in request.
-            try:
-                # Pull token from header `tapis-v2-token`
-                # Note: any HTTP headers in the request are converted to META keys by converting all characters to
-                # uppercase, replacing any hyphens with underscores and adding an HTTP_ prefix to the name.
-                v2_token = request.META['HTTP_TAPIS_V2_TOKEN']
-            except KeyError as e:
-                logger.warning(f"User not authenticated. Exception: {e}")
-                msg = "Unable to authenticate; was the tapis-v2-token header included in the request?"
-                return HttpResponse(make_error(msg=msg), status=401)
-
-            try:
-                url = "https://api.tacc.utexas.edu/profiles/v2/me"
-                head = {'Authorization': f'Bearer {v2_token}'}
-                response = requests.get(url, headers=head)
-            except Exception:
-                msg = f"Unable to retrieve user profile from Agave."
-                logger.error(msg)
-                msg = "Unable to validate v2 token; could not look up the associated profile."
-                return HttpResponseForbidden(make_error(msg=msg))
-            logger.debug(f"got response from profiles API: {response}")
-
-            try:
-                # Get the base url from the incoming request, and then use the
-                request_url = request.scheme + "://" + request.get_host()
-
-                # NOTE!!!!! This top one can be uncommented for local dev.
-                # Bottom one HAS to be uncommented for deployed services.
-                # tenant_id = get_tenant_id_from_base_url("https://admin.develop.tapis.io", t.tenant_cache)
-                tenant_id = get_tenant_id_from_base_url(request_url, t.tenant_cache)
-            except Exception as e:
-                msg = f"Error occurred while calculating tenant ID from the request base URL."
-                logger.error(msg)
-                return HttpResponseBadRequest(make_error(msg=msg))
-            logger.debug(f"got tenant_id: {tenant_id}")
-
-            try:
-                username = response.json()['result']['username']
-            except KeyError:
-                msg = "Unable to parse Agave token response for username."
-                logger.error(msg)
-                return HttpResponseForbidden(make_error(msg=msg))
-            logger.debug(f"got username: {username}")
-
-            try:
-                roles = t.sk.getUserRoles(user=username, tenant=tenant_id)
-                role_list = list()
-                for name in roles.names:
-                    role_list.append(name)
-            except Exception as e:
-                msg = f"Error occurred while retrieving roles from SK: {e}"
-                logger.error(msg)
-                return HttpResponseBadRequest(make_error(msg=msg))
-            logger.debug(f"got roles: {role_list}")
-
-            try:
-                db_instance_name = Tenants.objects.get(tenant_name=tenant_id).db_instance_name
-            except Exception as e:
-                msg = f"Error occurred while retrieving the db instance name for tenant {tenant_id}: {e}. " \
-                      f"Available tenants: {Tenants.objects.all().values()}"
-                logger.error(msg)
-                return HttpResponseBadRequest(make_error(msg=msg))
-            logger.debug(f"got db_instance_name: {db_instance_name}")
-
-            request.session['roles'] = role_list
-            request.session['username'] = username
-            request.session['tenant_id'] = tenant_id
-            request.session['db_instance_name'] = db_instance_name
-
-            return super().dispatch(request, *args, **kwargs)
-
+            # Get the base url from the incoming request, and then use that to determine tenant_id
+            request_url = request.scheme + "://" + request.get_host()
+            tenant_id = get_tenant_id_from_base_url(request_url, t.tenant_cache)
         except Exception as e:
-            logger.error(f"Unable to determine roles associated with authenticated user. Exception: {e}")
-            return HttpResponseBadRequest(make_error(msg=f"There was an error while fulfilling user request. Message: {e}"))
+            msg = f"Error occurred while calculating tenant ID from the request base URL."
+            logger.error(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+        logger.debug(f"got tenant_id: {tenant_id}")
+
+        # next, determine the username associated with the authentication token --
+        try:
+            # get user associated with request
+            username, error_response = get_username_for_request(request)
+            if error_response:
+                return error_response
+        except Exception as e:
+            logger.error(f"Unable to determine username associated with the authentication token. Exception: {e}")
+            return HttpResponseBadRequest(
+                make_error(msg=f"There was an error parsing the authentication headers. Details: {e}"))
+
+
+        try:
+            roles = t.sk.getUserRoles(user=username, tenant=tenant_id)
+            role_list = list()
+            for name in roles.names:
+                role_list.append(name)
+        except Exception as e:
+            msg = f"Error occurred while retrieving roles from SK: {e}"
+            logger.error(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+        logger.debug(f"got roles: {role_list}")
+
+        try:
+            db_instance_name = Tenants.objects.get(tenant_name=tenant_id).db_instance_name
+        except Exception as e:
+            msg = f"Error occurred while retrieving the db instance name for tenant {tenant_id}: {e}. " \
+                  f"Available tenants: {Tenants.objects.all().values()}"
+            logger.error(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+        logger.debug(f"got db_instance_name: {db_instance_name}")
+
+        request.session['roles'] = role_list
+        request.session['username'] = username
+        request.session['tenant_id'] = tenant_id
+        request.session['db_instance_name'] = db_instance_name
+
+        return super().dispatch(request, *args, **kwargs)
 
 
 class TableManagement(RoleSessionMixin, APIView):
@@ -645,8 +676,13 @@ class DynamicView(RoleSessionMixin, APIView):
     @can_write
     def post(self, request, *args, **kwargs):
         # req_tenant = "public"
-        req_tenant = request.session['tenant_id']
-        db_instance = request.session['db_instance_name']
+        try:
+            req_tenant = request.session['tenant_id']
+            db_instance = request.session['db_instance_name']
+        except Exception as e:
+            msg = f"Invalid request; unable to determine database instance; Details: {e}"
+            logger.debug(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         # Parse out required fields.
         try:
@@ -655,12 +691,30 @@ class DynamicView(RoleSessionMixin, APIView):
             msg = f"\'{e.args}\' is required to list rows in a table."
             logger.warning(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
+        except Exception as e:
+            msg = f"Could not parse the request; unable to determine root_url; Details: {e}"
+            logger.debug(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
             table = ManageTables.objects.get(root_url=root_url)
         except ManageTables.DoesNotExist:
             msg = f"Table with root url {root_url} does not exist."
             logger.warning(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+        except Exception as e:
+            msg = f"Could not parse the request; unable to look up corresponding table; Details: {e}"
+            logger.debug(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        try:
+            request_content_type = request.content_type.lower()
+        except Exception as e:
+            logger.error(f"could not parse request content type; look into this, e: {e}")
+            request_content_type = request.content_type
+        if not 'json' in request_content_type:
+            msg = f"Content-type application/json is required; found {request_content_type} instead."
+            logger.debug(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
         if "CREATE" not in table.endpoints:
@@ -683,14 +737,13 @@ class DynamicView(RoleSessionMixin, APIView):
         try:
             v = Validator(table.validate_json_create)
             if not v.validate(data):
-                msg = f"Data determined invalid from json validation schema: {v.errors}"
+                msg = f"Data determined invalid from validation schema; errors: {v.errors}"
                 logger.warning(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
         except Exception as e:
-            msg = f"Error occurred when validating the data from the json validation schema: {e}"
+            msg = f"Error occurred when validating the data from the validation schema; Details: {e}"
             logger.error(msg)
-            pass
-            # return HttpResponseBadRequest(make_error(msg=msg))
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         # Separate columns and values out into two lists.
         columns = list()
