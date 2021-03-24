@@ -821,6 +821,7 @@ class DynamicViewById(RoleSessionMixin, APIView):
     def get(self, request, *args, **kwargs):
         # req_tenant = "public"
         req_tenant = request.session['tenant_id']
+        db_instance = request.session['db_instance_name']
 
         # Parse out required fields.
         try:
@@ -844,7 +845,7 @@ class DynamicViewById(RoleSessionMixin, APIView):
             return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
-            result = table_data.get_row_from_table(table.table_name, pk_id, req_tenant)
+            result = table_data.get_row_from_table(table.table_name, pk_id, req_tenant, db_instance)
         except Exception as e:
             msg = f"Failed to retrieve row from table {table.table_name} with pk {pk_id} on tenant {req_tenant}. {e}"
             logger.error(msg)
