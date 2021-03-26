@@ -65,7 +65,7 @@ paths:
               $ref: '#/components/schemas/NewTable'
             examples:
               widgets:
-                summary: An example of definiing a simple table that holds "widgets".
+                summary: An example of defining a simple table that holds "widgets".
                 value: {"table_name": "widgets", "root_url": "widgets", "columns": {"name": {"data_type": "varchar", "char_len": 255, "unique": true, "null": false }, "widget_type": {"data_type": "varchar", "char_len": 100, "default": "sprocket", "null": true, }, "count": {"data_type": "integer", "null": true}, "is_private": {"data_type": "boolean", "null": "true", "default": "true"}}}
 
 
@@ -82,7 +82,7 @@ paths:
                   result:
                     $ref: '#/components/schemas/Table'
 
-  /v3/pgrest/manage/tables/{table_name}:
+  /v3/pgrest/manage/tables/{table_id}:
     get:
       tags:
         - Manage
@@ -91,12 +91,17 @@ paths:
       operationId: get_table
       x-swagger-router-controller: connexContr
       parameters:
-      - name: table_name
+      - name: table_id
         in: path
-        description: The name of the table.
+        description: The id of the table.
         required: true
         schema:
           type: string
+      - name: details
+        in: query
+        description: Get additional details about the table
+        schema:
+          type: boolean
       responses:
         '200':
           description: OK
@@ -116,9 +121,9 @@ paths:
       operationId: delete_table
       x-swagger-router-controller: connexContr
       parameters:
-      - name: table_name
+      - name: table_id
         in: path
-        description: The name of the table to delete.
+        description: The id of the table to delete.
         required: true
         schema:
           type: string
@@ -371,7 +376,7 @@ components:
       type: object
       description: A description of the columns of the table, in key/value pair format. Each key corresponds to a single collumn; the name of the key is the name of the column, and the value of the key decribes the type of the column and any additional validation information.
       properties:
-        null:
+        "null":
           type: boolean
           description: Whether the column can contain null values.
         data_type:
@@ -397,7 +402,7 @@ components:
               properties:
                 operator:
                   type: string
-                  description: The operator to use in the where clause, such as ">", "<", etc., when comparing rows to be updated.
+                  description: The operator to use in the where clause when comparing rows to be updated.
                 value:
                   description: The value to use in the where clause when comparing rows to be updated.
                   oneOf:
@@ -420,11 +425,13 @@ components:
 
     NewCollectionItem:
       type: object
+      properties:
+        data:
+          type: object
+          description: The values of the row to add.
+
 
     UpdateCollectionItem:
       type: object
       description: A JSON object of key/value pairs describing the updates to be made to the item. Each key should be the name of a column and each corresponding value should be the new value to update the column to.
-
-
-
 
