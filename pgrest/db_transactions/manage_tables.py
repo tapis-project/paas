@@ -22,7 +22,9 @@ def create_table(table_name, columns, tenant, db_instance=None):
     """Create table in the PostgreSQL database"""
     logger.info(f"Creating table {tenant}.{table_name}...")
 
-    command = "CREATE TABLE %s.%s (%s_id SERIAL PRIMARY KEY, " % (tenant, table_name, table_name)
+    command = f"CREATE TABLE {tenant}.{table_name} ("
+    primary_key_flag = False
+
     for key, val in columns.items():
         column_name = key.upper()
         column_args = val
@@ -36,7 +38,7 @@ def create_table(table_name, columns, tenant, db_instance=None):
         if column_type in {"VARCHAR", "CHAR", "TEXT"}:
             try:
                 char_len = column_args["char_len"]
-                column_type = "%s(%s)" % (column_type, char_len)
+                column_type = f"{column_type}({char_len})"
             except KeyError:
                 msg = f"Character max size not received for column {column_name}. Cannot create table {table_name}."
                 logger.warning(msg)
@@ -62,7 +64,7 @@ def create_table(table_name, columns, tenant, db_instance=None):
                     logger.warning(msg)
                     raise Exception(msg)
 
-                column_type = "%s REFERENCES %s.%s(%s) ON DELETE %s" % (column_type, tenant, ref_table, ref_column, on_delete)
+                column_type = f"{column_type} REFERENCES {tenant}.{ref_table}({ref_column}) ON DELETE {on_delete}"
 
             except KeyError as e:
                 msg = f"Required key {e.args[0]} not received for column {column_name}. " \
@@ -71,7 +73,7 @@ def create_table(table_name, columns, tenant, db_instance=None):
                 raise Exception(msg)
 
         col_str_list = list()
-        col_string = "%s %s" % (column_name, column_type)
+        col_string = f"{column_name} {column_type}"
         col_str_list.append(col_string)
 
         # Find optional values and assign to variable.
@@ -82,13 +84,39 @@ def create_table(table_name, columns, tenant, db_instance=None):
             elif key == "unique":
                 col_str_list.append("UNIQUE")
             elif key == "default":
-                col_str_list.append("DEFAULT %s" % val)
+                # Check if default value should be encased in quotes. (str v. int)
+                if type(val) == 'int' or type(val) == 'float':
+                    col_str_list.append(f"DEFAULT {val}")
+                else:
+                    col_str_list.append(f"DEFAULT '{val}'")
+            elif key == "primary_key" and val == True:
+                if not column_args['data_type'].lower() in ['integer', 'varchar']:
+                    msg = f"primary_key field can only be set on fields of data_type 'integer' or 'varchar'." \
+                          f" {column_args['data_type']} is not. Cannot create table: {table_name}"
+                    logger.warning(msg)
+                    raise Exception(msg)
+                if column_args.get('null'):
+                    msg = f"primary_key field cannot have 'null' set to True. Field must have unique value." \
+                          f" Cannot create table: {table_name}"
+                    logger.warning(msg)
+                    raise Exception(msg)
+                if column_args.get('default'):
+                    msg = f"primary_key field cannot have a 'default' set. Field must have unique value." \
+                          f" Cannot create table: {table_name}"
+                    logger.warning(msg)
+                    raise Exception(msg)
+                primary_key_flag = True
+                col_str_list.append("PRIMARY KEY")
             elif key not in ["data_type", "char_len", "FK", "reference_table", "reference_column", "on_delete"]:
                 msg = f"{key} is an invalid argument for column {column_name}. Cannot create table {table_name}"
+                logger.warning(msg)
                 raise Exception(msg)
 
         col_def = " ".join(col_str_list)
         command = command + f"{col_def},\n"
+
+    if not primary_key_flag:
+        command = command + f"{table_name}_id SERIAL PRIMARY KEY,\n"
 
     remove = command.rindex(",")
     command = command[:remove] + ")"
@@ -115,7 +143,7 @@ def create_table(table_name, columns, tenant, db_instance=None):
 def delete_table(table_name, tenant, db_instance=None):
     """ Drop table in the PostgreSQL database"""
     logger.info(f"Dropping table {tenant}.{table_name}...")
-    command = "DROP TABLE %s.%s CASCADE;" % (tenant, table_name)
+    command = f"DROP TABLE {tenant}.{table_name} CASCADE;"
     conn = None
     logger.info(f"Drop table command for {tenant}.{table_name}: {command}")
     try:
@@ -139,7 +167,7 @@ def create_schema(schema_name, db_instance=None):
     """Create schema for a tenant in the PostgreSQL database"""
     logger.info(f"Creating schema {schema_name}...")
 
-    command = "CREATE SCHEMA IF NOT EXISTS %s;" % (schema_name, )
+    command = f"CREATE SCHEMA IF NOT EXISTS {schema_name};"
 
     conn = None
     try:
