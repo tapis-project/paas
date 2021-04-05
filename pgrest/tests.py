@@ -237,8 +237,7 @@ class ResponseTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         # now, update
         data = {"col_two": 30}
-        row_id_int = table_name + "_id"
-        row_id = response.json()["result"][0][row_id_int]
+        row_id = response.json()["result"][0]['_pkid']
         response = self.client.put(f'/v3/pgrest/data/{root_url}/{row_id}', HTTP_TAPIS_V2_TOKEN=b_token,
                                    data=json.dumps({"data": data}), content_type='application/json')
         self.assertEqual(response.status_code, 200)
@@ -256,8 +255,7 @@ class ResponseTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         # now, update
         data = {"col_two": "haha"}
-        row_id_int = table_name + "_id"
-        row_id = response.json()["result"][0][row_id_int]
+        row_id = response.json()["result"][0]['_pkid']
         response = self.client.put(f'/v3/pgrest/data/{root_url}/{row_id}', HTTP_TAPIS_V2_TOKEN=b_token,
                                    data=json.dumps({"data": data}), content_type='application/json')
         self.assertEqual(response.status_code, 400)
@@ -283,8 +281,7 @@ class ResponseTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         # now, update
         data = {"col_where": 30}
-        row_id_int = table_name + "_id"
-        row_id = response.json()["result"][0][row_id_int]
+        row_id = response.json()["result"][0]['_pkid']
         response = self.client.put(f'/v3/pgrest/data/{root_url}/{row_id}', HTTP_TAPIS_V2_TOKEN=b_token,
                                    data=json.dumps({"data": data}), content_type='application/json')
         self.assertEqual(response.status_code, 400)
@@ -303,8 +300,7 @@ class ResponseTestCase(TestCase):
         self.assertEqual(len(response.json()["result"]), 1)
         self.assertEqual(response.status_code, 200)
         # now, delete
-        row_id_int = table_name + "_id"
-        row_id = response.json()["result"][0][row_id_int]
+        row_id = response.json()["result"][0]['_pkid']
         response = self.client.delete(f'/v3/pgrest/data/{root_url}/{row_id}', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(response.status_code, 200)
         response = self.client.delete(f'/v3/pgrest/data/{root_url}/{row_id}', HTTP_TAPIS_V2_TOKEN=b_token)
@@ -330,8 +326,7 @@ class ResponseTestCase(TestCase):
         self.assertEqual(len(response.json()["result"]), 1)
         self.assertEqual(response.status_code, 200)
         # now, list the row
-        row_id_int = table_name + "_id"
-        row_id = response.json()["result"][0][row_id_int]
+        row_id = response.json()["result"][0]['_pkid']
         response = self.client.get(f'/v3/pgrest/data/{root_url}/{row_id}', HTTP_TAPIS_V2_TOKEN=b_token)
         self.assertEqual(response.status_code, 200)
 

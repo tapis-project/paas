@@ -14,13 +14,28 @@ def dict_fetch_all(cursor):
         for row in cursor.fetchall()
     ]
 
+def expose_primary_key(result_list, primary_key):
+    list_with_id_field = []
+    if result_list:
+        for result_dict in result_list:
+            try:
+                list_entry = result_dict.update({'_pkid': result_dict[primary_key]})
+            except:
+                msg = f"Error finding 'primary_key' field, {primary_key} in result list: {result_list}"
+                logger.error(msg)
+                raise Exception(msg)
+            list_with_id_field.append(list_entry)
+    return list_with_id_field
 
-def get_row_from_table(table_name, pk_id, tenant, db_instance=None):
+def get_row_from_table(table_name, pk_id, tenant, primary_key, db_instance=None):
     """
     Gets the row with given primary key from the specified table.
     """
     logger.info(f"Getting row with pk {pk_id} from table {tenant}.{table_name}...")
-    command = "SELECT * FROM %s.%s WHERE %s_id = %d;" % (tenant, table_name, table_name, int(pk_id))
+    if type(pk_id) == 'int' or type(pk_id) == 'float':
+        command = f"SELECT * FROM {tenant}.{table_name} WHERE {primary_key} = {pk_id};"
+    else:
+        command = f"SELECT * FROM {tenant}.{table_name} WHERE {primary_key} = '{pk_id}';"
 
     logger.info(f"Command: {command}")
     try:
@@ -39,6 +54,7 @@ def get_row_from_table(table_name, pk_id, tenant, db_instance=None):
         conn.commit()
         # Success.
         logger.info(f"Row {pk_id} successfully retrieved from table {tenant}.{table_name}.")
+        expose_primary_key(result, primary_key)
         return result
     except psycopg2.DatabaseError as e:
         msg = f"Error accessing database: {e}"
@@ -50,35 +66,34 @@ def get_row_from_table(table_name, pk_id, tenant, db_instance=None):
         raise Exception(msg)
 
 
-def get_rows_from_table(table_name, query_dict, tenant, limit, db_instance, **kwargs):
+def get_rows_from_table(table_name, query_dict, tenant, limit, db_instance, primary_key, **kwargs):
     """
     Gets all rows from given table with an optional limit and filter.
     """
     logger.info(f"Getting rows from table {tenant}.{table_name}")
 
     try:
-        command = "SELECT * FROM %s.%s" % (tenant, table_name)
+        command = f"SELECT * FROM {tenant}.{table_name}"
         if len(query_dict) > 0:
             first = True
             for key, value in query_dict.items():
                 if first:
-
                     if type(value) == 'int' or type(value) == 'float':
-                        query = " WHERE \"%s\" = %d" % (key, value)
+                        query = f" WHERE \"{key}\" = {value}"
                     else:
-                        query = " WHERE \"%s\" = \'%s\'" % (key, value)
+                        query = f" WHERE \"{key}\" = \'{value}\'"
                     first = False
                 else:
                     if type(value) == 'int' or type(value) == 'float':
-                        query = " AND \"%s\" = %d" % (key, value)
+                        query = f" AND \"{key}\" = {value}"
                     else:
-                        query = " AND \"%s\" = \'%s\'" % (key, value)
+                        query = f" AND \"{key}\" = \'{value}\'"
                 command = command + query
         if "order" in kwargs:
             order = kwargs["order"].replace(",", " ").strip()
-            command = "%s ORDER BY %s " % (command, order)
+            command = f"{command} ORDER BY {order} "
 
-        command = command + " LIMIT %d;" % (int(limit))
+        command = command + f" LIMIT {int(limit)};"
     except Exception as e:
         msg = f"Unable to form database query for table {tenant}.{table_name} with query(ies) {query_dict}: {e}"
         logger.warning(msg)
@@ -99,6 +114,7 @@ def get_rows_from_table(table_name, query_dict, tenant, limit, db_instance, **kw
         conn.commit()
         # Success.
         logger.info(f"Rows successfully retrieved from table {tenant}.{table_name}.")
+        expose_primary_key(result, primary_key)
         return result
     except psycopg2.DatabaseError as e:
         msg = f"Error accessing database: {e}"
@@ -110,15 +126,30 @@ def get_rows_from_table(table_name, query_dict, tenant, limit, db_instance, **kw
         raise Exception(msg)
 
 
-def create_row(table_name, columns, val_str, values, tenant, db_instance=None):
+def create_row(table_name, data, tenant, primary_key, db_instance=None):
     """
     Creates a new row in the given table. Returns the primary key ID of the new row.
     """
     logger.info(f"Creating row in {tenant}.{table_name}...")
-    command = "INSERT INTO %s.%s(" % (tenant, table_name)
-    for col in columns:
-        command = "%s %s, " % (command, col)
-    command = command[:-2] + ") VALUES(%s) RETURNING %s_id;" % (val_str, table_name)
+    command = f"INSERT INTO {tenant}.{table_name}("
+    # Checking data to ensure it's URL safe.
+    for k, v in data.items():
+        if k == primary_key:
+            if isinstance(v, str):
+                FORBIDDEN_CHARS = ['\\', ' ', '"', ':', '/', '?', '#', '[', ']', '@', '!', '$', '&', "'", '(', ')', '*', '+', ',', ';', '=']
+                for char in FORBIDDEN_CHARS:
+                    if char in v:
+                        msg = f"The primary_key value must be url safe. {char} found in 'key:val' given: '{k}: {v}'." \
+                              f" The following chars are not url safe: {FORBIDDEN_CHARS}."
+                        logger.error(msg)
+                        raise Exception(msg)
+        command = f"{command} {k}, "
+
+    # Get the correct number of '%s' for the SQL query. (e.g. "%s, %s, %s, %s, %s, %s")
+    values = list(data.values())
+    value_str = '%s, ' * len(values)
+    value_str = value_str[:-2]
+    command = command[:-2] + f") VALUES({value_str}) RETURNING {primary_key};"
 
     logger.info(f"Command: {command}")
     try:
@@ -146,12 +177,15 @@ def create_row(table_name, columns, val_str, values, tenant, db_instance=None):
         raise Exception(msg)
 
 
-def delete_row(table_name, pk_id, tenant, db_instance=None):
+def delete_row(table_name, pk_id, tenant, primary_key, db_instance=None):
     """
     Deletes the specified row in the given table.
     """
     logger.info(f"Deleting row with pk {pk_id} in table {tenant}.{table_name}")
-    command = "DELETE FROM %s.%s WHERE %s_id = %d;" % (tenant, table_name, table_name, int(pk_id))
+    if type(pk_id) == 'int' or type(pk_id) == 'float':
+        command = f"DELETE FROM {tenant}.{table_name} WHERE {primary_key} = {pk_id};"
+    else:
+        command = f"DELETE FROM {tenant}.{table_name} WHERE {primary_key} = '{pk_id}';"
 
     logger.info(f"Command: {command}")
     try:
@@ -180,18 +214,21 @@ def delete_row(table_name, pk_id, tenant, db_instance=None):
         raise Exception(msg)
 
 
-def update_row_with_pk(table_name, pk_id, data, tenant, db_instance=None):
+def update_row_with_pk(table_name, pk_id, data, tenant, primary_key, db_instance=None):
     """
     Updates a specified row on a table with the given columns and associated values.
     """
     logger.info(f"Updating row with pk \'{pk_id}\' in {tenant}.{table_name}...")
-    command = "UPDATE %s.%s SET" % (tenant, table_name)
+    command = f"UPDATE {tenant}.{table_name} SET"
     for col in data:
         if type(data[col]) == str:
-            command = "%s %s = (\'%s\'), " % (command, col, data[col])
+            command = f"{command} {col} = (\'{data[col]}\'), "
         else:
-            command = "%s %s = (%s), " % (command, col, data[col])
-    command = command[:-2] + " WHERE %s_id = %d;" % (table_name, int(pk_id))
+            command = f"{command} {col} = ({data[col]}), "
+    if type(pk_id) == 'int' or type(pk_id) == 'float':
+        command = command[:-2] + f" WHERE {primary_key} = {pk_id};"
+    else:
+        command = command[:-2] + f" WHERE {primary_key} = '{pk_id}';"
 
     logger.info(f"Command: {command}")
     try:
@@ -228,12 +265,12 @@ def update_rows_with_where(table_name, data, tenant, db_instance, where_clause=N
     is not specified, the entire table is updated.
     """
     logger.info(f"Updating rows in {tenant}.{table_name}...")
-    command = "UPDATE %s.%s SET" % (tenant, table_name)
+    command = f"UPDATE {tenant}.{table_name} SET"
     for col in data:
         if type(data[col]) == str:
-            command = "%s %s = (\'%s\'), " % (command, col, data[col])
+            command = f"{command} {col} = (\'{data[col]}\'), "
         else:
-            command = "%s %s = (%s), " % (command, col, data[col])
+            command = f"{command} {col} = ({data[col]}), "
 
     command = command[:-2]
     if where_clause:
@@ -241,15 +278,15 @@ def update_rows_with_where(table_name, data, tenant, db_instance, where_clause=N
         for key, value in where_clause.items():
             if first:
                 if type(value) == int or type(value) == float:
-                    query = " WHERE \"%s\" %s %d" % (key, value["operator"], value["value"])
+                    query = f" WHERE \"{key}\" {value['operator']} {value['value']}"
                 else:
-                    query = " WHERE \"%s\" %s \'%s\'" % (key, value["operator"], value["value"])
+                    query = f" WHERE \"{key}\" {value['operator']} \'{value['value']}\'"
                 first = False
             else:
                 if type(value) == 'int' or type(value) == 'float':
-                    query = " AND \"%s\" %s %d" % (key, value["operator"], value["value"])
+                    query = f" AND \"{key}\" {value['operator']} {value['value']}"
                 else:
-                    query = " AND \"%s\" %s \'%s\'" % (key, value["operator"], value["value"])
+                    query = f" AND \"{key}\" {value['operator']} \'{value['value']}\'"
             command = command + query
     command = command + ';'
 
