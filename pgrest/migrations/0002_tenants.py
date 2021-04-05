@@ -14,7 +14,8 @@ class Migration(migrations.Migration):
             name='Tenants',
             fields=[
                 ('tenant_id', models.AutoField(primary_key=True, serialize=False)),
-                ('db_section', models.CharField(max_length=255, unique=True)),
+                ('db_instance_name', models.CharField(max_length=255)),
+                ('tenant_name', models.CharField(max_length=255, unique=True))
             ],
         ),
     ]

@@ -204,6 +204,7 @@ class TableManagement(RoleSessionMixin, APIView):
                                "root_url": table.root_url,
                                "tenant": table.tenant_id,
                                "endpoints": table.endpoints,
+                               "primary_key": table.primary_key,
                                "columns": table.column_definition,
                                "update_schema": table.validate_json_update,
                                "create_schema": table.validate_json_create,
@@ -215,7 +216,8 @@ class TableManagement(RoleSessionMixin, APIView):
                                "root_url": table.root_url,
                                "tenant": table.tenant_id,
                                "endpoints": table.endpoints,
-                               "tenant_id": table.tenant_id})
+                               "tenant_id": table.tenant_id,
+                               "primary_key": table.primary_key})
 
         return HttpResponse(make_success(result=result), content_type='application/json')
 
@@ -243,8 +245,8 @@ class TableManagement(RoleSessionMixin, APIView):
         delete = request.data.get('delete', True)
         endpoints = request.data.get('endpoints', True)
 
-        if ManageTables.objects.filter(table_name=table_name).exists():
-            msg = f"Table with name \'{table_name}\' already exists in ManageTables table."
+        if ManageTables.objects.filter(table_name=table_name, tenant_id=req_tenant).exists():
+            msg = f"Table with name \'{table_name}\' and tenant_id \'{req_tenant}\' already exists in ManageTables table."
             logger.warning(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
@@ -291,10 +293,26 @@ class TableManagement(RoleSessionMixin, APIView):
     def post_transaction(self, table_name, root_url, columns, validate_json_create, validate_json_update,
                          endpoints, tenant_id, db_instance_name):
 
+        primary_key = None
+        for key, val in columns.items():
+            column_args = val
+            if "primary_key" in column_args and column_args["primary_key"]:
+                if primary_key:
+                    msg = "Found two columns with 'primary_key' set to True, only one primary" \
+                          " key may exist in each table."
+                    logger.warning(msg)
+                    return HttpResponseBadRequest(make_error(msg=msg))
+                else:
+                    primary_key = key
+        
+        if not primary_key:
+            primary_key = f"{table_name}_id"
+
         new_table = ManageTables.objects.create(table_name=table_name, root_url=root_url, column_definition=columns,
                                                 validate_json_create=validate_json_create,
                                                 validate_json_update=validate_json_update,
-                                                endpoints=endpoints, tenant_id=tenant_id)
+                                                endpoints=endpoints, tenant_id=tenant_id,
+                                                primary_key=primary_key)
 
         ManageTablesTransition.objects.create(manage_table=new_table, column_definition_tn=columns,
                                               validate_json_create_tn=validate_json_create,
@@ -369,7 +387,8 @@ class TableManagementById(RoleSessionMixin, APIView):
                 "columns": table.column_definition,
                 "tenant_id": table.tenant_id,
                 "update schema": table.validate_json_update,
-                "create schema": table.validate_json_create
+                "create schema": table.validate_json_create,
+                "primary_key": table.primary_key
             }
         else:
             result = {
@@ -377,7 +396,8 @@ class TableManagementById(RoleSessionMixin, APIView):
                 "table_id": table.pk,
                 "root_url": table.root_url,
                 "endpoints": table.endpoints,
-                "tenant_id": table.tenant_id
+                "tenant_id": table.tenant_id,
+                "primary_key": table.primary_key
             }
 
         return HttpResponse(make_success(result=result), content_type='application/json')
@@ -651,9 +671,9 @@ class DynamicView(RoleSessionMixin, APIView):
                 limit = 10
             if order is not None:
                 result = table_data.get_rows_from_table(table.table_name, query_dict, req_tenant,
-                                                        limit, db_instance, order=order)
+                                                        limit, db_instance, table.primary_key, order=order)
             else:
-                result = table_data.get_rows_from_table(table.table_name, query_dict, req_tenant, limit, db_instance)
+                result = table_data.get_rows_from_table(table.table_name, query_dict, req_tenant, limit, db_instance, table.primary_key)
         except Exception as e:
             msg = f"Failed to retrieve rows from table {table.table_name} on tenant {req_tenant}. {e}"
             logger.error(msg)
@@ -733,25 +753,15 @@ class DynamicView(RoleSessionMixin, APIView):
             logger.error(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
-        # Separate columns and values out into two lists.
-        columns = list()
-        values = list()
-        for k, v in data.items():
-            columns.append(k)
-            values.append(v)
-        # Get the correct number of '%s' for the SQL query.
-        value_str = '%s, ' * len(values)
-        value_str = value_str[:-2]
-
         try:
-            result_id = table_data.create_row(table.table_name, columns, value_str, values, req_tenant,
+            result_id = table_data.create_row(table.table_name, data, req_tenant, table.primary_key,
                                               db_instance=db_instance)
         except Exception as e:
             msg = f"Failed to retrieve rows from table {table.table_name} on tenant {req_tenant}. {e}"
             logger.error(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
         try:
-            result = table_data.get_row_from_table(table.table_name, result_id, req_tenant, db_instance=db_instance)
+            result = table_data.get_row_from_table(table.table_name, result_id, req_tenant, table.primary_key, db_instance=db_instance)
         except Exception as e:
             msg = f"Failed to retrieve rows from table {table.table_name} on tenant {req_tenant}. {e}"
             logger.error(msg)
@@ -804,7 +814,7 @@ class DynamicView(RoleSessionMixin, APIView):
                 else:
                     table_data.update_rows_with_where(table.table_name, data, req_tenant, db_instance)
             except Exception as e:
-                msg = f"Failed to update row in table {table.table_name} with pk {pk_id} on tenant {req_tenant}. {e}"
+                msg = f"Failed to update row in table {table.table_name} on tenant {req_tenant}. {e}"
                 logger.error(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
 
@@ -845,7 +855,7 @@ class DynamicViewById(RoleSessionMixin, APIView):
             return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
-            result = table_data.get_row_from_table(table.table_name, pk_id, req_tenant, db_instance)
+            result = table_data.get_row_from_table(table.table_name, pk_id, req_tenant, table.primary_key, db_instance)
         except Exception as e:
             msg = f"Failed to retrieve row from table {table.table_name} with pk {pk_id} on tenant {req_tenant}. {e}"
             logger.error(msg)
@@ -893,14 +903,14 @@ class DynamicViewById(RoleSessionMixin, APIView):
             return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
-            table_data.update_row_with_pk(table.table_name, pk_id, data, req_tenant, db_instance=db_instance)
+            table_data.update_row_with_pk(table.table_name, pk_id, data, req_tenant, table.primary_key, db_instance=db_instance)
         except Exception as e:
             msg = f"Failed to update row in table {table.table_name} with pk {pk_id} in tenant {req_tenant}. {e}"
             logger.error(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
-            return_result = table_data.get_row_from_table(table.table_name, pk_id, req_tenant)
+            return_result = table_data.get_row_from_table(table.table_name, pk_id, req_tenant, table.primary_key)
         except Exception as e:
             msg = f"Failed to retrieve row from table {table.table_name} with pk {pk_id} on tenant {req_tenant}. {e}"
             logger.error(msg)
@@ -936,7 +946,7 @@ class DynamicViewById(RoleSessionMixin, APIView):
             return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
-            table_data.delete_row(table.table_name, pk_id, req_tenant, db_instance=db_instance)
+            table_data.delete_row(table.table_name, pk_id, req_tenant, table.primary_key, db_instance=db_instance)
         except Exception as e:
             msg = f"Failed to delete row from table {table.table_name} with pk {pk_id} in tenant {req_tenant}. {e}"
             logger.error(msg)
@@ -950,7 +960,7 @@ class CreateTenant(APIView):
         try:
             schema_name = request.data['schema_name']
             db_instance = request.data['db_instance']
-
+            logger.error(f"DEAR GOD IT'S ME: {db_instance}")
         except KeyError as e:
             msg = f"\'{e.args}\' is required when creating new row in a table."
             logger.warning(msg)

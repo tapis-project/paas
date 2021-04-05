@@ -41,7 +41,7 @@ level: MembershipLevel
 
 ===========
 ** Example command (for Questions table on localhost, change as needed) to create these tables:
-curl -H "tapis-v2-token: $token" localhost:5000/v3/pgrest/manage -X POST -d "@Question.json" -H "Content-type: application/json"
+curl -H "tapis-v2-token: $token" localhost:5000/v3/pgrest/manage/tables -X POST -d "@Question.json" -H "Content-type: application/json"
 
 Note: These tables have to be made in a specific order due to foreign keys.
 UserProfile->Account->BenchmarkingLab->Membership->QuestionType->Category->Question->Workflow->Project->

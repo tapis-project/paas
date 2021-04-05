@@ -169,4 +169,4 @@ grant_role('a2cps', 'vaughn', 'PGREST_ADMIN')
 
 grant_role('cii','ctjordan', 'PGREST_ADMIN')
 grant_role('cii','pscherer', 'PGREST_ADMIN')
-
+grant_role('cii','waller', 'PGREST_ADMIN')

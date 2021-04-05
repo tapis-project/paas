@@ -34,9 +34,9 @@ init_table_2 = {
   "root_url": "init_two",
   "columns": {
     "col_one": {
-      "null": True,
       "data_type": "varchar",
-      "char_len": 255
+      "char_len": 255,
+      "primary_key": True
     },
     "col_two": {
       "null": True,
