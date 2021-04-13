@@ -9,13 +9,11 @@ from rest_framework.test import APIClient
 from pgrest import test_data
 from pgrest.pycommon.config import conf
 
-b_token=conf.test_token
-
 # SET YOUR HEADERS! Either way, user needs ADMIN role in SK.
 # V3
-auth_headers = {'HTTP_X_TAPIS_TOKEN': b_token}
+#auth_headers = {'HTTP_X_TAPIS_TOKEN': conf.test_token}
 # V2
-#auth_headers = {'HTTP_TAPIS_V2_TOKEN': b_token}
+auth_headers = {'HTTP_TAPIS_V2_TOKEN': conf.test_token}
 
 class ResponseTestCase(TestCase):
 
@@ -62,7 +60,6 @@ class ResponseTestCase(TestCase):
     # ---- LIST ALL TABLES ---- #
     def test_list_tables(self):
         response = self.client.get('/v3/pgrest/manage/tables', **auth_headers)
-        print(response)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"].lower(), "application/json")
 
@@ -149,13 +146,11 @@ class ResponseTestCase(TestCase):
         response = self.client.post('/v3/pgrest/manage/tables', data=json.dumps(test_data.create_table_6),
                                     content_type='application/json', **auth_headers)
 
-        print(response)
         response = self.client.get(f'/v3/pgrest/manage/tables/{response.json()["result"]["table_id"]}', **auth_headers)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"].lower(), "application/json")
 
         del_resp = self.client.delete(f'/v3/pgrest/manage/tables/{response.json()["result"]["table_id"]}', **auth_headers)
-        print(del_resp)
 
     def test_list_single_tables_detail(self):
         response = self.client.post('/v3/pgrest/manage/tables', data=json.dumps(test_data.create_table_6),
@@ -595,3 +590,26 @@ class ResponseTestCase(TestCase):
         response = self.client.get(f'/v3/pgrest/data/{root_url}', **auth_headers)
         for resp in response.json()["result"]:
             self.assertNotEqual(resp["col_one"], 90)
+
+
+    ###############
+    # ENUMS TESTS #
+    ###############
+
+    # ---- CHECK ROW CREATION ---- #
+    def test_create_row_with_enum(self):
+        root_url = self.init_resp_2["result"]["root_url"]
+        data = {"col_one": "hello", "col_two": "cat", "col_three": 90, "col_four": False, "col_five": "hehe"}
+        response = self.client.post(f'/v3/pgrest/data/{root_url}', **auth_headers,
+                                    data=json.dumps({"data": data}), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        response = self.client.get(f'/v3/pgrest/data/{root_url}', **auth_headers)
+        self.assertEqual(len(response.json()["result"]), 1)
+
+    def test_create_row_with_enum_error(self):
+        # We should get a 400 from this as enum's won't match up.
+        root_url = self.init_resp_2["result"]["root_url"]
+        data = {"col_one": "hello", "col_two": "NotInEnum", "col_three": 90, "col_four": False, "col_five": "hehe"}
+        response = self.client.post(f'/v3/pgrest/data/{root_url}', **auth_headers,
+                                    data=json.dumps({"data": data}), content_type='application/json')
+        self.assertEqual(response.status_code, 400)

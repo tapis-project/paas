@@ -124,7 +124,7 @@ class RoleSessionMixin:
             # tenant one wants to interact with, but ONLY in local development
             if 'http://localhost' in request_url or 'http://testserver' in request_url:
                 tapis_local_tenant = request.META.get('HTTP_X_TAPIS_LOCAL_TENANT')
-                logger.warning(f"This is loal development; request_url was: {request_url}; "
+                logger.warning(f"This is local development; request_url was: {request_url}; "
                                f"tapis_local_tenant: {tapis_local_tenant}")
                 if tapis_local_tenant:
                     tenant_id = tapis_local_tenant
@@ -223,6 +223,7 @@ class TableManagement(RoleSessionMixin, APIView):
 
     @is_admin
     def post(self, request, *args, **kwargs):
+        logger.debug("top of post /manage/tables")
         # req_tenant = "public"
         req_tenant = request.session['tenant_id']
         db_instance_name = request.session['db_instance_name']
@@ -244,6 +245,7 @@ class TableManagement(RoleSessionMixin, APIView):
         update = request.data.get('update', True)
         delete = request.data.get('delete', True)
         endpoints = request.data.get('endpoints', True)
+        enums = request.data.get('enum', None)
 
         if ManageTables.objects.filter(table_name=table_name, tenant_id=req_tenant).exists():
             msg = f"Table with name \'{table_name}\' and tenant_id \'{req_tenant}\' already exists in ManageTables table."
@@ -271,17 +273,36 @@ class TableManagement(RoleSessionMixin, APIView):
         else:
             endpoints = []
 
+        # Create enums
+        if enums:
+            try:
+                manage_tables.parse_enums(enums, req_tenant, db_instance_name)
+            except Exception as e:
+                msg = f"Failed to create enums for table {table_name}. {e}"
+                logger.error(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+        # We grab enums to do some checks
+        existing_enums = manage_tables.get_enums(db_instance_name)    
+        if existing_enums.get(req_tenant):
+            existing_enums_names = list(existing_enums.get(req_tenant).keys())
+        else:
+            existing_enums_names = []
+        logger.info(f"Got list of existing enum_names: {existing_enums_names}")
+
+        # Create a validation schema
         try:
-            validate_json_create, validate_json_update = create_validate_schema(columns)
+            validate_json_create, validate_json_update = create_validate_schema(columns, req_tenant, existing_enums_names)
         except Exception as e:
             msg = f"Unable to create json validation schema for table {table_name}: {e}" \
                   f"\nFailed to create table {table_name}. "
             logger.warning(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
+        # Create table
         try:
             result = self.post_transaction(table_name, root_url, columns, validate_json_create, validate_json_update,
-                                           endpoints, req_tenant, db_instance_name)
+                                           endpoints, existing_enums_names, req_tenant, db_instance_name)
         except Exception as e:
             msg = f"Failed to create table {table_name}. {e}"
             logger.error(msg)
@@ -291,7 +312,7 @@ class TableManagement(RoleSessionMixin, APIView):
 
     @transaction.atomic
     def post_transaction(self, table_name, root_url, columns, validate_json_create, validate_json_update,
-                         endpoints, tenant_id, db_instance_name):
+                         endpoints, existing_enum_names, tenant_id, db_instance_name):
 
         primary_key = None
         for key, val in columns.items():
@@ -318,7 +339,7 @@ class TableManagement(RoleSessionMixin, APIView):
                                               validate_json_create_tn=validate_json_create,
                                               validate_json_update_tn=validate_json_update)
 
-        manage_tables.create_table(table_name, columns, tenant_id, db_instance_name)
+        manage_tables.create_table(table_name, columns, existing_enum_names, tenant_id, db_instance_name)
 
         result = {
             "table_name": new_table.table_name,
@@ -406,6 +427,7 @@ class TableManagementById(RoleSessionMixin, APIView):
     def put(self, request, *args, **kwargs):
         # req_tenant = "public"
         req_tenant = request.session['tenant_id']
+        db_instance_name = request.session['db_instance_name']
 
         # Parse out required fields.
         try:
@@ -506,8 +528,16 @@ class TableManagementById(RoleSessionMixin, APIView):
 
                     transition_table.save()
 
+                # We grab enums to do some checks
+                existing_enums = manage_tables.get_enums(db_instance_name)    
+                if existing_enums.get(req_tenant):
+                    existing_enums_names = list(existing_enums.get(req_tenant).keys())
+                else:
+                    existing_enums_names = []
+                logger.info(f"Got list of existing enum_names: {existing_enums_names}")
+
                 try:
-                    validate_json_create_tn, validate_json_update_tn = create_validate_schema(current_cols)
+                    validate_json_create_tn, validate_json_update_tn = create_validate_schema(current_cols, req_tenant, existing_enums)
                     transition_table.validate_json_create_tn = validate_json_create_tn
                     transition_table.validate_json_update_tn = validate_json_update_tn
                     transition_table.save()
@@ -960,7 +990,6 @@ class CreateTenant(APIView):
         try:
             schema_name = request.data['schema_name']
             db_instance = request.data['db_instance']
-            logger.error(f"DEAR GOD IT'S ME: {db_instance}")
         except KeyError as e:
             msg = f"\'{e.args}\' is required when creating new row in a table."
             logger.warning(msg)

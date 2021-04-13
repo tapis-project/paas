@@ -32,6 +32,7 @@ init_table_1 = {
 init_table_2 = {
   "table_name": "initial_table_2",
   "root_url": "init_two",
+  "enum": {"animals": ["cat", "dog"]},
   "columns": {
     "col_one": {
       "data_type": "varchar",
@@ -39,8 +40,7 @@ init_table_2 = {
       "primary_key": True
     },
     "col_two": {
-      "null": True,
-      "data_type": "integer"
+      "data_type": "animals"
     },
     "col_three": {
       "null": True,

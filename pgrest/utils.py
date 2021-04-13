@@ -43,34 +43,39 @@ def make_success(result=None, msg=None):
     return json.dumps(d)
 
 
-def create_validate_schema(columns):
+def create_validate_schema(columns, tenant, existing_enum_names):
     """
     Takes the column definition of a table and generates two validation schemas, one to be used in row creation
     and the other to be used in row update.
     """
+    logger.info("Top of create_validate_schema()")
     schema_update = dict()
     schema_create = dict()
 
     for key in columns.keys():
         key_info = columns[key]
-        key_type = key_info["data_type"]
+        key_type = key_info["data_type"].lower()
         info_dict = dict()
-        if key_type.lower() in {"varchar", "char", "text"}:
+        if key_type in {"varchar", "char", "text"}:
             val_length = int(key_info["char_len"])
             info_dict.update({"type": "string", "maxlength": val_length})
+        elif key_type in existing_enum_names or f'{tenant}.{key_type}' in existing_enum_names:
+            info_dict.update({"type": "string"})
         else:
-            info_dict.update({"type": key_type.lower()})
+            info_dict.update({"type": key_type})
         schema_update[key] = info_dict
 
     for key in columns.keys():
         key_info = columns[key]
         key_type = key_info["data_type"]
         info_dict = dict()
-        if key_type.lower() in {"varchar", "char", "text"}:
+        if key_type in {"varchar", "char", "text"}:
             val_length = int(key_info["char_len"])
             info_dict.update({"type": "string", "maxlength": val_length})
+        elif key_type in existing_enum_names or f'{tenant}.{key_type}' in existing_enum_names:
+            info_dict.update({"type": "string"})
         else:
-            info_dict.update({"type": key_type.lower()})
+            info_dict.update({"type": key_type})
 
         if "null" in key_info.keys():
             if not key_info["null"]:

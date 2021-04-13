@@ -18,7 +18,7 @@ def do_transaction(command, db_instance):
 
 
 # TODO create exceptions
-def create_table(table_name, columns, tenant, db_instance=None):
+def create_table(table_name, columns, existing_enum_names, tenant, db_instance=None):
     """Create table in the PostgreSQL database"""
     logger.info(f"Creating table {tenant}.{table_name}...")
 
@@ -43,6 +43,16 @@ def create_table(table_name, columns, tenant, db_instance=None):
                 msg = f"Character max size not received for column {column_name}. Cannot create table {table_name}."
                 logger.warning(msg)
                 raise Exception(msg)
+
+        # Attempt to handle enum data_types
+        # This is only a small subsect of postgres data_types, listing them
+        # all would be trouble though, so just checking the common ones.
+        # Here we are fixing enum data_types given without tenant, i.e., data_type: "animals"
+        # Should be "dev.animals", we fix that here if we can.
+        if not column_type in ["BOOLEAN", "VARCHAR", "CHAR", "TEXT", "INTEGER", "FLOAT", "DATE", "TIMESTAMP"]:
+            if column_type.lower() in existing_enum_names:
+                column_type = f"{tenant}.{column_type}"
+
         # Handle foreign keys.
         if "FK" in column_args and column_args["FK"]:
             try:
@@ -187,5 +197,164 @@ def create_schema(schema_name, db_instance=None):
         raise Exception(msg)
 
 
+def parse_enums(enums, tenant, db_instance_name=None):
+    logger.info(f"Parsing enum json information. enums: {enums}")
+    if not isinstance(enums, dict):
+        msg = f"enums declaration for table should be of type 'dict', not type '{type(enums)}'." \
+                " Dict should be formatted as {'enum_key1': ['string1', 'string2', ...], ...}"
+        logger.error(msg)
+        raise Exception(msg)
+    for enum_key, enum_list in enums.items():
+        enum_key = enum_key.lower()
+        logger.info(f"Parsing enum with enum_key {enum_key}.")
+        if not isinstance(enum_list, list):
+            msg = f"String values for enum should be declared in a list. Received type: {type(enum_list)}."
+            logger.error(msg)
+            raise Exception(msg)
+        FORBIDDEN_CHARS = ['\\', ' ', '"', ':', '/', '?', '#', '[', ']', '@', '!', '$', '&', "'", '(', ')', '*', '+', ',', ';', '=']
+        for char in FORBIDDEN_CHARS:
+            if char in enum_key:
+                msg = f"Forbidden char found in enum name {enum_key}. Forbidden character is: {char}"
+                logger.error(msg)
+                raise Exception(msg)
+        for enum_val in enum_list:
+            logger.info(enum_val)
+            if not isinstance(enum_val, str):
+                msg = f"enum list values must be strings. Got type {enum_val}."
+                logger.error(msg)
+                raise Exception(msg)
+            for char in FORBIDDEN_CHARS:
+                if char in enum_val:
+                    msg = f"Forbidden char found in enum value {enum_val}. Forbidden character is: {char}"
+                    logger.error(msg)
+                    raise Exception(msg)
+        create_enum(enum_key, enum_list, tenant, db_instance_name)
 
 
+def create_enum(enum_name, fields, tenant, db_instance=None):
+    """Create table in the PostgreSQL database"""
+    logger.info(f"Creating enum {tenant}.{enum_name} with fields: {fields}")
+
+    enums_created = []
+
+    existing_enums = get_enums(db_instance)
+    if existing_enums.get(tenant):
+        if existing_enums[tenant].get(enum_name):
+            logger.info(f"Enum {tenant}.{enum_name} already exists, skipping.")
+            return
+
+    command = f"CREATE TYPE {tenant}.{enum_name} AS ENUM ("
+
+    # Check that we receive list.
+    if not isinstance(fields, list):
+        msg = f"When declaring an ENUM type, fields should be a list, got '{type(fields)}'"
+        logger.error(msg)
+        raise Exception(msg)
+
+    # Check if list is populated.
+    if not fields:
+        msg = f"No fields for ENUM received. Fields received: {fields}"
+        logger.error(msg)
+        raise Exception(msg)
+
+    enums_created = []
+    # Check that fields are strings.
+    for field in fields:
+        if isinstance(field, str):
+            if "'" in field:
+                msg = f'ENUM fields cannot contain apostrophes. "{field}" does.'
+                logger.error(msg)
+                raise Exception(msg)
+            command += f"'{field}', "
+            enums_created.append(f"{tenant}.{enum_name}")
+        else:
+            msg = f"All ENUM fields must be strings, '{field}' is of type '{type(field)}'"
+            logger.error(msg)
+            raise Exception(msg)
+
+    # Get rid of excess comma.
+    remove = command.rindex(",")
+    command = command[:remove] + ")"
+    logger.debug(f"Create enum command for enum {enum_name}: {command}")
+
+    # Run postgres command
+    conn = None
+    try:
+        do_transaction(command, db_instance)
+        logger.debug(f"Enum {tenant}.{enum_name} successfully created in postgres db.")
+        return
+    except psycopg2.DatabaseError as e:
+        if conn:
+            conn.close()
+        msg = f"Error accessing database: {e}"
+        logger.error(msg)
+        raise Exception(msg)
+    except Exception as e:
+        if conn:
+            conn.close()
+        msg = f"Error creating enum {tenant}.{enum_name}: {e}"
+        logger.error(msg)
+        raise Exception(msg)
+
+
+
+def get_enums(db_instance=None):
+    # Gets all enums from postgres and organizes them by schema (tenant) and name, returns values.
+    command = "select n.nspname as enum_schema, t.typname as enum_name, string_agg(e.enumlabel, ', ') " \
+              "as enum_value from pg_type t join pg_enum e on t.oid = e.enumtypid join " \
+              "pg_catalog.pg_namespace n ON n.oid = t.typnamespace group by enum_schema, enum_name;"
+
+    conn = None
+    try:
+        # Read the connection parameters and connect to database.
+        if db_instance:
+            params = config.config(db_instance)
+        else:
+            params = config.config()
+        conn = psycopg2.connect(**params)
+        cur = conn.cursor()
+        cur.execute(command)
+        enums = dict_fetch_all(cur)
+        cur.close()
+        conn.commit()
+        # Success.
+        logger.info(f"Successfully retrieved all created enums from postgres db: {enums}")
+        return enums
+    except psycopg2.DatabaseError as e:
+        msg = f"Error accessing database: {e}"
+        logger.error(msg)
+        raise Exception(msg)
+    except Exception as e:
+        msg = f"Error retrieving enums: {e}"
+        logger.error(msg)
+        raise Exception(msg)
+
+
+def dict_fetch_all(cursor):
+    """
+    Return all rows from a cursor as a dict
+    enum formatted as {'tenant': {'enum1': ['enumval1', enumval2'],
+                                  'enum2': ['enumval1']},
+                                  ...}
+    """
+    enum_dict = {}
+    all_rows = cursor.fetchall()
+    # rows come back in tenant, enum_name, enum_value order.
+    for row in all_rows:
+        if enum_dict.get(row[0]):
+            enum_dict[row[0]].update({row[1]: row[2]})
+        else:
+            enum_dict[row[0]] = {row[1]: row[2]}
+
+    if not isinstance(enum_dict, dict):
+        msg = f"Internal Error: Report please. Err: 'enum_dict' should be a dict, not {type(enum_dict)}"
+        logger.error(msg)
+        raise Exception(msg)
+    
+    for tenant, enum in enum_dict.items():
+        if not isinstance(enum, dict):
+            msg = f"Internal Error: Report please. Err: 'enum' should be a dict, not {type(enum)}"
+            logger.error(msg)
+            raise Exception(msg)
+
+    return enum_dict
