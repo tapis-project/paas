@@ -3,6 +3,10 @@
   "root_url": "respondent-type",
   "endpoints": false,
   "columns": {
+    "respondent_type_id": {
+      "data_type": "serial",
+      "primary_key": true
+    },
     "value": {
       "null": true,
       "data_type": "varchar",

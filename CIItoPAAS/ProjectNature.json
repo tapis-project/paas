@@ -3,6 +3,10 @@
   "root_url": "project-nature",
   "endpoints": false,
   "columns": {
+    "project_nature_id": {
+      "data_type": "serial",
+      "primary_key": true
+    },
     "value": {
       "null": true,
       "data_type": "varchar",

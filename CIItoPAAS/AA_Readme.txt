@@ -31,7 +31,7 @@ for the parent IDs.
 
 Also, at the time of creating these, the foreign key naming conventions were messed up. These assume this has been fixed.
 
-I have included the enumes used in CII legacy in the enums.py file in this directory. The following columns will need enforce the given enum:
+I have included the enums used in CII legacy in the enums.py file in this directory. The following columns will need enforce the given enum:
 
 >> UserProfile
 role: AccountRole
@@ -46,3 +46,16 @@ curl -H "tapis-v2-token: $token" localhost:5000/v3/pgrest/manage/tables -X POST 
 Note: These tables have to be made in a specific order due to foreign keys.
 UserProfile->Account->BenchmarkingLab->Membership->QuestionType->Category->Question->Workflow->Project->
 LkpPotentialAnswer->Contact->IndustryGroup->IndustryGroupPhase->Section->Survey->Answer
+
+
+
+Recent Work Post-Brandi
+
+Enums created, no longer needing the enums.py folder.
+Two enums, AccountRole and MembershipLevel in the UserProfile and Membership table respectively. Both defined in said tables.
+
+Primary keys have been manually assigned to all tables with names that consist of two words in snake case (UserProfile, not Workflow).
+These tables have been defined with a serial primary key set equal to the table name, lowered, put into camelcase, and appended with "_id" (UserProfile -> user_profile_id).
+
+To-Do: Need to set datetime
+       Need to import data from legacy API

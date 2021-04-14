@@ -3,6 +3,10 @@
   "root_url": "project-delivery-method",
   "endpoints": false,
   "columns": {
+    "project_delivery_method_id": {
+      "data_type": "serial",
+      "primary_key": true
+    },
     "value": {
       "null": true,
       "data_type": "varchar",

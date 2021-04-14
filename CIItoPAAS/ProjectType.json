@@ -3,6 +3,10 @@
   "root_url": "project-type",
   "endpoints": false,
   "columns": {
+    "project_type_id": {
+      "data_type": "serial",
+      "primary_key": true
+    },
     "name": {
       "data_type": "varchar",
       "char_len": 255,

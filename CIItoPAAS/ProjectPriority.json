@@ -3,6 +3,10 @@
   "root_url": "project-priority",
   "endpoints": false,
   "columns": {
+    "project_priority_id": {
+      "data_type": "serial",
+      "primary_key": true
+    },
     "value": {
       "null": true,
       "data_type": "varchar",

@@ -3,6 +3,10 @@
   "root_url": "benchmarking-lab",
   "delete": false,
   "columns": {
+    "benchmarking_lab_id": {
+      "data_type": "serial",
+      "primary_key": true
+    },
     "lab_abbreviation": {
       "unique": true,
       "data_type": "varchar",

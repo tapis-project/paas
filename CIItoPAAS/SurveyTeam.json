@@ -2,5 +2,10 @@
   "table_name": "SurveyTeam",
   "root_url": "survey-team",
   "endpoints": false,
-  "columns": {}
+  "columns": {
+    "survey_team_id": {
+      "data_type": "serial",
+      "primary_key": true
+    }
+  }
 }

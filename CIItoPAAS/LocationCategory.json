@@ -3,6 +3,10 @@
   "root_url": "location-category",
   "endpoints": false,
   "columns": {
+    "location_category_id": {
+      "data_type": "serial",
+      "primary_key": true
+    },
     "value": {
       "null": true,
       "data_type": "varchar",

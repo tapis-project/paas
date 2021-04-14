@@ -2,6 +2,10 @@
   "table_name": "Membership",
   "root_url": "membership",
   "delete": false,
+  "enums": {"membershiplevel": ["TRIAL",
+                                "STANDARD",
+                                "PREMIUM",
+                                "INACTIVE"]},
   "columns": {
     "benchmarking_lab_id": {
       "data_type": "integer",
@@ -11,8 +15,7 @@
       "on_delete": "cascade"
     },
     "level": {
-      "data_type": "varchar",
-      "char_len": 25
+      "data_type": "membershiplevel"
     },
     "account_id": {
       "data_type": "integer",

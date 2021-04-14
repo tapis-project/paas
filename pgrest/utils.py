@@ -56,9 +56,14 @@ def create_validate_schema(columns, tenant, existing_enum_names):
         key_info = columns[key]
         key_type = key_info["data_type"].lower()
         info_dict = dict()
-        if key_type in {"varchar", "char", "text"}:
-            val_length = int(key_info["char_len"])
-            info_dict.update({"type": "string", "maxlength": val_length})
+        if key_type in {"varchar", "char"}:
+            try:
+                val_length = int(key_info["char_len"])
+                info_dict.update({"type": "string", "maxlength": val_length})
+            except KeyError:
+                raise KeyError(f"Unable to create table. {key_type} data types requires char_len field.")
+        elif key_type == "serial":
+            info_dict.update({"type": "integer"})
         elif key_type in existing_enum_names or f'{tenant}.{key_type}' in existing_enum_names:
             info_dict.update({"type": "string"})
         else:
@@ -69,9 +74,11 @@ def create_validate_schema(columns, tenant, existing_enum_names):
         key_info = columns[key]
         key_type = key_info["data_type"]
         info_dict = dict()
-        if key_type in {"varchar", "char", "text"}:
+        if key_type in {"varchar", "char"}:
             val_length = int(key_info["char_len"])
             info_dict.update({"type": "string", "maxlength": val_length})
+        elif key_type == "serial":
+            info_dict.update({"type": "integer"})
         elif key_type in existing_enum_names or f'{tenant}.{key_type}' in existing_enum_names:
             info_dict.update({"type": "string"})
         else:

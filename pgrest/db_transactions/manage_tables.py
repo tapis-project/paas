@@ -35,7 +35,7 @@ def create_table(table_name, columns, existing_enum_names, tenant, db_instance=N
         except KeyError:
             msg = f"Data type not received for column {column_name}. Cannot create table {table_name}"
             raise Exception(msg)
-        if column_type in {"VARCHAR", "CHAR", "TEXT"}:
+        if column_type in {"VARCHAR", "CHAR"}:
             try:
                 char_len = column_args["char_len"]
                 column_type = f"{column_type}({char_len})"
@@ -100,8 +100,8 @@ def create_table(table_name, columns, existing_enum_names, tenant, db_instance=N
                 else:
                     col_str_list.append(f"DEFAULT '{val}'")
             elif key == "primary_key" and val == True:
-                if not column_args['data_type'].lower() in ['integer', 'varchar']:
-                    msg = f"primary_key field can only be set on fields of data_type 'integer' or 'varchar'." \
+                if not column_args['data_type'].lower() in ['integer', 'varchar', 'serial']:
+                    msg = f"primary_key field can only be set on fields of data_type 'integer', 'serial', or 'varchar'." \
                           f" {column_args['data_type']} is not. Cannot create table: {table_name}"
                     logger.warning(msg)
                     raise Exception(msg)

@@ -3,6 +3,10 @@
   "root_url": "work-involvement",
   "endpoints": false,
   "columns": {
+    "work_involvement_id": {
+      "data_type": "serial",
+      "primary_key": true
+    },
     "value": {
       "data_type": "varchar",
       "char_len": 100,

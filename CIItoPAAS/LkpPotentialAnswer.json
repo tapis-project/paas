@@ -3,6 +3,10 @@
   "root_url": "lkp-potential-answer",
   "endpoints": false,
   "columns": {
+    "lkp_potential_answer_id": {
+      "data_type": "serial",
+      "primary_key": true
+    },
     "question_id": {
       "data_type": "integer",
       "FK": true,

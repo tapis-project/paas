@@ -245,7 +245,7 @@ class TableManagement(RoleSessionMixin, APIView):
         update = request.data.get('update', True)
         delete = request.data.get('delete', True)
         endpoints = request.data.get('endpoints', True)
-        enums = request.data.get('enum', None)
+        enums = request.data.get('enums', None)
 
         if ManageTables.objects.filter(table_name=table_name, tenant_id=req_tenant).exists():
             msg = f"Table with name \'{table_name}\' and tenant_id \'{req_tenant}\' already exists in ManageTables table."

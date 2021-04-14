@@ -32,7 +32,7 @@ init_table_1 = {
 init_table_2 = {
   "table_name": "initial_table_2",
   "root_url": "init_two",
-  "enum": {"animals": ["cat", "dog"]},
+  "enums": {"animals": ["cat", "dog"]},
   "columns": {
     "col_one": {
       "data_type": "varchar",

@@ -2,22 +2,28 @@
   "table_name": "UserProfile",
   "root_url": "user-profile",
   "delete": false,
+  "enums": {"accountrole": ["BENCHMARKING_ASSOCIATE",
+                            "CII_STAFF",
+                            "LAB_MANAGER"]},
   "columns": {
+    "user_profile_id": {
+      "data_type": "serial",
+      "primary_key": true
+    },
     "username": {
       "unique": true,
       "data_type": "varchar",
       "char_len": 255
     },
     "role": {
-      "data_type": "varchar",
-      "char_len": 25
+      "data_type": "accountrole"
     },
     "first_name": {
       "null": true,
       "data_type": "varchar",
       "char_len": 255
     },
-    "last_name": {
+    "last_name": { 
       "null": true,
       "data_type": "varchar",
       "char_len": 255
@@ -38,4 +44,3 @@
     }
   }
 }
-
