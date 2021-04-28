@@ -1,5 +1,6 @@
 import json
 
+import datetime
 from cerberus import Validator
 from django.db import transaction
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseServerError, HttpResponseNotFound, \
@@ -278,17 +279,49 @@ class TableManagement(RoleSessionMixin, APIView):
             try:
                 manage_tables.parse_enums(enums, req_tenant, db_instance_name)
             except Exception as e:
-                msg = f"Failed to create enums for table {table_name}. {e}"
+                msg = f"Failed to create enums for table {table_name}. e:{e}"
                 logger.error(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
 
         # We grab enums to do some checks
-        existing_enums = manage_tables.get_enums(db_instance_name)    
-        if existing_enums.get(req_tenant):
-            existing_enums_names = list(existing_enums.get(req_tenant).keys())
-        else:
-            existing_enums_names = []
-        logger.info(f"Got list of existing enum_names: {existing_enums_names}")
+        try:
+            existing_enums = manage_tables.get_enums(db_instance_name)    
+            if existing_enums.get(req_tenant):
+                existing_enums_names = list(existing_enums.get(req_tenant).keys())
+            else:
+                existing_enums_names = []
+            logger.info(f"Got list of existing enum_names: {existing_enums_names}")
+        except Exception as e:
+            msg = f"Failed to get enums for table {table_name}. e:{e}"
+            logger.warning(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        # Going through data and parsing out some table column data.
+        # primary_key is added to the primary_key column.
+        # CREATETIME or UPDATETIME are added to the specials_rules column.
+        try:
+            primary_key = None
+            special_rules = {"CREATETIME": [], "UPDATETIME": []}
+            for column_key, column_args in columns.items():
+                if column_args.get("primary_key"):
+                    if primary_key:
+                        msg = "Found two columns with 'primary_key' set to True, only one primary" \
+                            " key may exist in each table."
+                        logger.warning(msg)
+                        return HttpResponseBadRequest(make_error(msg=msg))
+                    else:
+                        primary_key = column_key
+                if column_args.get("default") in ["CREATETIME", "UPDATETIME"] and column_args.get('data_type') in ['timestamp', 'date']:
+                    # Create new managetables column for parsing during create/update row.
+                    special_rules[column_args["default"]].append(column_key)
+                    # Change the defaults to "NOW()" so the columns automatically update time during creation.
+                    columns[column_key]["default"] = 'NOW()'
+            if not primary_key:
+                primary_key = f"{table_name}_id"
+        except Exception as e:
+            msg = f"Failed to parse primary keys and special rules from data for table {table_name}. e:{e}"
+            logger.warning(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         # Create a validation schema
         try:
@@ -301,8 +334,8 @@ class TableManagement(RoleSessionMixin, APIView):
 
         # Create table
         try:
-            result = self.post_transaction(table_name, root_url, columns, validate_json_create, validate_json_update,
-                                           endpoints, existing_enums_names, req_tenant, db_instance_name)
+            result = self.post_transaction(table_name, root_url, primary_key, columns, validate_json_create, validate_json_update,
+                                           endpoints, existing_enums_names, special_rules, req_tenant, db_instance_name)
         except Exception as e:
             msg = f"Failed to create table {table_name}. {e}"
             logger.error(msg)
@@ -311,29 +344,14 @@ class TableManagement(RoleSessionMixin, APIView):
         return HttpResponse(make_success(result=result), content_type='application/json')
 
     @transaction.atomic
-    def post_transaction(self, table_name, root_url, columns, validate_json_create, validate_json_update,
-                         endpoints, existing_enum_names, tenant_id, db_instance_name):
-
-        primary_key = None
-        for key, val in columns.items():
-            column_args = val
-            if "primary_key" in column_args and column_args["primary_key"]:
-                if primary_key:
-                    msg = "Found two columns with 'primary_key' set to True, only one primary" \
-                          " key may exist in each table."
-                    logger.warning(msg)
-                    return HttpResponseBadRequest(make_error(msg=msg))
-                else:
-                    primary_key = key
-        
-        if not primary_key:
-            primary_key = f"{table_name}_id"
+    def post_transaction(self, table_name, root_url, primary_key, columns, validate_json_create, validate_json_update,
+                         endpoints, existing_enum_names, special_rules, tenant_id, db_instance_name):
 
         new_table = ManageTables.objects.create(table_name=table_name, root_url=root_url, column_definition=columns,
                                                 validate_json_create=validate_json_create,
                                                 validate_json_update=validate_json_update,
-                                                endpoints=endpoints, tenant_id=tenant_id,
-                                                primary_key=primary_key)
+                                                endpoints=endpoints, special_rules=special_rules,
+                                                tenant_id=tenant_id, primary_key=primary_key)
 
         ManageTablesTransition.objects.create(manage_table=new_table, column_definition_tn=columns,
                                               validate_json_create_tn=validate_json_create,
@@ -565,7 +583,7 @@ class TableManagementById(RoleSessionMixin, APIView):
     #                 command = command + " DROP %s IF EXISTS column %s" % col_name, col_info["on_delete"]
 
 
-        return HttpResponse(200)
+        return HttpResponse(make_success(msg="Table put successfully."), content_type='application/json')
 
     @is_admin
     def delete(self, request, *args, **kwargs):
@@ -595,7 +613,7 @@ class TableManagementById(RoleSessionMixin, APIView):
             logger.error(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
-        return HttpResponse(200)
+        return HttpResponse(make_success(msg="Table deleted successfully."), content_type='application/json')
 
     @transaction.atomic
     def delete_transaction(self, table, tenant_id, db_instance_name):
@@ -631,7 +649,7 @@ class TableManagementDump(RoleSessionMixin, APIView):
                 except Exception as e:
                     print("awww, ", e)
 
-        return HttpResponse(200)
+        return HttpResponse(make_success(msg="Table dumped successfully."), content_type='application/json')
 
 
 class TableManagementLoad(RoleSessionMixin, APIView):
@@ -798,57 +816,70 @@ class DynamicView(RoleSessionMixin, APIView):
             return HttpResponseBadRequest(make_error(msg=msg))
 
         return HttpResponse(make_success(result=result), content_type='application/json')
+
     @can_write
     def put(self, request, *args, **kwargs):
-            # req_tenant = "public"
-            req_tenant = request.session['tenant_id']
-            db_instance = request.session['db_instance_name']
+        # req_tenant = "public"
+        req_tenant = request.session['tenant_id']
+        db_instance = request.session['db_instance_name']
 
-            # Parse out required fields.
-            result_dict = json.loads(request.body.decode())
-            try:
-                root_url = self.kwargs["root_url"]
-                data = result_dict["data"]
-            except KeyError as e:
-                msg = f"\'{e.args}\' is required to update rows in a table."
+        # Parse out required fields.
+        result_dict = json.loads(request.body.decode())
+        try:
+            root_url = self.kwargs["root_url"]
+            data = result_dict["data"]
+        except KeyError as e:
+            msg = f"\'{e.args}\' is required to update rows in a table."
+            logger.warning(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+        where_clause = result_dict.get("where", None)
+
+        try:
+            table = ManageTables.objects.get(root_url=root_url)
+        except ManageTables.DoesNotExist:
+            msg = f"Table with root url {root_url} does not exist."
+            logger.warning(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        if "UPDATE" not in table.endpoints:
+            msg = "API access to UPDATE disabled."
+            logger.warning(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        # Check if any keys in the table.special_rules are in the UPDATETIME list. If they are,
+        #  we check posted data, if they didn't set it, we set it to current time.
+        try:
+            special_rules = table.special_rules
+            for key_to_update in special_rules['UPDATETIME']:
+                if not data.get(key_to_update):
+                    data[key_to_update] = datetime.datetime.utcnow().isoformat()
+        except Exception as e:
+            msg = f"Error occurred updating time for {key_to_update}; Details: {e}"
+            logger.error(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        try:
+            v = Validator(table.validate_json_update)
+            if not v.validate(data):
+                msg = f"Data determined invalid from json validation schema: {v.errors}"
                 logger.warning(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
-            where_clause = result_dict.get("where", None)
+        except Exception as e:
+            msg = f"Error occurred when validating the data from the json validation schema: {e}"
+            logger.error(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
-            try:
-                table = ManageTables.objects.get(root_url=root_url)
-            except ManageTables.DoesNotExist:
-                msg = f"Table with root url {root_url} does not exist."
-                logger.warning(msg)
-                return HttpResponseBadRequest(make_error(msg=msg))
+        try:
+            if where_clause:
+                table_data.update_rows_with_where(table.table_name, data, req_tenant, db_instance, where_clause)
+            else:
+                table_data.update_rows_with_where(table.table_name, data, req_tenant, db_instance)
+        except Exception as e:
+            msg = f"Failed to update row in table {table.table_name} on tenant {req_tenant}. {e}"
+            logger.error(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
-            if "UPDATE" not in table.endpoints:
-                msg = "API access to UPDATE disabled."
-                logger.warning(msg)
-                return HttpResponseBadRequest(make_error(msg=msg))
-
-            try:
-                v = Validator(table.validate_json_update)
-                if not v.validate(data):
-                    msg = f"Data determined invalid from json validation schema: {v.errors}"
-                    logger.warning(msg)
-                    return HttpResponseBadRequest(make_error(msg=msg))
-            except Exception as e:
-                msg = f"Error occurred when validating the data from the json validation schema: {e}"
-                logger.error(msg)
-                return HttpResponseBadRequest(make_error(msg=msg))
-
-            try:
-                if where_clause:
-                    table_data.update_rows_with_where(table.table_name, data, req_tenant, db_instance, where_clause)
-                else:
-                    table_data.update_rows_with_where(table.table_name, data, req_tenant, db_instance)
-            except Exception as e:
-                msg = f"Failed to update row in table {table.table_name} on tenant {req_tenant}. {e}"
-                logger.error(msg)
-                return HttpResponseBadRequest(make_error(msg=msg))
-
-            return HttpResponse(status=200)
+        return HttpResponse(make_success(msg="Table put successfully."), content_type='application/json')
 
 
 class DynamicViewById(RoleSessionMixin, APIView):
@@ -921,6 +952,18 @@ class DynamicViewById(RoleSessionMixin, APIView):
             logger.warning(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
+        # Check if any keys in the table.special_rules are in the UPDATETIME list. If they are,
+        #  we check posted data, if they didn't set it, we set it to current time.
+        try:
+            special_rules = table.special_rules
+            for key_to_update in special_rules['UPDATETIME']:
+                if not data.get(key_to_update):
+                    data[key_to_update] = datetime.datetime.utcnow().isoformat()
+        except Exception as e:
+            msg = f"Error occurred updating time for {key_to_update}; Details: {e}"
+            logger.error(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
         try:
             v = Validator(table.validate_json_update)
             if not v.validate(data):
@@ -940,13 +983,13 @@ class DynamicViewById(RoleSessionMixin, APIView):
             return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
-            return_result = table_data.get_row_from_table(table.table_name, pk_id, req_tenant, table.primary_key)
+            result = table_data.get_row_from_table(table.table_name, pk_id, req_tenant, table.primary_key)
         except Exception as e:
             msg = f"Failed to retrieve row from table {table.table_name} with pk {pk_id} on tenant {req_tenant}. {e}"
             logger.error(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
-        return HttpResponse(json.dumps(return_result), content_type='application/json', status=200)
+        return HttpResponse(make_success(result=result), content_type='application/json')
 
     @can_write
     def delete(self, request, *args, **kwargs):
@@ -982,8 +1025,7 @@ class DynamicViewById(RoleSessionMixin, APIView):
             logger.error(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
-        return HttpResponse(status=200)
-
+        return HttpResponse(make_success(msg="Row delected successfully."), content_type='application/json')
 
 class CreateTenant(APIView):
     def post(self, request, *args, **kwargs):
@@ -1010,5 +1052,4 @@ class CreateTenant(APIView):
             logger.error(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
-        return HttpResponse(200)
-
+        return HttpResponse(make_success(msg="Tenant created successfully."), content_type='application/json')

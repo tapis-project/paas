@@ -3,6 +3,7 @@ from . import config
 from pgrest.pycommon.logs import get_logger
 logger = get_logger(__name__)
 
+FORBIDDEN_CHARS = ['\\', ' ', '"', ':', '/', '?', '#', '[', ']', '@', '!', '$', '&', "'", '(', ')', '*', '+', ',', ';', '=']
 
 def do_transaction(command, db_instance):
     # Read the connection parameters and connect to database.
@@ -21,6 +22,12 @@ def do_transaction(command, db_instance):
 def create_table(table_name, columns, existing_enum_names, tenant, db_instance=None):
     """Create table in the PostgreSQL database"""
     logger.info(f"Creating table {tenant}.{table_name}...")
+
+    for char in FORBIDDEN_CHARS:
+        if char in table_name:
+            msg = f"Forbidden char found in table name {table_name}. Forbidden character is: {char}"
+            logger.error(msg)
+            raise Exception(msg)
 
     command = f"CREATE TABLE {tenant}.{table_name} ("
     primary_key_flag = False
@@ -211,7 +218,6 @@ def parse_enums(enums, tenant, db_instance_name=None):
             msg = f"String values for enum should be declared in a list. Received type: {type(enum_list)}."
             logger.error(msg)
             raise Exception(msg)
-        FORBIDDEN_CHARS = ['\\', ' ', '"', ':', '/', '?', '#', '[', ']', '@', '!', '$', '&', "'", '(', ')', '*', '+', ',', ';', '=']
         for char in FORBIDDEN_CHARS:
             if char in enum_key:
                 msg = f"Forbidden char found in enum name {enum_key}. Forbidden character is: {char}"

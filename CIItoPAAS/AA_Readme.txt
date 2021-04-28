@@ -57,5 +57,9 @@ Two enums, AccountRole and MembershipLevel in the UserProfile and Membership tab
 Primary keys have been manually assigned to all tables with names that consist of two words in snake case (UserProfile, not Workflow).
 These tables have been defined with a serial primary key set equal to the table name, lowered, put into camelcase, and appended with "_id" (UserProfile -> user_profile_id).
 
-To-Do: Need to set datetime
-       Need to import data from legacy API
+Datetime stuff is done. Timestamps can now be returned. Also have two new "default" values for timestamps. CREATETIME and UPDATETIME. Both change the default to "NOW()", 
+which is a pg function and will update the field at creation. Both also will add the key values they're attached to to a new table column in ManageTables. "special_rules",
+this column allows us to keep track of which keys have special rules associated with them. CREATETIME does nothing but acts as an alias for "NOW()" for users. UPDATETIME
+is not possible in pg alone though. So we check during puts to see if any keys have that property, if they do and they didn't set the value for the key with said property,
+we go ahead and set the value equal to current datettime. Note, both fields with these defaults are just that, just defaults, they are muttable. If we want to go ahead and
+make not muttable versions, we just add a new special_rule and always set the time on these or ensure no value is entered for the key.

@@ -35,10 +35,12 @@
       "on_delete": "cascade"
     },
     "created_at": {
-      "data_type": "timestamp"
+      "data_type": "timestamp",
+      "default": "CREATETIME"
     },
     "last_modified_at": {
-      "data_type": "timestamp"
+      "data_type": "timestamp",
+      "default": "UPDATETIME"
     },
     "project_size": {
       "null": true,

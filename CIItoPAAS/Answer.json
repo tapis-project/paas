@@ -61,7 +61,8 @@
       "null": true
     },
     "last_updated_at": {
-      "data_type": "date"
+      "data_type": "date",
+      "default": "UPDATETIME"
     }
   }
 }

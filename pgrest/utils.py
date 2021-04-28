@@ -1,6 +1,8 @@
 import json
+import datetime
 
 from django.http import HttpResponseForbidden
+from django.core.serializers.json import DjangoJSONEncoder
 
 from pgrest.pycommon import errors as common_errors
 from pgrest.pycommon.auth import t
@@ -9,6 +11,16 @@ logger = get_logger(__name__)
 
 PGREST_ROLES = ['PGREST_ADMIN', 'PGREST_WRITE', 'PGREST_READ']
 
+def timestampJSONEncoder(raw_object):
+    """
+    We need this to catch timestamps being returned and change how
+    they're converted to JSON. Without this json.dumps gets caught up
+    when trying to return datetimes. Credits to:
+    https://stackoverflow.com/questions/11875770/how-to-overcome-datetime-datetime-not-json-serializable
+    """
+    if isinstance(raw_object, (datetime.date, datetime.datetime)):
+        return raw_object.isoformat()
+    raise TypeError (f"Type {type(raw_object)} not serializable")
 
 def get_version():
     """
@@ -39,8 +51,8 @@ def make_success(result=None, msg=None):
     d = {"status": "success",
          "message": msg,
          "version": get_version(),
-         "result": result}
-    return json.dumps(d)
+         "result": result}    
+    return json.dumps(d, default=timestampJSONEncoder)
 
 
 def create_validate_schema(columns, tenant, existing_enum_names):
@@ -56,7 +68,7 @@ def create_validate_schema(columns, tenant, existing_enum_names):
         key_info = columns[key]
         key_type = key_info["data_type"].lower()
         info_dict = dict()
-        if key_type in {"varchar", "char"}:
+        if key_type in ["varchar", "char"]:
             try:
                 val_length = int(key_info["char_len"])
                 info_dict.update({"type": "string", "maxlength": val_length})
@@ -64,6 +76,12 @@ def create_validate_schema(columns, tenant, existing_enum_names):
                 raise KeyError(f"Unable to create table. {key_type} data types requires char_len field.")
         elif key_type == "serial":
             info_dict.update({"type": "integer"})
+        elif key_type == "date":
+            info_dict.update({"type": "string"})
+        elif key_type == "timestamp":
+            info_dict.update({"type": "string"})
+        elif '[]' in key_type:
+            info_dict.update({"type": "list"})
         elif key_type in existing_enum_names or f'{tenant}.{key_type}' in existing_enum_names:
             info_dict.update({"type": "string"})
         else:
@@ -74,11 +92,17 @@ def create_validate_schema(columns, tenant, existing_enum_names):
         key_info = columns[key]
         key_type = key_info["data_type"]
         info_dict = dict()
-        if key_type in {"varchar", "char"}:
+        if key_type in ["varchar", "char"]:
             val_length = int(key_info["char_len"])
             info_dict.update({"type": "string", "maxlength": val_length})
         elif key_type == "serial":
             info_dict.update({"type": "integer"})
+        elif key_type == "date":
+            info_dict.update({"type": "string"})
+        elif key_type == "timestamp":
+            info_dict.update({"type": "string"})
+        elif '[]' in key_type:
+            info_dict.update({"type": "list"})
         elif key_type in existing_enum_names or f'{tenant}.{key_type}' in existing_enum_names:
             info_dict.update({"type": "string"})
         else:

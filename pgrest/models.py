@@ -30,6 +30,8 @@ class ManageTables(models.Model):
     tenant_id = models.CharField(max_length=255)
     # Primary key to be set for the table.
     primary_key = models.CharField(max_length=255)
+    # Special_Rules key, used to hold misc data for parsing tables/rows.
+    special_rules = JSONField()
 
     def __str__(self):
         return 'Table ID: %s | Root URL: %s' % (self.manage_table_id, self.root_url)
