@@ -3,6 +3,10 @@
   "root_url": "answer",
   "delete": false,
   "columns": {
+    "answer_id": {
+      "data_type": "serial",
+      "primary_key": true
+    },
     "question_id": {
       "data_type": "integer",
       "FK": true,
@@ -19,7 +23,8 @@
       "on_delete": "cascade"
     },
     "project_id": {
-      "data_type": "integer",
+      "data_type": "varchar",
+      "char_len": 255,
       "FK": true,
       "reference_table": "Project",
       "reference_column": "project_id",

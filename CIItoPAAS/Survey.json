@@ -3,6 +3,10 @@
   "root_url": "survey",
   "delete": false,
   "columns": {
+    "survey_id": {
+      "data_type": "serial",
+      "primary_key": true
+    },
     "project_id": {
       "data_type": "integer",
       "FK": true,

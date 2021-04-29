@@ -1,7 +1,7 @@
 {
   "table_name": "ProjectNature",
   "root_url": "project-nature",
-  "endpoints": false,
+  "delete": false,
   "columns": {
     "project_nature_id": {
       "data_type": "serial",

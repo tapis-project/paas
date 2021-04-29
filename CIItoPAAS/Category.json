@@ -1,8 +1,12 @@
 {
   "table_name": "Category",
   "root_url": "category",
-  "endpoints": false,
+  "delete": false,
   "columns": {
+    "category_id": {
+      "data_type": "serial",
+      "primary_key": true
+    },
     "category_label": {
       "data_type": "varchar",
       "char_len": 100

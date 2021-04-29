@@ -1,7 +1,7 @@
 {
   "table_name": "SubMetricCategory",
   "root_url": "sub-metric-category",
-  "endpoints": false,
+  "delete": false,
   "columns": {
     "sub_metric_category_id": {
       "data_type": "serial",

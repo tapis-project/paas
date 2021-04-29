@@ -1,7 +1,7 @@
 {
   "table_name": "IndustryGroupPhase",
   "root_url": "industry-group-phase",
-  "endpoints": false,
+  "delete": false,
   "columns": {
     "industry_group_phase_id": {
       "data_type": "serial",

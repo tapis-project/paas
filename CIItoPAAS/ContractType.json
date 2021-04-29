@@ -1,7 +1,7 @@
 {
   "table_name": "ContractType",
   "root_url": "contract-type",
-  "endpoints": false,
+  "delete": false,
   "columns": {
     "contract_type_id": {
       "data_type": "serial",

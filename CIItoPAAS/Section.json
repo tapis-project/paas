@@ -1,6 +1,11 @@
 {
   "table_name": "Section",
   "root_url": "section",
-  "endpoints": false,
-  "columns": {}
+  "delete": false,
+  "columns": {
+    "section_id": {
+      "data_type": "serial",
+      "primary_key": true
+    }
+  }
 }

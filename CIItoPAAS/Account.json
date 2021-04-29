@@ -3,6 +3,10 @@
   "root_url": "account",
   "delete": false,
   "columns": {
+    "account_id": {
+      "data_type": "serial",
+      "primary_key": true
+    },
     "company_name": {
       "null": true,
       "data_type": "varchar",

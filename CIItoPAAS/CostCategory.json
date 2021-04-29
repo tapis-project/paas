@@ -1,7 +1,7 @@
 {
   "table_name": "CostCategory",
   "root_url": "cost-category",
-  "endpoints": false,
+  "delete": false,
   "columns": {
     "cost_category_id": {
       "data_type": "serial",

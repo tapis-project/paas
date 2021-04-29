@@ -1,7 +1,7 @@
 {
   "table_name": "RespondentType",
   "root_url": "respondent-type",
-  "endpoints": false,
+  "delete": false,
   "columns": {
     "respondent_type_id": {
       "data_type": "serial",

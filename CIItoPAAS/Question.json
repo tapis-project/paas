@@ -3,6 +3,10 @@
   "root_url": "question",
   "delete": false,
   "columns": {
+    "question_id": {
+      "data_type": "serial",
+      "primary_key": true
+    },
     "code": {
       "data_type": "varchar",
       "char_len": 100,

@@ -1,7 +1,7 @@
 {
   "table_name": "MetricCategory",
   "root_url": "metric-category",
-  "endpoints": false,
+  "delete": false,
   "columns": {
     "metric_category_id": {
       "data_type": "serial",

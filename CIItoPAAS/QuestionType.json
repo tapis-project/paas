@@ -1,7 +1,7 @@
 {
   "table_name": "QuestionType",
   "root_url": "question-type",
-  "endpoints": false,
+  "delete": false,
   "columns": {
     "question_type_id": {
       "data_type": "serial",

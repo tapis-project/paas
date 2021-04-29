@@ -3,6 +3,10 @@
   "root_url": "constants",
   "delete": false,
   "columns": {
+    "workflow_id": {
+      "data_type": "serial",
+      "primary_key": true
+    },
     "workflow_name": {
       "data_type": "varchar",
       "char_len": 20

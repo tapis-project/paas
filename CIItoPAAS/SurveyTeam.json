@@ -1,7 +1,7 @@
 {
   "table_name": "SurveyTeam",
   "root_url": "survey-team",
-  "endpoints": false,
+  "delete": false,
   "columns": {
     "survey_team_id": {
       "data_type": "serial",

@@ -7,6 +7,10 @@
                                 "PREMIUM",
                                 "INACTIVE"]},
   "columns": {
+    "membership_id": {
+      "data_type": "serial",
+      "primary_key": true
+    },
     "benchmarking_lab_id": {
       "data_type": "integer",
       "FK": true,

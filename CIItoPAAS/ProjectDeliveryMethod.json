@@ -1,7 +1,7 @@
 {
   "table_name": "ProjectDeliveryMethod",
   "root_url": "project-delivery-method",
-  "endpoints": false,
+  "delete": false,
   "columns": {
     "project_delivery_method_id": {
       "data_type": "serial",

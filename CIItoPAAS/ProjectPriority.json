@@ -1,7 +1,7 @@
 {
   "table_name": "ProjectPriority",
   "root_url": "project-priority",
-  "endpoints": false,
+  "delete": false,
   "columns": {
     "project_priority_id": {
       "data_type": "serial",

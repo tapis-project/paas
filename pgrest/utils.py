@@ -64,8 +64,7 @@ def create_validate_schema(columns, tenant, existing_enum_names):
     schema_update = dict()
     schema_create = dict()
 
-    for key in columns.keys():
-        key_info = columns[key]
+    for key, key_info in columns.items():
         key_type = key_info["data_type"].lower()
         info_dict = dict()
         if key_type in ["varchar", "char"]:
@@ -74,6 +73,8 @@ def create_validate_schema(columns, tenant, existing_enum_names):
                 info_dict.update({"type": "string", "maxlength": val_length})
             except KeyError:
                 raise KeyError(f"Unable to create table. {key_type} data types requires char_len field.")
+        elif key_type == "text":
+            info_dict.update({"type": "string"})
         elif key_type == "serial":
             info_dict.update({"type": "integer"})
         elif key_type == "date":
@@ -88,13 +89,14 @@ def create_validate_schema(columns, tenant, existing_enum_names):
             info_dict.update({"type": key_type})
         schema_update[key] = info_dict
 
-    for key in columns.keys():
-        key_info = columns[key]
+    for key, key_info in columns.items():
         key_type = key_info["data_type"]
         info_dict = dict()
         if key_type in ["varchar", "char"]:
             val_length = int(key_info["char_len"])
             info_dict.update({"type": "string", "maxlength": val_length})
+        elif key_type == "text":
+            info_dict.update({"type": "string"})
         elif key_type == "serial":
             info_dict.update({"type": "integer"})
         elif key_type == "date":
@@ -110,9 +112,11 @@ def create_validate_schema(columns, tenant, existing_enum_names):
 
         if "null" in key_info.keys():
             if not key_info["null"]:
-                info_dict.update({"required": True})
+                info_dict.update({"required": True,
+                                  "nullable": True})
             else:
-                info_dict.update({"required": False})
+                info_dict.update({"required": False,
+                                  "nullable": True})
         schema_create[key] = info_dict
 
     return schema_create, schema_update

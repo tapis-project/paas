@@ -3,6 +3,11 @@
   "root_url": "project",
   "delete": false,
   "columns": {
+    "project_id": {
+      "data_type": "varchar",
+      "char_len": 255,
+      "primary_key": true
+    },
     "identifier": {
       "data_type": "varchar",
       "char_len": 9

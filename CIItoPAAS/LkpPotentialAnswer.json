@@ -1,7 +1,7 @@
 {
   "table_name": "LkpPotentialAnswer",
   "root_url": "lkp-potential-answer",
-  "endpoints": false,
+  "delete": false,
   "columns": {
     "lkp_potential_answer_id": {
       "data_type": "serial",

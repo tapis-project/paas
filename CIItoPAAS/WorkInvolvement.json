@@ -1,7 +1,7 @@
 {
   "table_name": "WorkInvolvement",
   "root_url": "work-involvement",
-  "endpoints": false,
+  "delete": false,
   "columns": {
     "work_involvement_id": {
       "data_type": "serial",

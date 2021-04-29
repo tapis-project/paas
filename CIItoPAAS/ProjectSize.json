@@ -1,7 +1,7 @@
 {
   "table_name": "ProjectSize",
   "root_url": "project-size",
-  "endpoints": false,
+  "delete": false,
   "columns": {
     "project_size_id": {
       "data_type": "serial",

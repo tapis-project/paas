@@ -1,7 +1,7 @@
 {
   "table_name": "LocationCategory",
   "root_url": "location-category",
-  "endpoints": false,
+  "delete": false,
   "columns": {
     "location_category_id": {
       "data_type": "serial",
