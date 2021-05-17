@@ -69,10 +69,12 @@ curl -H "tapis-v2-token: $tok" localhost:5000/v3/pgrest/data/init
 
 Table Definitions and Features
 ------------------------------
-The /manage endpoints for PgREST expect a json formatted table definition. Each table definition requires the following.
+The /manage endpoints for PgREST expect a json formatted table definition. Each table definition can have the following rules.
  - table_name
+   - This is a required rule.
    - The name of the table in question.
  - root_url
+   - This is a required rule.
    - The root_url for PgRESTs /data endpoint.
    - Ex: root_url "table25" would be accessible via "http://pgrestURL/data/table25".
  - enums
@@ -81,6 +83,7 @@ The /manage endpoints for PgREST expect a json formatted table definition. Each 
    - Ex: {"accountrole": ["ADMIN", "USER"]} would create an "accountrole" enum that can have values of "ADMIN" or "USER"
    - Deletion/Updates are not currently supported. Speak to developer if you're interested in a delete/update endpoint.
  - columns
+   - This is a required rule. 
    - Column definitions in the form of a dict. Dict key would be column, value would be column definition.
    - Ex: {"username": {"unique": true, "data_type": "varchar", "char_len": 255}
    - Columns arguments are as follows.
