@@ -67,6 +67,131 @@ curl -H "tapis-v2-token: $tok" localhost:5000/v3/pgrest/data/init
 
 
 
+Table Definitions and Features
+------------------------------
+The /manage endpoints for PgREST expect a json formatted table definition. Each table definition requires the following.
+ - table_name
+   - The name of the table in question.
+ - root_url
+   - The root_url for PgRESTs /data endpoint.
+   - Ex: root_url "table25" would be accessible via "http://pgrestURL/data/table25".
+ - enums
+   - Enum generation is done in table definitions.
+   - Provide a dict of enums where the key is enum name and the value is the possible values for the enum.
+   - Ex: {"accountrole": ["ADMIN", "USER"]} would create an "accountrole" enum that can have values of "ADMIN" or "USER"
+   - Deletion/Updates are not currently supported. Speak to developer if you're interested in a delete/update endpoint.
+ - columns
+   - Column definitions in the form of a dict. Dict key would be column, value would be column definition.
+   - Ex: {"username": {"unique": true, "data_type": "varchar", "char_len": 255}
+   - Columns arguments are as follows.
+     - data_type
+       - This field is required.
+       - Specifies the data type for values in this column.
+       - Can be varchar, datetime, {enumName}, text, timestamp, serial, varchar[], boolean, integer, integer[].
+         - Note: varchar requires the char_len column definition.
+         - Note: Setting a timestamp data_type column to default to "UPDATETIME" or "CREATETIME" has special properties.
+           - "CREATETIME" sets the field to the UTC time at creation. It is then not changed later.
+           - "UPDATETIME" sets the filed to the UTC time at creation. It is updated to the update time when it is updated.
+     - char_len
+       - Additional argument for varchar data_types. Required to set max value size.
+       - Can be any value from 1 to 255.
+     - unique
+       - Determines whether or not each value in this column is unique.
+       - Can be true or false.
+     - null
+       - States whether or not a value can be "null".
+       - Can be true or false.
+     - default
+       - Sets default value for column to fallback on if no value is given.
+       - Must follow the data_type for the column.
+       - Note: Setting a timestamp data_type column to default to "UPDATETIME" or "CREATETIME" has special properties.
+          - "CREATETIME" sets the field to the UTC time at creation. It is then not changed later.
+          - "UPDATETIME" sets the filed to the UTC time at creation. It is updated to the update time when it is updated.
+     - primary_key
+       - Specifies primary_key for the table.
+       - This can only be used for one column in the table.
+       - This primary_key column will be the value users can use to *get* a row in the table.
+       - If this is not specified in a table, primary_key defaults to "{table_name}_id".
+         - Note that this default cannot be modified and is of data_type=serial.
+     - FK
+       - Weather or not this key should reference a key in another table, a "foreign key".
+       - Can be true or false.
+       - If FK is set to true, columns arguments "reference_table", "reference_column", and "on_delete" must also be set.
+         - reference_table
+           - Only needed in the case that FK is set to true.
+           - Specifies the foreign table that the foreign_key is in.
+           - Can be set to the table_name of any table.
+         - reference_column
+           - Only needed in the case that FK is set to true.
+           - Specifies the foreign column that the foreign_key is in.
+           - Can be set to the key for any column in the reference_table.
+         - on_delete
+           - Only needed in the case that FK is set to true.
+           - Specifies the deletion strategy when referencing a foreign key.
+           - Can be set to "CASCADE" or "SET NULL"
+             - "CASCADE" deletes this column if the foreign key's column is deleted.
+             - "SET NULL" set this column to null if the foreign key's column is deleted.
+
+Example of a table definition with many different column types.
+```
+{
+  "table_name": "UserProfile",
+  "root_url": "user-profile",
+  "delete": false,
+  "enums": {"accountrole": ["ADMIN",
+                            "USER",
+                            "GUEST"]},
+  "columns": {
+    "user_profile_id": {
+      "data_type": "serial",
+      "primary_key": true
+    },
+    "username": {
+      "unique": true,
+      "data_type": "varchar",
+      "char_len": 255
+    },
+    "role": {
+      "data_type": "accountrole"
+    },
+    "company": {
+      "data_type": "varchar",
+      "char_len": 255,
+      "FK": true,
+      "reference_table": "Companys",
+      "reference_column": "company_name",
+      "on_delete": "CASCADE"
+    },
+    "employee_id": {
+      "data_type": "integer",
+      "FK": true,
+      "reference_table": "Employees",
+      "reference_column": "employee_id",
+      "on_delete": "CASCADE"
+    }
+    "first_name": {
+      "null": true,
+      "data_type": "varchar",
+      "char_len": 255
+    },
+    "last_name": { 
+      "null": true,
+      "data_type": "varchar",
+      "char_len": 255
+    },
+    "created_at": {
+      "data_type": "timestamp",
+      "default": "CREATETIME"
+    },
+    "last_updated_at": {
+      "data_type": "timestamp",
+      "default": "UPDATETIME"
+    }
+  }
+}
+```
+
+
 # Old, Manual Instructions (You Probably Want to Use the Makefile)
 
 Build the containers:
