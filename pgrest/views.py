@@ -983,7 +983,7 @@ class DynamicViewById(RoleSessionMixin, APIView):
             return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
-            result = table_data.get_row_from_table(table.table_name, pk_id, req_tenant, table.primary_key)
+            result = table_data.get_row_from_table(table.table_name, pk_id, req_tenant, table.primary_key, db_instance=db_instance)
         except Exception as e:
             msg = f"Failed to retrieve row from table {table.table_name} with pk {pk_id} on tenant {req_tenant}. {e}"
             logger.error(msg)
