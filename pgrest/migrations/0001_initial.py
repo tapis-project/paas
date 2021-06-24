@@ -26,7 +26,8 @@ class Migration(migrations.Migration):
                 ('endpoints', django.contrib.postgres.fields.ArrayField(base_field=models.CharField(max_length=255), size=None)),
                 ('tenant_id', models.CharField(max_length=255)),
                 ('primary_key', models.CharField(max_length=255)),
-                ('special_rules', django.contrib.postgres.fields.jsonb.JSONField())
+                ('special_rules', django.contrib.postgres.fields.jsonb.JSONField()),
+                ('comments', models.TextField())
             ],
         ),
         migrations.CreateModel(

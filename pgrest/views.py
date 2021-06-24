@@ -1,4 +1,6 @@
 import json
+import re
+import timeit
 
 import datetime
 from cerberus import Validator
@@ -8,8 +10,8 @@ from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseServer
 import requests
 from rest_framework.views import APIView
 
-from pgrest.models import ManageTables, ManageTablesTransition, Tenants
-from pgrest.db_transactions import manage_tables, table_data, bulk_data
+from pgrest.models import ManageTables, ManageTablesTransition, Tenants, ManageViews
+from pgrest.db_transactions import manage_tables, table_data, bulk_data, view_data
 from pgrest.pycommon.auth import t, get_tenant_id_from_base_url
 from pgrest.pycommon import errors
 from pgrest.utils import create_validate_schema, can_read, can_write, is_admin, make_error, make_success
@@ -17,19 +19,21 @@ from pgrest.pycommon.logs import get_logger
 logger = get_logger(__name__)
 
 
-# Error views
+# We create a forbidden regex for quick parsing
+# Forbidden: \ ` ' " ~  / ? # [ ] ( ) @ ! $ & * + = , : ;
+FORBIDDEN_CHARS =  re.compile("^[^<>\\\/{}[\]~` $'\":?#@!$&()*+,;=]*$")
 
+
+# Error views
 def error_404(request, exception, template_name=None):
     return HttpResponse(make_error(msg="The HTTP path and/or method are not available from this service."),
                         content_type='application/json',
                         status=404)
 
-
 def error_400(request, exception, template_name=None):
     return HttpResponse(make_error(msg="The HTTP path and/or method are not available from this service."),
                         content_type='application/json',
                         status=400)
-
 
 def error_500(request):
     return HttpResponse(make_error(msg="Something went wrong, Please try your request again later."),
@@ -106,6 +110,26 @@ def get_username_for_request(request, tenant_id):
         return None, HttpResponseForbidden(make_error(msg=msg))
     logger.debug(f"got username: {username}")
     return username, None
+
+
+def get_user_sk_roles(tenant, username):
+    logger.debug(f"Getting SK roles on tenant {tenant} and user {username}")
+    start_timer = timeit.default_timer()
+    try:
+        roles_obj = t.sk.getUserRoles(tenant=tenant, user=username)
+    except Exception as e:
+        end_timer = timeit.default_timer()
+        total = (end_timer - start_timer) * 1000
+        if total > 4000:
+            logger.critical(f"t.sk.getUserRoles took {total} to run for user {username}, tenant: {tenant}")
+        raise e
+    end_timer = timeit.default_timer()
+    total = (end_timer - start_timer) * 1000
+    if total > 4000:
+        logger.critical(f"t.sk.getUserRoles took {total} to run for user {username}, tenant: {tenant}")
+    roles_list = roles_obj.names
+    logger.debug(f"Roles received: {roles_list}")
+    return roles_list
 
 
 class RoleSessionMixin:
@@ -209,7 +233,8 @@ class TableManagement(RoleSessionMixin, APIView):
                                "columns": table.column_definition,
                                "update_schema": table.validate_json_update,
                                "create_schema": table.validate_json_create,
-                               "tenant_id": table.tenant_id})
+                               "tenant_id": table.tenant_id,
+                               "comments": table.comments})
         else:
             for table in tables:
                 result.append({"table_name": table.table_name,
@@ -218,7 +243,8 @@ class TableManagement(RoleSessionMixin, APIView):
                                "tenant": table.tenant_id,
                                "endpoints": table.endpoints,
                                "tenant_id": table.tenant_id,
-                               "primary_key": table.primary_key})
+                               "primary_key": table.primary_key,
+                               "comments": table.comments})
 
         return HttpResponse(make_success(result=result), content_type='application/json')
 
@@ -247,6 +273,7 @@ class TableManagement(RoleSessionMixin, APIView):
         delete = request.data.get('delete', True)
         endpoints = request.data.get('endpoints', True)
         enums = request.data.get('enums', None)
+        comments = request.data.get('comments', "")
 
         if ManageTables.objects.filter(table_name=table_name, tenant_id=req_tenant).exists():
             msg = f"Table with name \'{table_name}\' and tenant_id \'{req_tenant}\' already exists in ManageTables table."
@@ -335,7 +362,7 @@ class TableManagement(RoleSessionMixin, APIView):
         # Create table
         try:
             result = self.post_transaction(table_name, root_url, primary_key, columns, validate_json_create, validate_json_update,
-                                           endpoints, existing_enums_names, special_rules, req_tenant, db_instance_name)
+                                           endpoints, existing_enums_names, special_rules, comments, req_tenant, db_instance_name)
         except Exception as e:
             msg = f"Failed to create table {table_name}. {e}"
             logger.error(msg)
@@ -345,13 +372,14 @@ class TableManagement(RoleSessionMixin, APIView):
 
     @transaction.atomic
     def post_transaction(self, table_name, root_url, primary_key, columns, validate_json_create, validate_json_update,
-                         endpoints, existing_enum_names, special_rules, tenant_id, db_instance_name):
+                         endpoints, existing_enum_names, special_rules, comments, tenant_id, db_instance_name):
 
         new_table = ManageTables.objects.create(table_name=table_name, root_url=root_url, column_definition=columns,
                                                 validate_json_create=validate_json_create,
                                                 validate_json_update=validate_json_update,
                                                 endpoints=endpoints, special_rules=special_rules,
-                                                tenant_id=tenant_id, primary_key=primary_key)
+                                                comments=comments, tenant_id=tenant_id,
+                                                primary_key=primary_key)
 
         ManageTablesTransition.objects.create(manage_table=new_table, column_definition_tn=columns,
                                               validate_json_create_tn=validate_json_create,
@@ -363,7 +391,8 @@ class TableManagement(RoleSessionMixin, APIView):
             "table_name": new_table.table_name,
             "table_id": new_table.pk,
             "root_url": new_table.root_url,
-            "endpoints": new_table.endpoints
+            "endpoints": new_table.endpoints,
+            "comments": new_table.comments
         }
 
         return result
@@ -403,7 +432,6 @@ class TableManagementById(RoleSessionMixin, APIView):
 
         # Display information for each table based on details variable.
         try:
-            # table = ManageTables.objects.get(pk=table_id, tenant_id=req_tenant)
             table = ManageTables.objects.get(pk=table_id)
 
         except ManageTables.DoesNotExist:
@@ -427,7 +455,8 @@ class TableManagementById(RoleSessionMixin, APIView):
                 "tenant_id": table.tenant_id,
                 "update schema": table.validate_json_update,
                 "create schema": table.validate_json_create,
-                "primary_key": table.primary_key
+                "primary_key": table.primary_key,
+                "comments": table.comments
             }
         else:
             result = {
@@ -436,7 +465,8 @@ class TableManagementById(RoleSessionMixin, APIView):
                 "root_url": table.root_url,
                 "endpoints": table.endpoints,
                 "tenant_id": table.tenant_id,
-                "primary_key": table.primary_key
+                "primary_key": table.primary_key,
+                "comments": table.comments
             }
 
         return HttpResponse(make_success(result=result), content_type='application/json')
@@ -471,7 +501,7 @@ class TableManagementById(RoleSessionMixin, APIView):
         root_url = request.data.get('root_url', None)
         table_name = request.data.get('table_name', None)
         update_cols = request.data.get('columns', None)
-
+        comments = request.data.get('comments', None)
         list_all = request.data.get('list_all', ("GET_ALL" in table.endpoints))
         list_one = request.data.get('list_one', ("GET_ONE" in table.endpoints))
         create = request.data.get('create', ("CREATE" in table.endpoints))
@@ -481,6 +511,9 @@ class TableManagementById(RoleSessionMixin, APIView):
 
         if root_url is not None:
             table.root_url = root_url
+            table.save()
+        if comments is not None:
+            table.comments = comments
             table.save()
         if not endpoints:
             table.endpoints = list()
@@ -1053,3 +1086,308 @@ class CreateTenant(APIView):
             return HttpResponseBadRequest(make_error(msg=msg))
 
         return HttpResponse(make_success(msg="Tenant created successfully."), content_type='application/json')
+
+
+### Views
+# Once we figure out the table and row, these are just simple SQL crud operations.
+class ViewsResource(RoleSessionMixin, APIView):
+    """
+    GET: Lists the rows in the given view based on root url. Restricted to READ and above role.
+    POST: Creates a new row in the view based on root URL. Restricted to WRITE and above role.
+    PUT: Updates the rows in the given view based on filter. If no filter is provided, updates the entire table.
+    Restricted to WRITE and above role.
+    """
+    @can_read
+    def get(self, request, *args, **kwargs):
+        logger.debug("top of get /data/views/<view_root_url>")
+        req_tenant = request.session['tenant_id']
+        db_instance = request.session['db_instance_name']
+        req_username = request.session['username']
+
+        params = self.request.query_params
+        limit = self.request.query_params.get("limit")
+        order = self.request.query_params.get("order")
+
+        # Parse out required fields.
+        try:
+            root_url = self.kwargs['root_url']
+        except KeyError as e:
+            msg = f"\'{e.args}\' is required to list rows in a view."
+            logger.warning(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        try:
+            view = ManageViews.objects.get(root_url=root_url)
+        except ManageViews.DoesNotExist:
+            msg = f"View with root url {root_url} does not exist."
+            logger.warning(msg)
+            return HttpResponseNotFound(make_error(msg=msg))
+
+        # Permission check, permission_rules cross-refed with sk roles
+        # Get all user roles from sk and check if view's permission_rules are a subset of user_roles
+        user_roles = get_user_sk_roles(req_tenant, req_username)
+        try:
+            if not set(view.permission_rules).issubset(set(user_roles)):
+                msg = f"User {req_username} in tenant {req_tenant} does not have permission to access table {view.view_name} in tenant {req_tenant}."
+                logger.debug(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+        except Exception as e:
+            msg = f"Error checking permissions for view {view.view_name} on tenant {req_tenant}. Error: {e}"
+            logger.error(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        if "GET_ALL" not in view.endpoints:
+            msg = "API access to LIST ROWS disabled."
+            logger.warning(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        query_dict = dict()
+
+        try:
+            if limit is None:
+                limit = 10
+            if order is not None:
+                result = view_data.get_rows_from_view(view.view_name, query_dict, req_tenant,
+                                                      limit, db_instance, view.manage_view_id, order=order)
+            else:
+                result = view_data.get_rows_from_view(view.view_name, query_dict, req_tenant, limit, db_instance, view.manage_view_id)
+        except Exception as e:
+            msg = f"Failed to retrieve rows from view {view.view_name} on tenant {req_tenant}. {e}"
+            logger.error(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        return HttpResponse(make_success(result=result), content_type='application/json')
+
+
+class ViewManagement(RoleSessionMixin, APIView):
+    """
+    GET: Returns information about all of the views.
+    POST: Creates a new table in ManageViews, and then a new view from the json provided by the user.
+    All of these endpoints are restricted to ADMIN role only.
+    """
+    @is_admin
+    def get(self, request, *args, **kwargs):
+        logger.debug("top of get /manage/views")
+        req_tenant = request.session['tenant_id']
+
+        # Check for details=true. Decide what a brief description and a detailed description is.
+        details = self.request.query_params.get('details')
+
+        # Display information for each table based on details variable.
+        tables = ManageViews.objects.filter(tenant_id=req_tenant)
+
+        result = list()
+        # If details, form information about the columns and endpoints of the table
+        # TODO Fix up this format.
+        if details:
+            for table in tables:
+                result.append({"view_name": table.view_name,
+                               "manage_view_id": table.pk,
+                               "root_url": table.root_url,
+                               "view_definition": table.view_definition,
+                               "permission_rules": table.permission_rules,
+                               "endpoints": table.endpoints,
+                               "tenant_id": table.tenant_id})
+        else:
+            for table in tables:
+                result.append({"view_name": table.view_name,
+                               "manage_view_id": table.pk,
+                               "root_url": table.root_url,
+                               "endpoints": table.endpoints,
+                               "tenant_id": table.tenant_id})
+
+        return HttpResponse(make_success(result=result), content_type='application/json')
+
+    @is_admin
+    def post(self, request, *args, **kwargs):
+        logger.debug("top of post /manage/views")
+        req_tenant = request.session['tenant_id']
+        db_instance_name = request.session['db_instance_name']
+
+        # Parse out required fields.
+        try:
+            view_name = request.data['view_name']
+            select_query = request.data['select_query']
+            from_table = request.data['from_table']
+        except KeyError as e:
+            msg = f"\'{e.args}\' is required when creating a new table."
+            logger.warning(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        # Parse out optional fields.
+        root_url = request.data.get('root_url', view_name)
+        where_query = request.data.get('where_query', None)
+        permission_rules = request.data.get('permission_rules', [])
+        list_all = request.data.get('list_all', True)
+        list_one = request.data.get('list_one', True)
+        create = request.data.get('create', True)
+        update = request.data.get('update', True)
+        delete = request.data.get('delete', True)
+        endpoints = request.data.get('endpoints', True)
+
+        # view_name checks
+        if not isinstance(view_name, str):
+            msg = f"The view_name must be of type string. Got type: {type(view_name)}"
+            logger.error(msg)
+            raise HttpResponseBadRequest(make_error(msg=msg))
+        if not FORBIDDEN_CHARS.match(view_name):
+            msg = f"The view_name value is not url safe. Value must be alphanumeric with _ and - optional. Value inputted: {view_name}"
+            logger.error(msg)
+            raise HttpResponseBadRequest(make_error(msg=msg))
+
+        # Check for existence of view_name, table_name, and root_url
+        if ManageViews.objects.filter(view_name=view_name, tenant_id=req_tenant).exists():
+            msg = f"View with name \'{view_name}\' and tenant_id \'{req_tenant}\' already exists in ManageViews table."
+            logger.warning(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        if ManageViews.objects.filter(root_url=root_url).exists():
+            msg = f"View with root url \'{root_url}\' already exists in ManageViews table. " \
+                  f"View name: {view_name}"
+            logger.warning(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        if not ManageTables.objects.filter(table_name=from_table, tenant_id=req_tenant).exists():
+            msg = f"Table with name \'{from_table}\' and tenant_id \'{req_tenant}\' does not exist in ManageTables table."
+            logger.warning(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        # Get endpoint rules
+        if endpoints:
+            endpoints = ["GET_ONE", "GET_ALL", "CREATE", "UPDATE", "DELETE"]
+            if not list_one:
+                endpoints.remove("GET_ONE")
+            if not list_all:
+                endpoints.remove("GET_ALL")
+            if not create:
+                endpoints.remove("CREATE")
+            if not update:
+                endpoints.remove("UPDATE")
+            if not delete:
+                endpoints.remove("DELETE")
+        else:
+            endpoints = []
+
+        # Create view_definition
+        view_definition = {"select_query": select_query,
+                           "from_table": from_table,
+                           "where_query": where_query}
+
+        # Create table
+        try:
+            result = self.post_view_transaction(view_name, root_url, view_definition, permission_rules, endpoints, req_tenant, db_instance_name)
+        except Exception as e:
+            msg = f"Failed to create view {view_name}. {e}"
+            logger.error(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        return HttpResponse(make_success(result=result), content_type='application/json')
+
+    @transaction.atomic
+    def post_view_transaction(self, view_name, root_url, view_definition, permission_rules, endpoints, tenant_id, db_instance_name):
+
+        new_view = ManageViews.objects.create(view_name=view_name, root_url=root_url, view_definition=view_definition,
+                                              permission_rules=permission_rules, endpoints=endpoints, tenant_id=tenant_id)
+
+        view_data.create_view(view_name, view_definition, tenant_id, db_instance=db_instance_name)
+
+        result = {
+            "view_name": new_view.view_name,
+            "view_id": new_view.pk,
+            "root_url": new_view.root_url,
+            "endpoints": new_view.endpoints
+        }
+
+        return result
+
+
+class ViewManagementById(RoleSessionMixin, APIView):
+    """
+    GET: Returns information about all of the views.
+    POST: Creates a new table in ManageViews, and then a new view from the json provided by the user.
+    All of these endpoints are restricted to ADMIN role only.
+    """
+    @is_admin
+    def get(self, request, *args, **kwargs):
+        logger.debug("top of get /manage/views/<id>")
+        req_tenant = request.session['tenant_id']
+
+        # Check for details=true. Decide what a brief description and a detailed description is.
+        details = self.request.query_params.get('details')
+
+        # Parse out required fields.
+        try:
+            view_id = self.kwargs['manage_view_id']
+        except KeyError as e:
+            msg = f"\'{e.args}\' is required to list a table."
+            logger.warning(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        try:
+            view_id = int(view_id)
+        except:
+            msg = "Invalid view id; the view id must be an integer."
+            logger.debug(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        try:
+            table = ManageViews.objects.get(pk=view_id)
+        except ManageViews.DoesNotExist:
+            msg = f"View with id {view_id} does not exist in the ManageViews table."
+            logger.warning(msg)
+            return HttpResponseNotFound(make_error(msg=msg))
+        except Exception as e:
+            msg = f"Could not retrieve description of view with id {view_id}. Details: {e}"
+            logger.debug(msg)
+            return HttpResponseNotFound(make_error(msg=msg))
+
+        if details:
+            result = {"view_name": table.view_name,
+                      "manage_view_id": table.pk,
+                      "root_url": table.root_url,
+                      "view_definition": table.view_definition,
+                      "permission_rules": table.permission_rules,
+                      "endpoints": table.endpoints,
+                      "tenant_id": table.tenant_id}
+        else:
+            result = {"view_name": table.view_name,
+                      "manage_view_id": table.pk,
+                      "root_url": table.root_url,
+                      "endpoints": table.endpoints,
+                      "tenant_id": table.tenant_id}
+
+        return HttpResponse(make_success(result=result), content_type='application/json')
+
+    @is_admin
+    def delete(self, request, *args, **kwargs):
+        req_tenant = request.session['tenant_id']
+        db_instance_name = request.session['db_instance_name']
+
+        # Parse out required fields.
+        try:
+            view_id = self.kwargs['manage_view_id']
+        except KeyError as e:
+            msg = f"\'{e.args}\' is required to drop a view."
+            logger.warning(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        try:
+            view = ManageViews.objects.get(pk=view_id)
+        except ManageViews.DoesNotExist:
+            msg = f"View with ID {view_id} does not exist in ManageViews table."
+            logger.warning(msg)
+            return HttpResponseNotFound(make_error(msg=msg))
+
+        try:
+            self.delete_transaction(view, req_tenant, db_instance_name)
+        except Exception as e:
+            msg = f"Failed to drop view {view.view_name} from the ManageViews table: {e}"
+            logger.error(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        return HttpResponse(make_success(msg="View deleted successfully."), content_type='application/json')
+
+    @transaction.atomic
+    def delete_view_transaction(self, view, tenant_id, db_instance_name):
+        ManageViews.objects.get(view_name=view.view_name, tenant_id=tenant_id).delete()
+        view_data.delete_view(view.view_name, tenant_id, db_instance=db_instance_name)

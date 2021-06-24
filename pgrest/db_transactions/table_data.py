@@ -3,6 +3,8 @@ from . import config
 from pgrest.pycommon.logs import get_logger
 logger = get_logger(__name__)
 
+FORBIDDEN_CHARS = ['\\', ' ', '"', ':', '/', '?', '#', '[', ']', '@', '!', '$', '&', "'", '(', ')', '*', '+', ',', ';', '=']
+
 
 def dict_fetch_all(cursor):
     """
@@ -136,7 +138,6 @@ def create_row(table_name, data, tenant, primary_key, db_instance=None):
     for k, v in data.items():
         if k == primary_key:
             if isinstance(v, str):
-                FORBIDDEN_CHARS = ['\\', ' ', '"', ':', '/', '?', '#', '[', ']', '@', '!', '$', '&', "'", '(', ')', '*', '+', ',', ';', '=']
                 for char in FORBIDDEN_CHARS:
                     if char in v:
                         msg = f"The primary_key value must be url safe. {char} found in 'key:val' given: '{k}: {v}'." \
