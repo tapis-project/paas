@@ -79,7 +79,7 @@ def get_row_from_view(view_name, pk_id, tenant, primary_key, db_instance=None):
         raise Exception(msg)
 
 
-def get_rows_from_view(view_name, query_dict, tenant, limit, db_instance, primary_key, **kwargs):
+def get_rows_from_view(view_name, query_dict, tenant, limit, offset, db_instance, primary_key, **kwargs):
     """
     Gets all rows from given table with an optional limit and filter.
     """
@@ -106,7 +106,8 @@ def get_rows_from_view(view_name, query_dict, tenant, limit, db_instance, primar
             order = kwargs["order"].replace(",", " ").strip()
             command = f"{command} ORDER BY {order} "
 
-        command = command + f" LIMIT {int(limit)};"
+        command = command + f" LIMIT {int(limit)} "
+        command = command + f" OFFSET {int(offset)};"
     except Exception as e:
         msg = f"Unable to form database query for table {tenant}.{view_name} with query(ies) {query_dict}: {e}"
         logger.warning(msg)

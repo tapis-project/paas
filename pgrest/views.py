@@ -719,6 +719,7 @@ class DynamicView(RoleSessionMixin, APIView):
 
         params = self.request.query_params
         limit = self.request.query_params.get("limit")
+        offset = self.request.query_params.get("offset")
         order = self.request.query_params.get("order")
 
         # Parse out required fields.
@@ -755,11 +756,13 @@ class DynamicView(RoleSessionMixin, APIView):
         try:
             if limit is None:
                 limit = 10
+            if offset is None:
+                offset = 0
             if order is not None:
                 result = table_data.get_rows_from_table(table.table_name, query_dict, req_tenant,
-                                                        limit, db_instance, table.primary_key, order=order)
+                                                        limit, offset, db_instance, table.primary_key, order=order)
             else:
-                result = table_data.get_rows_from_table(table.table_name, query_dict, req_tenant, limit, db_instance, table.primary_key)
+                result = table_data.get_rows_from_table(table.table_name, query_dict, req_tenant, limit, offset, db_instance, table.primary_key)
         except Exception as e:
             msg = f"Failed to retrieve rows from table {table.table_name} on tenant {req_tenant}. {e}"
             logger.error(msg)
@@ -1112,6 +1115,7 @@ class ViewsResource(RoleSessionMixin, APIView):
 
         params = self.request.query_params
         limit = self.request.query_params.get("limit")
+        offset = self.request.query_params.get("offset")
         order = self.request.query_params.get("order")
 
         # Parse out required fields.
@@ -1152,11 +1156,13 @@ class ViewsResource(RoleSessionMixin, APIView):
         try:
             if limit is None:
                 limit = 10
+            if offset is None:
+                offset = 0
             if order is not None:
                 result = view_data.get_rows_from_view(view.view_name, query_dict, req_tenant,
-                                                      limit, db_instance, view.manage_view_id, order=order)
+                                                      limit, offset, db_instance, view.manage_view_id, order=order)
             else:
-                result = view_data.get_rows_from_view(view.view_name, query_dict, req_tenant, limit, db_instance, view.manage_view_id)
+                result = view_data.get_rows_from_view(view.view_name, query_dict, req_tenant, limit, offset, db_instance, view.manage_view_id)
         except Exception as e:
             msg = f"Failed to retrieve rows from view {view.view_name} on tenant {req_tenant}. {e}"
             logger.error(msg)

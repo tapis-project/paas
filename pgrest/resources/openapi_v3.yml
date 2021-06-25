@@ -28,17 +28,6 @@ paths:
       description: List tables in the tenant's schema.
       operationId: list_tables
       x-swagger-router-controller: connexContr
-      parameters:
-        - name: limit
-          in: query
-          description: limit the number of records returned.
-          schema:
-            type: integer
-        - name: offset
-          in: query
-          description: index (offset) to start list.
-          schema:
-            type: integer
       responses:
         '200':
           description: OK
@@ -67,9 +56,6 @@ paths:
               widgets:
                 summary: An example of defining a simple table that holds "widgets".
                 value: {"table_name": "widgets", "root_url": "widgets", "columns": {"name": {"data_type": "varchar", "char_len": 255, "unique": true, "null": false }, "widget_type": {"data_type": "varchar", "char_len": 100, "default": "sprocket", "null": true, }, "count": {"data_type": "integer", "null": true}, "is_private": {"data_type": "boolean", "null": "true", "default": "true"}}}
-
-
-
       responses:
         '201':
           description: Created
@@ -150,6 +136,17 @@ paths:
         required: true
         schema:
           type: string
+      parameters:
+        - name: limit
+          in: query
+          description: limit the number of records returned.
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          description: index (offset) to start list.
+          schema:
+            type: integer
       responses:
         '200':
           description: OK
@@ -283,7 +280,6 @@ paths:
                 properties:
                   result:
                     $ref: '#/components/schemas/CollectionItem'
-
     delete:
       tags:
         - Data
@@ -311,6 +307,145 @@ paths:
                 allOf:
                   - $ref: '#/components/schemas/BasicResponse'
 
+  /v3/pgrest/manage/views:
+    get:
+      tags:
+        - Manage
+      summary: List views.
+      description: List views in the tenant's schema.
+      operationId: list_views
+      x-swagger-router-controller: connexContr
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BasicResponse'
+                properties:
+                  result:
+                    $ref: '#/components/schemas/arrayOfTables'
+    post:
+      tags:
+        - Manage
+      summary: Create a view.
+      description: Create a view.
+      operationId: create_view
+      x-swagger-router-controller: connexContr
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewTable'
+            examples:
+              widgets:
+                summary: An example of defining a simple table that holds "widgets".
+                value: {"view_name": "HELLO_View", "select_query": "*", "from_table": "initial_table", "permission_rules": ["hello_team_admin", "hello_team_member", "citizen_of_hello_world"]}
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BasicResponse'
+                properties:
+                  result:
+                    $ref: '#/components/schemas/Table'
+
+  /v3/pgrest/manage/views/{view_name}:
+    get:
+      tags:
+        - Manage
+      summary: Get details of a specific view.
+      description: Get details of a specific view.
+      operationId: get_view
+      x-swagger-router-controller: connexContr
+      parameters:
+      - name: view_name
+        in: path
+        description: The id of the view.
+        required: true
+        schema:
+          type: string
+      - name: details
+        in: query
+        description: Get additional details about the view
+        schema:
+          type: boolean
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BasicResponse'
+                properties:
+                  result:
+                    $ref: '#/components/schemas/Table'
+    delete:
+      tags:
+        - Manage
+      summary: Delete a specific view. No data is deleted.
+      description: Delete a specific view. WARNING -- this action cannot be undone.
+      operationId: delete_view
+      x-swagger-router-controller: connexContr
+      parameters:
+      - name: view_name
+        in: path
+        description: The name of the view to delete.
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BasicResponse'
+
+  /v3/pgrest/views/{view_name}:
+    get:
+      tags:
+        - View
+      summary: List objects in the view with root_url {view_name}.
+      operationId: get_view
+      parameters:
+      - name: view_name
+        in: path
+        description: The root_url parameter of the view.
+        required: true
+        schema:
+          type: string
+      parameters:
+        - name: limit
+          in: query
+          description: limit the number of records returned.
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          description: index (offset) to start list.
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BasicResponse'
+                properties:
+                  result:
+                    $ref: '#/components/schemas/CollectionArray'
+
+
 components:
   schemas:
     BasicResponse:
@@ -326,10 +461,12 @@ components:
           type: string
           description: Whether the request was a success or failure.
           enum: [success, error]
+
     arrayOfTables:
       type: array
       items:
         $ref: '#/components/schemas/Table'
+
     Table:
       type: object
       properties:
@@ -339,6 +476,7 @@ components:
         root_url:
           type: string
           description: The url path used for the root collection associated with the records in the table.
+
     NewTable:
       type: object
       properties:
@@ -350,6 +488,9 @@ components:
           description: The url path to use for the root collection associated with the records in the table.
         columns:
           $ref: '#/components/schemas/Columns'
+        comments:
+          type: text
+          description: Text area to describe table. Returned when calling table.
         create:
           type: boolean
           description: Whether the "created" endpoint (HTTP verb "POST") for creating new rows is available.
@@ -370,8 +511,8 @@ components:
           type: boolean
           description: Whether the "update" endpoint (HTTP verb "PUT") for updating a specific row is available.
           default: True
-
       required: [table_name, root_url, columns]
+
     Columns:
       type: object
       description: A description of the columns of the table, in key/value pair format. Each key corresponds to a single collumn; the name of the key is the name of the column, and the value of the key decribes the type of the column and any additional validation information.
@@ -385,6 +526,9 @@ components:
         char_len:
           type: integer
           description: For columns of type "varchar", the max length of the column.
+        comments:
+          type: text
+          description: Text area to describe column. Disregarded in code, for user use only.
       additionalProperties:
         type: object
       required: [data_type]
@@ -409,11 +553,9 @@ components:
                     - type: integer
                     - type: string
                     - type: boolean
-
       additionalProperties:
         type: object
       required: [where]
-
 
     CollectionArray:
       type: array
@@ -429,7 +571,6 @@ components:
         data:
           type: object
           description: The values of the row to add.
-
 
     UpdateCollectionItem:
       type: object

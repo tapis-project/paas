@@ -127,6 +127,8 @@ def create_table(table_name, columns, existing_enum_names, constraints, tenant, 
                     raise Exception(msg)
                 primary_key_flag = True
                 col_str_list.append("PRIMARY KEY")
+            elif key == "comments":
+                continue
             elif key not in ["data_type", "char_len", "FK", "reference_table", "reference_column", "on_delete"]:
                 msg = f"{key} is an invalid argument for column {column_name}. Cannot create table {table_name}"
                 logger.warning(msg)
