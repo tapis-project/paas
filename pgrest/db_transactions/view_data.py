@@ -4,9 +4,6 @@ from . import config
 from pgrest.pycommon.logs import get_logger
 logger = get_logger(__name__)
 
-# We create a forbidden regex for quick parsing
-# Forbidden: \ ` ' " ~  / ? # [ ] ( ) @ ! $ & * + = , : ;
-FORBIDDEN_CHARS =  re.compile("^[^<>\\\/{}[\]~` $'\":?#@!$&()*+,;=]*$")
 
 def do_transaction(command, db_instance):
     # Read the connection parameters and connect to database.

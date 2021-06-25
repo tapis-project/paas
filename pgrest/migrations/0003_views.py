@@ -21,6 +21,6 @@ class Migration(migrations.Migration):
                 ('tenant_id', models.CharField(max_length=255)),
                 ('endpoints', django.contrib.postgres.fields.ArrayField(base_field=models.CharField(max_length=255), size=None)),
                 ('comments', models.TextField(null=True))
-            ],
-        ),
+            ]
+        )
     ]

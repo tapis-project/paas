@@ -27,7 +27,8 @@ class Migration(migrations.Migration):
                 ('tenant_id', models.CharField(max_length=255)),
                 ('primary_key', models.CharField(max_length=255)),
                 ('special_rules', django.contrib.postgres.fields.jsonb.JSONField()),
-                ('comments', models.TextField())
+                ('comments', models.TextField()),
+                ('constraints', django.contrib.postgres.fields.jsonb.JSONField())
             ],
         ),
         migrations.CreateModel(
@@ -39,6 +40,6 @@ class Migration(migrations.Migration):
                 ('validate_json_update_tn', django.contrib.postgres.fields.jsonb.JSONField()),
                 ('table_name_tn', models.CharField(blank=True, max_length=255, null=True, unique=True)),
                 ('manage_table', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='pgrest.ManageTables')),
-            ],
-        ),
+            ]
+        )
     ]

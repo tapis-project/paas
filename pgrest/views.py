@@ -20,8 +20,8 @@ logger = get_logger(__name__)
 
 
 # We create a forbidden regex for quick parsing
-# Forbidden: \ ` ' " ~  / ? # [ ] ( ) @ ! $ & * + = , : ;
-FORBIDDEN_CHARS =  re.compile("^[^<>\\\/{}[\]~` $'\":?#@!$&()*+,;=]*$")
+# Forbidden: \ ` ' " ~  / ? # [ ] ( ) @ ! $ & * + = - . , : ;
+FORBIDDEN_CHARS =  re.compile("^[^<>\\\/{}[\]~` $'\".:-?#@!$&()*+,;=]*$")
 
 
 # Error views
@@ -210,7 +210,6 @@ class TableManagement(RoleSessionMixin, APIView):
     @is_admin
     def get(self, request, *args, **kwargs):
         logger.debug("top of get /manage/tables")
-        # req_tenant = "public"
         req_tenant = request.session['tenant_id']
 
         # Check for details=true. Decide what a brief description and a detailed description is.
@@ -251,7 +250,6 @@ class TableManagement(RoleSessionMixin, APIView):
     @is_admin
     def post(self, request, *args, **kwargs):
         logger.debug("top of post /manage/tables")
-        # req_tenant = "public"
         req_tenant = request.session['tenant_id']
         db_instance_name = request.session['db_instance_name']
 
@@ -274,6 +272,7 @@ class TableManagement(RoleSessionMixin, APIView):
         endpoints = request.data.get('endpoints', True)
         enums = request.data.get('enums', None)
         comments = request.data.get('comments', "")
+        constraints = request.data.get('constraints', {})
 
         if ManageTables.objects.filter(table_name=table_name, tenant_id=req_tenant).exists():
             msg = f"Table with name \'{table_name}\' and tenant_id \'{req_tenant}\' already exists in ManageTables table."
@@ -350,6 +349,12 @@ class TableManagement(RoleSessionMixin, APIView):
             logger.warning(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
+        # Checking constraints
+        if not isinstance(constraints, dict):
+            msg = f"Constraints should be of type dict. Object inputted: {constraints} for table {table_name} on tenant {req_tenant}"
+            logger.warning(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
         # Create a validation schema
         try:
             validate_json_create, validate_json_update = create_validate_schema(columns, req_tenant, existing_enums_names)
@@ -362,7 +367,7 @@ class TableManagement(RoleSessionMixin, APIView):
         # Create table
         try:
             result = self.post_transaction(table_name, root_url, primary_key, columns, validate_json_create, validate_json_update,
-                                           endpoints, existing_enums_names, special_rules, comments, req_tenant, db_instance_name)
+                                           endpoints, existing_enums_names, special_rules, comments, constraints, req_tenant, db_instance_name)
         except Exception as e:
             msg = f"Failed to create table {table_name}. {e}"
             logger.error(msg)
@@ -372,20 +377,20 @@ class TableManagement(RoleSessionMixin, APIView):
 
     @transaction.atomic
     def post_transaction(self, table_name, root_url, primary_key, columns, validate_json_create, validate_json_update,
-                         endpoints, existing_enum_names, special_rules, comments, tenant_id, db_instance_name):
+                         endpoints, existing_enum_names, special_rules, comments, constraints, tenant_id, db_instance_name):
 
         new_table = ManageTables.objects.create(table_name=table_name, root_url=root_url, column_definition=columns,
                                                 validate_json_create=validate_json_create,
                                                 validate_json_update=validate_json_update,
                                                 endpoints=endpoints, special_rules=special_rules,
-                                                comments=comments, tenant_id=tenant_id,
-                                                primary_key=primary_key)
+                                                comments=comments, constraints=constraints,
+                                                tenant_id=tenant_id, primary_key=primary_key)
 
         ManageTablesTransition.objects.create(manage_table=new_table, column_definition_tn=columns,
                                               validate_json_create_tn=validate_json_create,
                                               validate_json_update_tn=validate_json_update)
 
-        manage_tables.create_table(table_name, columns, existing_enum_names, tenant_id, db_instance_name)
+        manage_tables.create_table(table_name, columns, existing_enum_names, constraints, tenant_id, db_instance_name)
 
         result = {
             "table_name": new_table.table_name,
@@ -473,7 +478,7 @@ class TableManagementById(RoleSessionMixin, APIView):
 
     @is_admin
     def put(self, request, *args, **kwargs):
-        # req_tenant = "public"
+        logger.debug("top of put /manage/tables/<id>")
         req_tenant = request.session['tenant_id']
         db_instance_name = request.session['db_instance_name']
 
@@ -620,7 +625,7 @@ class TableManagementById(RoleSessionMixin, APIView):
 
     @is_admin
     def delete(self, request, *args, **kwargs):
-        # req_tenant = "public"
+        logger.debug("top of del /manage/tables/<id>")
         req_tenant = request.session['tenant_id']
         db_instance_name = request.session['db_instance_name']
 
@@ -708,7 +713,7 @@ class DynamicView(RoleSessionMixin, APIView):
     """
     @can_read
     def get(self, request, *args, **kwargs):
-        # req_tenant = "public"
+        logger.debug("top of get /data/<data_root_url>")
         req_tenant = request.session['tenant_id']
         db_instance = request.session['db_instance_name']
 
@@ -764,7 +769,7 @@ class DynamicView(RoleSessionMixin, APIView):
 
     @can_write
     def post(self, request, *args, **kwargs):
-        # req_tenant = "public"
+        logger.debug("top of post /data/<data_root_url>")
         try:
             req_tenant = request.session['tenant_id']
             db_instance = request.session['db_instance_name']
@@ -852,7 +857,7 @@ class DynamicView(RoleSessionMixin, APIView):
 
     @can_write
     def put(self, request, *args, **kwargs):
-        # req_tenant = "public"
+        logger.debug("top of put /data/<data_root_url>")
         req_tenant = request.session['tenant_id']
         db_instance = request.session['db_instance_name']
 
@@ -923,7 +928,7 @@ class DynamicViewById(RoleSessionMixin, APIView):
     """
     @can_read
     def get(self, request, *args, **kwargs):
-        # req_tenant = "public"
+        logger.debug("top of get /data/<root_url>/<pk>")
         req_tenant = request.session['tenant_id']
         db_instance = request.session['db_instance_name']
 
@@ -959,7 +964,7 @@ class DynamicViewById(RoleSessionMixin, APIView):
 
     @can_write
     def put(self, request, *args, **kwargs):
-        # req_tenant = "public"
+        logger.debug("top of put /data/<root_url>/<pk>")
         req_tenant = request.session['tenant_id']
         db_instance = request.session['db_instance_name']
 
@@ -1026,7 +1031,7 @@ class DynamicViewById(RoleSessionMixin, APIView):
 
     @can_write
     def delete(self, request, *args, **kwargs):
-        # req_tenant = "public"
+        logger.debug("top of del /data/<root_url>/<pk>")
         req_tenant = request.session['tenant_id']
         db_instance = request.session['db_instance_name']
 
@@ -1062,6 +1067,7 @@ class DynamicViewById(RoleSessionMixin, APIView):
 
 class CreateTenant(APIView):
     def post(self, request, *args, **kwargs):
+        logger.debug("top of post /manage/tenants")
         try:
             schema_name = request.data['schema_name']
             db_instance = request.data['db_instance']
@@ -1085,7 +1091,7 @@ class CreateTenant(APIView):
             logger.error(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
-        return HttpResponse(make_success(msg="Tenant created successfully."), content_type='application/json')
+        return HttpResponse(make_success(msg=f"Tenant '{schema_name}' created successfully."), content_type='application/json')
 
 
 ### Views
@@ -1099,7 +1105,7 @@ class ViewsResource(RoleSessionMixin, APIView):
     """
     @can_read
     def get(self, request, *args, **kwargs):
-        logger.debug("top of get /data/views/<view_root_url>")
+        logger.debug("top of get /views/<view_root_url>")
         req_tenant = request.session['tenant_id']
         db_instance = request.session['db_instance_name']
         req_username = request.session['username']
@@ -1229,11 +1235,11 @@ class ViewManagement(RoleSessionMixin, APIView):
         if not isinstance(view_name, str):
             msg = f"The view_name must be of type string. Got type: {type(view_name)}"
             logger.error(msg)
-            raise HttpResponseBadRequest(make_error(msg=msg))
+            return HttpResponseBadRequest(make_error(msg=msg))
         if not FORBIDDEN_CHARS.match(view_name):
-            msg = f"The view_name value is not url safe. Value must be alphanumeric with _ and - optional. Value inputted: {view_name}"
+            msg = f"The view_name inputted is not url safe. Value must be alphanumeric with _ and - optional. Value inputted: {view_name}"
             logger.error(msg)
-            raise HttpResponseBadRequest(make_error(msg=msg))
+            return HttpResponseBadRequest(make_error(msg=msg))
 
         # Check for existence of view_name, table_name, and root_url
         if ManageViews.objects.filter(view_name=view_name, tenant_id=req_tenant).exists():
@@ -1273,7 +1279,7 @@ class ViewManagement(RoleSessionMixin, APIView):
                            "from_table": from_table,
                            "where_query": where_query}
 
-        # Create table
+        # Create view
         try:
             result = self.post_view_transaction(view_name, root_url, view_definition, permission_rules, endpoints, req_tenant, db_instance_name)
         except Exception as e:
@@ -1360,6 +1366,7 @@ class ViewManagementById(RoleSessionMixin, APIView):
 
     @is_admin
     def delete(self, request, *args, **kwargs):
+        logger.debug("top of del /views/<view_root_url>")
         req_tenant = request.session['tenant_id']
         db_instance_name = request.session['db_instance_name']
 

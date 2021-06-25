@@ -56,6 +56,8 @@ class ManageTables(models.Model):
     special_rules = JSONField()
     # Comments area to document table more.
     comments = models.TextField()
+    # Constraints
+    constraints = JSONField()
 
     def __str__(self):
         return 'Table ID: %s | Root URL: %s' % (self.manage_table_id, self.root_url)

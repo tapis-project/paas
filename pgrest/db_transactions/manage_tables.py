@@ -1,9 +1,13 @@
+import re
 import psycopg2
 from . import config
 from pgrest.pycommon.logs import get_logger
 logger = get_logger(__name__)
 
-FORBIDDEN_CHARS = ['\\', ' ', '"', ':', '/', '?', '#', '[', ']', '@', '!', '$', '&', "'", '(', ')', '*', '+', ',', ';', '=']
+# We create a forbidden regex for quick parsing
+# Forbidden: \ ` ' " ~  / ? # [ ] ( ) @ ! $ & * + = - . , : ;
+FORBIDDEN_CHARS =  re.compile("^[^<>\\\/{}[\]~` $'\".:-?#@!$&()*+,;=]*$")
+
 
 def do_transaction(command, db_instance):
     # Read the connection parameters and connect to database.
@@ -19,15 +23,14 @@ def do_transaction(command, db_instance):
 
 
 # TODO create exceptions
-def create_table(table_name, columns, existing_enum_names, tenant, db_instance=None):
+def create_table(table_name, columns, existing_enum_names, constraints, tenant, db_instance=None):
     """Create table in the PostgreSQL database"""
     logger.info(f"Creating table {tenant}.{table_name}...")
 
-    for char in FORBIDDEN_CHARS:
-        if char in table_name:
-            msg = f"Forbidden char found in table name {table_name}. Forbidden character is: {char}"
-            logger.error(msg)
-            raise Exception(msg)
+    if not FORBIDDEN_CHARS.match(table_name):
+        msg = f"Forbidden char found in table name {table_name}. Table name inputted: {table_name}"
+        logger.warning(msg)
+        raise Exception(msg)
 
     command = f"CREATE TABLE {tenant}.{table_name} ("
     primary_key_flag = False
@@ -132,11 +135,56 @@ def create_table(table_name, columns, existing_enum_names, tenant, db_instance=N
         col_def = " ".join(col_str_list)
         command = command + f"{col_def},\n"
 
+    # Check if this column was set as the "primary_key" column.
     if not primary_key_flag:
         command = command + f"{table_name}_id SERIAL PRIMARY KEY,\n"
 
+    # Checking multi-value unique constraints
+    # Proper format is {"constraint": {"unique": {"uniqueConstraintName": ["Col1", "Col2"]}}}
+    try:
+        unique_columns = constraints.get('unique', {})
+    except Exception as e:
+        msg = f"Error getting unique_columns from constraints inputted for table {table_name} on tenant {tenant}"
+        logger.warning(msg)
+        raise Exception(msg)
+
+    if not isinstance(unique_columns, dict):
+        msg = f"Error with unique constraints. Got {unique_columns} of type {type(unique_columns)}, not dict."
+        logger.warning(msg)
+        raise Exception(msg)
+
+    if unique_columns:
+        for constraint_name, constraint_values in unique_columns.items():
+            # Ensure constraint_name is not forbidden
+            if not FORBIDDEN_CHARS.match(constraint_name):
+                msg = f"constraint_name is not url safe. Value must be alphanumeric with _ and - optional. Value inputted: {constraint_name}"
+                logger.warning(msg)
+                raise Exception(msg)
+            # Ensure constraint_values is a list and it's non-empty and len() > 1
+            if not isinstance(constraint_values, list):
+                msg = f"Unique constraint dictionary should have a value of type list. Value inputted: {constraint_values}"
+                logger.warning(msg)
+                raise Exception(msg)
+            if len(constraint_values) <= 1:
+                msg = f"Multi-variable unique restraints require more than one column to be specified. Value inputted: {constraint_values}"
+                logger.warning(msg)
+                raise Exception(msg)
+            # Check constraint values are strings and not forbidden
+            for value in constraint_values:
+                if not isinstance(value, str):
+                    msg = f"Unique constraint list should consist of string types. {value} is not of type string in list: {constraint_values}"
+                    logger.warning(msg)
+                    raise Exception(msg)
+                if not FORBIDDEN_CHARS.match(value):
+                    msg = f"Unique constraint list should consist of string types. {value} is not of type string in list: {constraint_values}"
+                    logger.warning(msg)
+                    raise Exception(msg)
+            # Create unique constraint.
+            command = command + f"CONSTRAINT {constraint_name} UNIQUE ({', '.join(constraint_values)}),\n"
+
     remove = command.rindex(",")
     command = command[:remove] + ")"
+
     logger.debug(f"Create db command for table {table_name}: {command}")
 
     conn = None
@@ -218,22 +266,20 @@ def parse_enums(enums, tenant, db_instance_name=None):
             msg = f"String values for enum should be declared in a list. Received type: {type(enum_list)}."
             logger.error(msg)
             raise Exception(msg)
-        for char in FORBIDDEN_CHARS:
-            if char in enum_key:
-                msg = f"Forbidden char found in enum name {enum_key}. Forbidden character is: {char}"
-                logger.error(msg)
-                raise Exception(msg)
+        if not FORBIDDEN_CHARS.match(enum_key):
+            msg = f"Forbidden char found in enum name {enum_key}. Enum name inputted: {enum_key}"
+            logger.warning(msg)
+            raise Exception(msg)
         for enum_val in enum_list:
             logger.info(enum_val)
             if not isinstance(enum_val, str):
                 msg = f"enum list values must be strings. Got type {enum_val}."
                 logger.error(msg)
                 raise Exception(msg)
-            for char in FORBIDDEN_CHARS:
-                if char in enum_val:
-                    msg = f"Forbidden char found in enum value {enum_val}. Forbidden character is: {char}"
-                    logger.error(msg)
-                    raise Exception(msg)
+            if not FORBIDDEN_CHARS.match(enum_val):
+                msg = f"Forbidden char found in enum value {enum_val}. Enum value inputted: {enum_val}"
+                logger.warning(msg)
+                raise Exception(msg)
         create_enum(enum_key, enum_list, tenant, db_instance_name)
 
 
