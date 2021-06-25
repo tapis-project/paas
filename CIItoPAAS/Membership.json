@@ -13,7 +13,7 @@
     },
     "benchmarking_lab_id": {
       "data_type": "integer",
-      "FK": true,
+      "foreign_key": true,
       "reference_table": "BenchmarkingLab",
       "reference_column": "benchmarking_lab_id",
       "on_delete": "cascade"
@@ -23,7 +23,7 @@
     },
     "account_id": {
       "data_type": "integer",
-      "FK": true,
+      "foreign_key": true,
       "reference_table": "Account",
       "reference_column": "account_id",
       "on_delete": "cascade"

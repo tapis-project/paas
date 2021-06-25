@@ -116,20 +116,20 @@ The /manage endpoints for PgREST expect a json formatted table definition. Each 
        - This primary_key column will be the value users can use to *get* a row in the table.
        - If this is not specified in a table, primary_key defaults to "{table_name}_id".
          - Note that this default cannot be modified and is of data_type=serial.
-     - FK
+     - foreign_key
        - Weather or not this key should reference a key in another table, a "foreign key".
        - Can be true or false.
-       - If FK is set to true, columns arguments "reference_table", "reference_column", and "on_delete" must also be set.
+       - If foreign_key is set to true, columns arguments "reference_table", "reference_column", and "on_delete" must also be set.
          - reference_table
-           - Only needed in the case that FK is set to true.
+           - Only needed in the case that foreign_key is set to true.
            - Specifies the foreign table that the foreign_key is in.
            - Can be set to the table_name of any table.
          - reference_column
-           - Only needed in the case that FK is set to true.
+           - Only needed in the case that foreign_key is set to true.
            - Specifies the foreign column that the foreign_key is in.
            - Can be set to the key for any column in the reference_table.
          - on_delete
-           - Only needed in the case that FK is set to true.
+           - Only needed in the case that foreign_key is set to true.
            - Specifies the deletion strategy when referencing a foreign key.
            - Can be set to "CASCADE" or "SET NULL"
              - "CASCADE" deletes this column if the foreign key's column is deleted.
@@ -160,14 +160,14 @@ Example of a table definition with many different column types.
     "company": {
       "data_type": "varchar",
       "char_len": 255,
-      "FK": true,
+      "foreign_key": true,
       "reference_table": "Companys",
       "reference_column": "company_name",
       "on_delete": "CASCADE"
     },
     "employee_id": {
       "data_type": "integer",
-      "FK": true,
+      "foreign_key": true,
       "reference_table": "Employees",
       "reference_column": "employee_id",
       "on_delete": "CASCADE"

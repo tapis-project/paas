@@ -270,7 +270,7 @@ create_table_9 = {
     },
     "col_three": {
       "null": True,
-      "FK": True,
+      "foreign_key": True,
       "data_type": "integer",
       "reference_table": "initial_table",
       "reference_column": "initial_table_id",
@@ -304,7 +304,7 @@ create_table_10 = {
     },
     "col_three": {
       "null": False,
-      "FK": True,
+      "foreign_key": True,
       "data_type": "integer",
       "reference_table": "initial_table",
       "reference_column": "initial_table_id",
@@ -338,7 +338,7 @@ create_table_11 = {
     },
     "col_three": {
       "null": True,
-      "FK": True,
+      "foreign_key": True,
       "data_type": "integer",
       "reference_table": "initial_table",
       "reference_column": "initial_table_id",

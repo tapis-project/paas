@@ -27,7 +27,7 @@
     "question_type_id": {
       "null": true,
       "data_type": "integer",
-      "FK": true,
+      "foreign_key": true,
       "reference_table": "QuestionType",
       "reference_column": "question_type_id",
       "on_delete": "cascade"
@@ -43,7 +43,7 @@
     "category_id": {
       "null": true,
       "data_type": "integer",
-      "FK": true,
+      "foreign_key": true,
       "reference_table": "Category",
       "reference_column": "category_id",
       "on_delete": "cascade"

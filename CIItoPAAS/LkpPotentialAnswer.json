@@ -9,7 +9,7 @@
     },
     "question_id": {
       "data_type": "integer",
-      "FK": true,
+      "foreign_key": true,
       "reference_table": "Question",
       "reference_column": "question_id",
       "on_delete": "cascade"

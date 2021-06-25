@@ -20,7 +20,7 @@
     "user_id": {
       "null": true,
       "data_type": "integer",
-      "FK": true,
+      "foreign_key": true,
       "reference_table": "UserProfile",
       "reference_column": "user_profile_id",
       "on_delete": "cascade"
@@ -33,7 +33,7 @@
     "account_id": {
       "null": true,
       "data_type": "integer",
-      "FK": true,
+      "foreign_key": true,
       "reference_table": "Account",
       "reference_column": "account_id",
       "on_delete": "cascade"

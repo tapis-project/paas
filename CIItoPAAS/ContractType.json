@@ -15,7 +15,7 @@
     "parent_id": {
       "null": true,
       "data_type": "integer",
-      "FK": true,
+      "foreign_key": true,
       "reference_table": "ContractType",
       "reference_column": "contract_type_id",
       "on_delete": "cascade"

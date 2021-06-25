@@ -27,14 +27,14 @@
     },
     "last_modified_by_id": {
       "data_type": "integer",
-      "FK": true,
+      "foreign_key": true,
       "reference_table": "UserProfile",
       "reference_column": "user_profile_id",
       "on_delete": "cascade"
     },
     "created_by_id": {
       "data_type": "integer",
-      "FK": true,
+      "foreign_key": true,
       "reference_table": "UserProfile",
       "reference_column": "user_profile_id",
       "on_delete": "cascade"
@@ -55,7 +55,7 @@
     "account_id": {
       "null": true,
       "data_type": "integer",
-      "FK": true,
+      "foreign_key": true,
       "reference_table": "Account",
       "reference_column": "account_id",
       "on_delete": "cascade"
@@ -72,7 +72,7 @@
     "status_id": {
       "null": true,
       "data_type": "integer",
-      "FK": true,
+      "foreign_key": true,
       "reference_table": "Workflow",
       "reference_column": "workflow_id",
       "on_delete": "cascade"

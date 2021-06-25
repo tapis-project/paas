@@ -64,7 +64,7 @@ def create_table(table_name, columns, existing_enum_names, constraints, tenant, 
                 column_type = f"{tenant}.{column_type}"
 
         # Handle foreign keys.
-        if "FK" in column_args and column_args["FK"]:
+        if "foreign_key" in column_args and column_args["foreign_key"]:
             try:
                 # check we have we need
                 ref_table = column_args["reference_table"]
@@ -129,7 +129,7 @@ def create_table(table_name, columns, existing_enum_names, constraints, tenant, 
                 col_str_list.append("PRIMARY KEY")
             elif key == "comments":
                 continue
-            elif key not in ["data_type", "char_len", "FK", "reference_table", "reference_column", "on_delete"]:
+            elif key not in ["data_type", "char_len", "foreign_key", "reference_table", "reference_column", "on_delete"]:
                 msg = f"{key} is an invalid argument for column {column_name}. Cannot create table {table_name}"
                 logger.warning(msg)
                 raise Exception(msg)

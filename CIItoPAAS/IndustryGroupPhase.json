@@ -14,7 +14,7 @@
     "industry_group_id": {
       "null": true,
       "data_type": "integer",
-      "FK": true,
+      "": true,
       "reference_table": "IndustryGroup",
       "reference_column": "industry_group_id",
       "on_delete": "cascade"
