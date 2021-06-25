@@ -3,16 +3,21 @@
   "root_url": "survey",
   "delete": false,
   "columns": {
+    "survey_id": {
+      "data_type": "serial",
+      "primary_key": true
+    },
     "project_id": {
-      "data_type": "integer",
-      "FK": true,
+      "data_type": "varchar",
+      "char_len": 255,
+      "foreign_key": true,
       "reference_table": "Project",
       "reference_column": "project_id",
       "on_delete": "cascade"
     },
     "industry_group_phase": {
       "data_type": "integer",
-      "FK": true,
+      "foreign_key": true,
       "reference_table": "IndustryGroupPhase",
       "reference_column": "industry_group_phase_id",
       "on_delete": "cascade"
@@ -24,21 +29,21 @@
     },
     "general_workflow_id": {
       "data_type": "integer",
-      "FK": true,
+      "foreign_key": true,
       "reference_table": "Workflow",
       "reference_column": "workflow_id",
       "on_delete": "cascade"
     },
     "input_workflow_id": {
       "data_type": "integer",
-      "FK": true,
+      "foreign_key": true,
       "reference_table": "Workflow",
       "reference_column": "workflow_id",
       "on_delete": "cascade"
     },
     "output_workflow_id": {
       "data_type": "integer",
-      "FK": true,
+      "foreign_key": true,
       "reference_table": "Workflow",
       "reference_column": "workflow_id",
       "on_delete": "cascade"
@@ -92,7 +97,7 @@
     },
     "section_id": {
       "data_type": "integer",
-      "FK": true,
+      "foreign_key": true,
       "reference_table": "Section",
       "reference_column": "section_id",
       "on_delete": "cascade"

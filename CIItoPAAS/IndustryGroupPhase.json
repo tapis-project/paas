@@ -1,8 +1,12 @@
 {
   "table_name": "IndustryGroupPhase",
   "root_url": "industry-group-phase",
-  "endpoints": false,
+  "delete": false,
   "columns": {
+    "industry_group_phase_id": {
+      "data_type": "serial",
+      "primary_key": true
+    },
     "value": {
       "data_type": "varchar",
       "char_len": 255
@@ -10,7 +14,7 @@
     "industry_group_id": {
       "null": true,
       "data_type": "integer",
-      "FK": true,
+      "": true,
       "reference_table": "IndustryGroup",
       "reference_column": "industry_group_id",
       "on_delete": "cascade"

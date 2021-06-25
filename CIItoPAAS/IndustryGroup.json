@@ -1,8 +1,12 @@
 {
   "table_name": "IndustryGroup",
   "root_url": "industry-group",
-  "endpoints": false,
+  "delete": false,
   "columns": {
+    "industry_group_id": {
+      "data_type": "serial",
+      "primary_key": true
+    },
     "value": {
       "data_type": "varchar",
       "char_len": 100,

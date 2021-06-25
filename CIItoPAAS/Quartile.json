@@ -7,6 +7,10 @@
   "update": false,
   "delete": false,
   "columns": {
+    "quartile_id": {
+      "data_type": "serial",
+      "primary_key": true
+    },
     "metric_id": {
       "data_type": "integer",
       "null": true
@@ -72,7 +76,8 @@
       "null": true
     },
     "last_updated_at": {
-      "data_type": "timestamp"
+      "data_type": "timestamp",
+      "default": "UPDATETIME"
     }
   }
 }

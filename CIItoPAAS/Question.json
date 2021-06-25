@@ -3,6 +3,10 @@
   "root_url": "question",
   "delete": false,
   "columns": {
+    "question_id": {
+      "data_type": "serial",
+      "primary_key": true
+    },
     "code": {
       "data_type": "varchar",
       "char_len": 100,
@@ -23,7 +27,7 @@
     "question_type_id": {
       "null": true,
       "data_type": "integer",
-      "FK": true,
+      "foreign_key": true,
       "reference_table": "QuestionType",
       "reference_column": "question_type_id",
       "on_delete": "cascade"
@@ -39,7 +43,7 @@
     "category_id": {
       "null": true,
       "data_type": "integer",
-      "FK": true,
+      "foreign_key": true,
       "reference_table": "Category",
       "reference_column": "category_id",
       "on_delete": "cascade"

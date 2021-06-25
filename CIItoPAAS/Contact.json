@@ -3,6 +3,10 @@
   "root_url": "contact",
   "delete": false,
   "columns": {
+    "contact_id": {
+      "data_type": "serial",
+      "primary_key": true
+    },
     "company_salesforce_id": {
       "null": true,
       "data_type": "varchar",
@@ -16,7 +20,7 @@
     "user_id": {
       "null": true,
       "data_type": "integer",
-      "FK": true,
+      "foreign_key": true,
       "reference_table": "UserProfile",
       "reference_column": "user_profile_id",
       "on_delete": "cascade"
@@ -29,7 +33,7 @@
     "account_id": {
       "null": true,
       "data_type": "integer",
-      "FK": true,
+      "foreign_key": true,
       "reference_table": "Account",
       "reference_column": "account_id",
       "on_delete": "cascade"
