@@ -234,7 +234,8 @@ The /manage/views endpoints for PgREST expects a json formatted view definition.
  - permission_rules
    - List of roles required to view this view.
    - If nothing is given, view is open to all.
-
+   - 
+```
 {
   'view_name': 'test_view', 
   'root_url': 'just_a_cool_url',
@@ -246,6 +247,7 @@ The /manage/views endpoints for PgREST expects a json formatted view definition.
                initial_table_2. Only users with the
                lab_6_admin and cii_rep role can view this.'
 }
+```
 
 # Old, Manual Instructions (You Probably Want to Use the Makefile)
 
