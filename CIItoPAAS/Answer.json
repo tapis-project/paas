@@ -3,9 +3,13 @@
   "root_url": "answer",
   "delete": false,
   "columns": {
+    "answer_id": {
+      "data_type": "serial",
+      "primary_key": true
+    },
     "question_id": {
       "data_type": "integer",
-      "FK": true,
+      "foreign_key": true,
       "reference_table": "Question",
       "reference_column": "question_id",
       "on_delete": "cascade"
@@ -13,14 +17,15 @@
     "survey_id": {
       "null": true,
       "data_type": "integer",
-      "FK": true,
+      "foreign_key": true,
       "reference_table": "Survey",
       "reference_column": "survey_id",
       "on_delete": "cascade"
     },
     "project_id": {
-      "data_type": "integer",
-      "FK": true,
+      "data_type": "varchar",
+      "char_len": 255,
+      "foreign_key": true,
       "reference_table": "Project",
       "reference_column": "project_id",
       "on_delete": "cascade"
@@ -28,14 +33,14 @@
     "potential_answer_id": {
       "null": true,
       "data_type": "integer",
-      "FK": true,
+      "foreign_key": true,
       "reference_table": "LkpPotentialAnswer",
       "reference_column": "lkp_potential_answer_id",
       "on_delete": "cascade"
     },
     "updated_by_id": {
       "data_type": "integer",
-      "FK": true,
+      "foreign_key": true,
       "reference_table": "UserProfile",
       "reference_column": "user_profile_id",
       "on_delete": "cascade"
@@ -61,7 +66,8 @@
       "null": true
     },
     "last_updated_at": {
-      "data_type": "date"
+      "data_type": "date",
+      "default": "UPDATETIME"
     }
   }
 }

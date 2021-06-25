@@ -1,8 +1,12 @@
 {
   "table_name": "ContractType",
   "root_url": "contract-type",
-  "endpoints": false,
+  "delete": false,
   "columns": {
+    "contract_type_id": {
+      "data_type": "serial",
+      "primary_key": true
+    },
     "name": {
       "data_type": "varchar",
       "char_len": 100,
@@ -11,7 +15,7 @@
     "parent_id": {
       "null": true,
       "data_type": "integer",
-      "FK": true,
+      "foreign_key": true,
       "reference_table": "ContractType",
       "reference_column": "contract_type_id",
       "on_delete": "cascade"

@@ -8,21 +8,28 @@ from pgrest import views
 urlpatterns = [
 
     # ---- table management --- #
-
-    # POST
+    # Tenants: POST
     url('^v3/pgrest/manage/tenants', views.CreateTenant.as_view()),
 
-    # GET SINGLE, PUT, DELETE
+    # Tables: GET SINGLE, PUT, DELETE
     url('^v3/pgrest/manage/tables/(?P<manage_table_id>.+)', views.TableManagementById.as_view()),
-    # GET ALL, POST, PUT
+    # Tables: GET ALL, POST, PUT
     url('^v3/pgrest/manage/tables', views.TableManagement.as_view()),
 
+    # Views: GET SINGLE, DELETE
+    url('^v3/pgrest/manage/views/(?P<manage_view_id>.+)', views.ViewManagementById.as_view()),
+    # Views: GET ALL, POST
+    url('^v3/pgrest/manage/views', views.ViewManagement.as_view()),
+
+
     # ---- dynamic views --- #
-    # GET SINGLE, PUT, DELETE
+    # Tables: GET SINGLE, PUT, DELETE
     url('^v3/pgrest/data/(?P<root_url>.+)/(?P<primary_id>.+)', views.DynamicViewById.as_view()),
-    # GET ALL, POST, PUT
+    # Tables: GET ALL, POST, PUT
     url('^v3/pgrest/data/(?P<root_url>.+)', views.DynamicView.as_view()),
+
+    # Views: GET ALL
+    url('^v3/pgrest/views/(?P<root_url>.+)', views.ViewsResource.as_view()),
 
 ]
 urlpatterns = format_suffix_patterns(urlpatterns)
-

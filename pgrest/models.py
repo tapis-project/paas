@@ -4,6 +4,28 @@
 
 from django.db import models
 from django.contrib.postgres.fields import JSONField, ArrayField
+from django.utils import tree
+
+
+class ManageViews(models.Model):
+    manage_view_id = models.AutoField(primary_key=True)
+    # view name for SQL statement
+    view_name = models.CharField(max_length=255, unique=True)
+    # Will be the base url, used to help identify in the dynamic view
+    root_url = models.CharField(max_length=255, unique=True)
+    # Definition of view
+    view_definition = JSONField()
+    # Tenant id to use.
+    tenant_id = models.CharField(max_length=255)
+    # Table permission rules
+    permission_rules = ArrayField(base_field=models.CharField(max_length=255), null=True, blank=True, size=None)
+    # default is all 5, but will remove specific endpoints if specified in json.
+    endpoints = ArrayField(models.CharField(max_length=255))
+    # Comments area to document view more.
+    comments = models.TextField(null=True)
+
+    def __str__(self):
+        return 'View ID: %s | Root URL: %s' % (self.manage_view_id, self.root_url)
 
 
 class ManageTables(models.Model):
@@ -30,6 +52,12 @@ class ManageTables(models.Model):
     tenant_id = models.CharField(max_length=255)
     # Primary key to be set for the table.
     primary_key = models.CharField(max_length=255)
+    # Special_Rules key, used to hold misc data for parsing tables/rows.
+    special_rules = JSONField()
+    # Comments area to document table more.
+    comments = models.TextField()
+    # Constraints
+    constraints = JSONField()
 
     def __str__(self):
         return 'Table ID: %s | Root URL: %s' % (self.manage_table_id, self.root_url)
@@ -42,7 +70,6 @@ class ManageTablesTransition(models.Model):
     validate_json_create_tn = JSONField()
     validate_json_update_tn = JSONField()
     table_name_tn = models.CharField(max_length=255, unique=True, null=True, blank=True)
-    # Status field
 
 
 class Tenants(models.Model):

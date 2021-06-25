@@ -1,8 +1,12 @@
 {
   "table_name": "Metric",
   "root_url": "metric",
-  "endpoints": false,
+  "delete": false,
   "columns": {
+    "metric_id": {
+      "data_type": "serial",
+      "primary_key": true
+    },
     "name": {
       "data_type": "varchar",
       "char_len": 100,

@@ -32,15 +32,18 @@ init_table_1 = {
 init_table_2 = {
   "table_name": "initial_table_2",
   "root_url": "init_two",
+  "enums": {"animals": ["cat", "dog"]},
+  "comments": "This is initial_table_2. This is a comment to test that comments work",
+  "constraints": {"unique": {"unique_col_one_and_two_pair": ["col_one", "col_two"]}},
   "columns": {
     "col_one": {
       "data_type": "varchar",
       "char_len": 255,
-      "primary_key": True
+      "primary_key": True,
+      "comments": "Testing to ensure working comments in table creation."
     },
     "col_two": {
-      "null": True,
-      "data_type": "integer"
+      "data_type": "animals"
     },
     "col_three": {
       "null": True,
@@ -270,7 +273,7 @@ create_table_9 = {
     },
     "col_three": {
       "null": True,
-      "FK": True,
+      "foreign_key": True,
       "data_type": "integer",
       "reference_table": "initial_table",
       "reference_column": "initial_table_id",
@@ -304,7 +307,7 @@ create_table_10 = {
     },
     "col_three": {
       "null": False,
-      "FK": True,
+      "foreign_key": True,
       "data_type": "integer",
       "reference_table": "initial_table",
       "reference_column": "initial_table_id",
@@ -338,7 +341,7 @@ create_table_11 = {
     },
     "col_three": {
       "null": True,
-      "FK": True,
+      "foreign_key": True,
       "data_type": "integer",
       "reference_table": "initial_table",
       "reference_column": "initial_table_id",

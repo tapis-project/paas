@@ -1,8 +1,12 @@
 {
   "table_name": "LocationLookup",
   "root_url": "location-lookup",
-  "endpoints": false,
+  "delete": false,
   "columns": {
+    "location_lookup_id": {
+      "data_type": "serial",
+      "primary_key": true
+    },
     "value": {
       "data_type": "varchar",
       "char_len": 100,

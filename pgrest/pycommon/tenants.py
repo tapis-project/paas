@@ -307,4 +307,3 @@ class Tenants(object):
 # services that override the base Tenants class with a custom class that implements the extend_tenant() method should
 # create singletons of that child class and not use this object.
 tenants = Tenants()
-
