@@ -69,7 +69,7 @@ curl -H "tapis-v2-token: $tok" localhost:5000/v3/pgrest/data/init
 
 Table Definitions and Features
 ------------------------------
-The /manage endpoints for PgREST expect a json formatted table definition. Each table definition can have the following rules.
+The /manage/tables endpoints for PgREST expect a json formatted table definition. Each table definition can have the following rules.
  - table_name
    - This is a required rule.
    - The name of the table in question.
@@ -82,6 +82,16 @@ The /manage endpoints for PgREST expect a json formatted table definition. Each 
    - Provide a dict of enums where the key is enum name and the value is the possible values for the enum.
    - Ex: {"accountrole": ["ADMIN", "USER"]} would create an "accountrole" enum that can have values of "ADMIN" or "USER"
    - Deletion/Updates are not currently supported. Speak to developer if you're interested in a delete/update endpoint.
+ - comments
+   - Field to allow for better readability of table json. Table comments are saved and outputted on /manage/tables/ endpoints.
+ - constraints
+   - Specification of Postgres table constraints. Currently only allows multi-column unique constraints
+   - Constraints available:
+     - unique
+       - multi-column unique constraint that requires sets of column values to be unique.
+       - Example: "constraints": {"unique": {"unique_col_one_and_two_pair": ["col_one", "col_two"]}}
+         - This means that col_one and col_two cannot have pairs of values that are identical.
+         - The constraint name can be specified as well
  - columns
    - This is a required rule. 
    - Column definitions in the form of a dict. Dict key would be column, value would be column definition.
@@ -104,6 +114,8 @@ The /manage endpoints for PgREST expect a json formatted table definition. Each 
      - null
        - States whether or not a value can be "null".
        - Can be true or false.
+     - comments
+       - Field to allow for better readability of table and column json. Column comments are not saved or used. They are for json readability only.
      - default
        - Sets default value for column to fallback on if no value is given.
        - Must follow the data_type for the column.
@@ -144,6 +156,8 @@ Example of a table definition with many different column types.
   "enums": {"accountrole": ["ADMIN",
                             "USER",
                             "GUEST"]},
+  "comments": "This is the user profile table that keeps track of user profiles and data",
+  "constraints": {"unique": {"unique_first_name_last_name_pair": ["first_name", "last_name"]}},
   "columns": {
     "user_profile_id": {
       "data_type": "serial",
@@ -153,6 +167,7 @@ Example of a table definition with many different column types.
       "unique": true,
       "data_type": "varchar",
       "char_len": 255
+      "comments": "The username used by *** service"
     },
     "role": {
       "data_type": "accountrole"
@@ -194,6 +209,43 @@ Example of a table definition with many different column types.
 }
 ```
 
+View Creation and Features
+------------------------------
+Views allow admins to create postgres views to cordone off data from users and give
+users exactly what they need. These views allow for permission_rules which cross reference a users roles and if they own all roles the permission_rules state for the view, then they have access to view the view.
+The /manage/views endpoints for PgREST expects a json formatted view definition. Each view definition can have the following rules.
+ - view_name
+   - This is a required rule.
+   - The name of the view in question.
+ - root_url
+   - This is a required rule.
+   - The root_url for PgRESTs /views endpoint.
+   - Ex: root_url "view25" would be accessible via "http://pgrestURL/views/table25".
+ - select_query
+   - This is a required rule.
+   - Query to select from the table specified with from_table
+ - from_table
+   - This is a required rule.
+   - Table to read data from
+ - where_query
+   - Optional field that allows you to specify a postgres where clause for the view
+ - comments
+   - Field to allow for better readability of view json. Table comments are saved and outputted on /manage/views/ endpoints.
+ - permission_rules
+   - List of roles required to view this view.
+   - If nothing is given, view is open to all.
+
+{
+  'view_name': 'test_view', 
+  'root_url': 'just_a_cool_url',
+  'select_query': '*',
+  'from_table': 'initial_table_2',
+  'where_query': 'col_one >= 90',
+  'permission_rules': ['lab_6_admin', 'cii_rep],
+  'comments': 'This is a cool test_view to view all of
+               initial_table_2. Only users with the
+               lab_6_admin and cii_rep role can view this.'
+}
 
 # Old, Manual Instructions (You Probably Want to Use the Makefile)
 

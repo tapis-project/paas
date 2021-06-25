@@ -23,7 +23,7 @@ local-deploy: build-core
 
 # Running the pgrest/test.py file
 test:
-	@docker-compose run api python manage.py test
+	@docker-compose run api python manage.py test -v 2
 
 
 # Pulls all Docker images not yet available but needed to run pgrest

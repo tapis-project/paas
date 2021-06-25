@@ -597,7 +597,8 @@ class ResponseTestCase(TestCase):
     ###############
 
     # ---- CHECK ROW CREATION ---- #
-    def test_create_row_with_enum(self):
+    def test_create_complex_row_with_enum(self):
+        # Note this also tests comments and unique constraints.
         root_url = self.init_resp_2["result"]["root_url"]
         data = {"col_one": "hello", "col_two": "cat", "col_three": 90, "col_four": False, "col_five": "hehe"}
         response = self.client.post(f'/v3/pgrest/data/{root_url}', **auth_headers,
@@ -613,3 +614,36 @@ class ResponseTestCase(TestCase):
         response = self.client.post(f'/v3/pgrest/data/{root_url}', **auth_headers,
                                     data=json.dumps({"data": data}), content_type='application/json')
         self.assertEqual(response.status_code, 400)
+
+
+    ###############
+    # VIEWS TESTS #
+    ###############
+
+    # Create view
+    def test_create_view(self):
+        response = self.client.post(f'/v3/pgrest/manage/views', **auth_headers,
+                                    data=json.dumps({'view_name': 'test_view', 
+                                                     'root_url': 'just_a_cool_url',
+                                                     'select_query': '*',
+                                                     'from_table': 'initial_table_2'}),
+                                    content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        response = self.client.get(f'/v3/pgrest/manage/views', **auth_headers)
+        self.assertEqual(len(response.json()["result"]), 1)
+
+    # Nonexistence checks
+    def test_get_nonexistent_view(self):
+        response = self.client.get(f'/v3/pgrest/views/this_view_does_not_exist', **auth_headers)
+        print(response)
+        self.assertEqual(response.status_code, 404)
+
+    def test_get_nonexistent_manage_view(self):
+        response = self.client.get(f'/v3/pgrest/manage/views/22', **auth_headers)
+        print(response)
+        self.assertEqual(response.status_code, 404)
+
+    def test_delete_nonexistent_view(self):
+        response = self.client.delete(f'/v3/pgrest/manage/views/22', **auth_headers)
+        print(response)
+        self.assertEqual(response.status_code, 404)

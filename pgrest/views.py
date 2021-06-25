@@ -1098,79 +1098,6 @@ class CreateTenant(APIView):
 
 
 ### Views
-# Once we figure out the table and row, these are just simple SQL crud operations.
-class ViewsResource(RoleSessionMixin, APIView):
-    """
-    GET: Lists the rows in the given view based on root url. Restricted to READ and above role.
-    POST: Creates a new row in the view based on root URL. Restricted to WRITE and above role.
-    PUT: Updates the rows in the given view based on filter. If no filter is provided, updates the entire table.
-    Restricted to WRITE and above role.
-    """
-    @can_read
-    def get(self, request, *args, **kwargs):
-        logger.debug("top of get /views/<view_root_url>")
-        req_tenant = request.session['tenant_id']
-        db_instance = request.session['db_instance_name']
-        req_username = request.session['username']
-
-        params = self.request.query_params
-        limit = self.request.query_params.get("limit")
-        offset = self.request.query_params.get("offset")
-        order = self.request.query_params.get("order")
-
-        # Parse out required fields.
-        try:
-            root_url = self.kwargs['root_url']
-        except KeyError as e:
-            msg = f"\'{e.args}\' is required to list rows in a view."
-            logger.warning(msg)
-            return HttpResponseBadRequest(make_error(msg=msg))
-
-        try:
-            view = ManageViews.objects.get(root_url=root_url)
-        except ManageViews.DoesNotExist:
-            msg = f"View with root url {root_url} does not exist."
-            logger.warning(msg)
-            return HttpResponseNotFound(make_error(msg=msg))
-
-        # Permission check, permission_rules cross-refed with sk roles
-        # Get all user roles from sk and check if view's permission_rules are a subset of user_roles
-        user_roles = get_user_sk_roles(req_tenant, req_username)
-        try:
-            if not set(view.permission_rules).issubset(set(user_roles)):
-                msg = f"User {req_username} in tenant {req_tenant} does not have permission to access table {view.view_name} in tenant {req_tenant}."
-                logger.debug(msg)
-                return HttpResponseBadRequest(make_error(msg=msg))
-        except Exception as e:
-            msg = f"Error checking permissions for view {view.view_name} on tenant {req_tenant}. Error: {e}"
-            logger.error(msg)
-            return HttpResponseBadRequest(make_error(msg=msg))
-
-        if "GET_ALL" not in view.endpoints:
-            msg = "API access to LIST ROWS disabled."
-            logger.warning(msg)
-            return HttpResponseBadRequest(make_error(msg=msg))
-
-        query_dict = dict()
-
-        try:
-            if limit is None:
-                limit = 10
-            if offset is None:
-                offset = 0
-            if order is not None:
-                result = view_data.get_rows_from_view(view.view_name, query_dict, req_tenant,
-                                                      limit, offset, db_instance, view.manage_view_id, order=order)
-            else:
-                result = view_data.get_rows_from_view(view.view_name, query_dict, req_tenant, limit, offset, db_instance, view.manage_view_id)
-        except Exception as e:
-            msg = f"Failed to retrieve rows from view {view.view_name} on tenant {req_tenant}. {e}"
-            logger.error(msg)
-            return HttpResponseBadRequest(make_error(msg=msg))
-
-        return HttpResponse(make_success(result=result), content_type='application/json')
-
-
 class ViewManagement(RoleSessionMixin, APIView):
     """
     GET: Returns information about all of the views.
@@ -1199,14 +1126,16 @@ class ViewManagement(RoleSessionMixin, APIView):
                                "view_definition": table.view_definition,
                                "permission_rules": table.permission_rules,
                                "endpoints": table.endpoints,
-                               "tenant_id": table.tenant_id})
+                               "tenant_id": table.tenant_id,
+                               "comments": table.comments})
         else:
             for table in tables:
                 result.append({"view_name": table.view_name,
                                "manage_view_id": table.pk,
                                "root_url": table.root_url,
                                "endpoints": table.endpoints,
-                               "tenant_id": table.tenant_id})
+                               "tenant_id": table.tenant_id,
+                               "comments": table.comments})
 
         return HttpResponse(make_success(result=result), content_type='application/json')
 
@@ -1236,6 +1165,7 @@ class ViewManagement(RoleSessionMixin, APIView):
         update = request.data.get('update', True)
         delete = request.data.get('delete', True)
         endpoints = request.data.get('endpoints', True)
+        comments = request.data.get('comments', "")
 
         # view_name checks
         if not isinstance(view_name, str):
@@ -1287,7 +1217,7 @@ class ViewManagement(RoleSessionMixin, APIView):
 
         # Create view
         try:
-            result = self.post_view_transaction(view_name, root_url, view_definition, permission_rules, endpoints, req_tenant, db_instance_name)
+            result = self.post_view_transaction(view_name, root_url, view_definition, permission_rules, endpoints, comments, req_tenant, db_instance_name)
         except Exception as e:
             msg = f"Failed to create view {view_name}. {e}"
             logger.error(msg)
@@ -1296,10 +1226,11 @@ class ViewManagement(RoleSessionMixin, APIView):
         return HttpResponse(make_success(result=result), content_type='application/json')
 
     @transaction.atomic
-    def post_view_transaction(self, view_name, root_url, view_definition, permission_rules, endpoints, tenant_id, db_instance_name):
+    def post_view_transaction(self, view_name, root_url, view_definition, permission_rules, endpoints, comments, tenant_id, db_instance_name):
 
         new_view = ManageViews.objects.create(view_name=view_name, root_url=root_url, view_definition=view_definition,
-                                              permission_rules=permission_rules, endpoints=endpoints, tenant_id=tenant_id)
+                                              permission_rules=permission_rules, endpoints=endpoints, comments=comments,
+                                              tenant_id=tenant_id)
 
         view_data.create_view(view_name, view_definition, tenant_id, db_instance=db_instance_name)
 
@@ -1307,7 +1238,8 @@ class ViewManagement(RoleSessionMixin, APIView):
             "view_name": new_view.view_name,
             "view_id": new_view.pk,
             "root_url": new_view.root_url,
-            "endpoints": new_view.endpoints
+            "endpoints": new_view.endpoints,
+            "comments": new_view.comments
         }
 
         return result
@@ -1321,7 +1253,7 @@ class ViewManagementById(RoleSessionMixin, APIView):
     """
     @is_admin
     def get(self, request, *args, **kwargs):
-        logger.debug("top of get /manage/views/<id>")
+        logger.debug("top of get /manage/views/<manage_view_id>")
         req_tenant = request.session['tenant_id']
 
         # Check for details=true. Decide what a brief description and a detailed description is.
@@ -1360,19 +1292,21 @@ class ViewManagementById(RoleSessionMixin, APIView):
                       "view_definition": table.view_definition,
                       "permission_rules": table.permission_rules,
                       "endpoints": table.endpoints,
-                      "tenant_id": table.tenant_id}
+                      "tenant_id": table.tenant_id,
+                      "comments": table.comments}
         else:
             result = {"view_name": table.view_name,
                       "manage_view_id": table.pk,
                       "root_url": table.root_url,
                       "endpoints": table.endpoints,
-                      "tenant_id": table.tenant_id}
+                      "tenant_id": table.tenant_id,
+                      "comments": table.comments}
 
         return HttpResponse(make_success(result=result), content_type='application/json')
 
     @is_admin
     def delete(self, request, *args, **kwargs):
-        logger.debug("top of del /views/<view_root_url>")
+        logger.debug("top of del /manage/views/<manage_view_id>")
         req_tenant = request.session['tenant_id']
         db_instance_name = request.session['db_instance_name']
 
@@ -1385,6 +1319,13 @@ class ViewManagementById(RoleSessionMixin, APIView):
             return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
+            view_id = int(view_id)
+        except:
+            msg = "Invalid view id; the view id must be an integer."
+            logger.debug(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        try:
             view = ManageViews.objects.get(pk=view_id)
         except ManageViews.DoesNotExist:
             msg = f"View with ID {view_id} does not exist in ManageViews table."
@@ -1392,7 +1333,7 @@ class ViewManagementById(RoleSessionMixin, APIView):
             return HttpResponseNotFound(make_error(msg=msg))
 
         try:
-            self.delete_transaction(view, req_tenant, db_instance_name)
+            self.delete_view_transaction(view, req_tenant, db_instance_name)
         except Exception as e:
             msg = f"Failed to drop view {view.view_name} from the ManageViews table: {e}"
             logger.error(msg)
@@ -1404,3 +1345,75 @@ class ViewManagementById(RoleSessionMixin, APIView):
     def delete_view_transaction(self, view, tenant_id, db_instance_name):
         ManageViews.objects.get(view_name=view.view_name, tenant_id=tenant_id).delete()
         view_data.delete_view(view.view_name, tenant_id, db_instance=db_instance_name)
+
+
+class ViewsResource(RoleSessionMixin, APIView):
+    """
+    GET: Lists the rows in the given view based on root url. Restricted to READ and above role.
+    POST: Creates a new row in the view based on root URL. Restricted to WRITE and above role.
+    PUT: Updates the rows in the given view based on filter. If no filter is provided, updates the entire table.
+    Restricted to WRITE and above role.
+    """
+    @can_read
+    def get(self, request, *args, **kwargs):
+        logger.debug("top of get /views/<root_url>")
+        req_tenant = request.session['tenant_id']
+        db_instance = request.session['db_instance_name']
+        req_username = request.session['username']
+
+        params = self.request.query_params
+        limit = self.request.query_params.get("limit")
+        offset = self.request.query_params.get("offset")
+        order = self.request.query_params.get("order")
+
+        # Parse out required fields.
+        try:
+            root_url = self.kwargs['root_url']
+        except KeyError as e:
+            msg = f"\'{e.args}\' is required to list rows in a view."
+            logger.warning(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        try:
+            view = ManageViews.objects.get(root_url=root_url)
+        except ManageViews.DoesNotExist:
+            msg = f"View with root url {root_url} does not exist."
+            logger.warning(msg)
+            return HttpResponseNotFound(make_error(msg=msg))
+
+        # Permission check, permission_rules cross-refed with sk roles
+        # Get all user roles from sk and check if view's permission_rules are a subset of user_roles
+        user_roles = get_user_sk_roles(req_tenant, req_username)
+        try:
+            if not set(view.permission_rules).issubset(set(user_roles)):
+                msg = f"User {req_username} in tenant {req_tenant} does not have permission to access view {view.view_name} in tenant {req_tenant}."
+                logger.debug(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+        except Exception as e:
+            msg = f"Error checking permissions for view {view.view_name} on tenant {req_tenant}. Error: {e}"
+            logger.error(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        if "GET_ALL" not in view.endpoints:
+            msg = "API access to LIST ROWS disabled."
+            logger.warning(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        query_dict = dict()
+
+        try:
+            if limit is None:
+                limit = 10
+            if offset is None:
+                offset = 0
+            if order is not None:
+                result = view_data.get_rows_from_view(view.view_name, query_dict, req_tenant,
+                                                      limit, offset, db_instance, view.manage_view_id, order=order)
+            else:
+                result = view_data.get_rows_from_view(view.view_name, query_dict, req_tenant, limit, offset, db_instance, view.manage_view_id)
+        except Exception as e:
+            msg = f"Failed to retrieve rows from view {view.view_name} on tenant {req_tenant}. {e}"
+            logger.error(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        return HttpResponse(make_success(result=result), content_type='application/json')
