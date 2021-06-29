@@ -14,8 +14,8 @@ class Migration(migrations.Migration):
             name='ManageViews',
             fields=[
                 ('manage_view_id', models.AutoField(primary_key=True, serialize=False)),
-                ('view_name', models.CharField(max_length=255, unique=True)),
-                ('root_url', models.CharField(max_length=255, unique=True)),
+                ('view_name', models.CharField(max_length=255)),
+                ('root_url', models.CharField(max_length=255)),
                 ('view_definition', django.contrib.postgres.fields.jsonb.JSONField()),
                 ('permission_rules', django.contrib.postgres.fields.ArrayField(base_field=models.CharField(max_length=255), null=True, blank=True, size=None)),
                 ('tenant_id', models.CharField(max_length=255)),
