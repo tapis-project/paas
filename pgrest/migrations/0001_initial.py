@@ -18,8 +18,8 @@ class Migration(migrations.Migration):
             name='ManageTables',
             fields=[
                 ('manage_table_id', models.AutoField(primary_key=True, serialize=False)),
-                ('table_name', models.CharField(max_length=255, unique=True)),
-                ('root_url', models.CharField(max_length=255, unique=True)),
+                ('table_name', models.CharField(max_length=255)),
+                ('root_url', models.CharField(max_length=255)),
                 ('column_definition', django.contrib.postgres.fields.jsonb.JSONField()),
                 ('validate_json_create', django.contrib.postgres.fields.jsonb.JSONField()),
                 ('validate_json_update', django.contrib.postgres.fields.jsonb.JSONField()),
