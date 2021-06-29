@@ -275,12 +275,12 @@ class TableManagement(RoleSessionMixin, APIView):
         constraints = request.data.get('constraints', {})
 
         if ManageTables.objects.filter(table_name=table_name, tenant_id=req_tenant).exists():
-            msg = f"Table with name \'{table_name}\' and tenant_id \'{req_tenant}\' already exists in ManageTables table."
+            msg = f"Table with name '{table_name}' and tenant_id '{req_tenant}' already exists in ManageTables table."
             logger.warning(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
-        if ManageTables.objects.filter(root_url=root_url).exists():
-            msg = f"Table with root url \'{root_url}\' already exists in ManageTables table. " \
+        if ManageTables.objects.filter(root_url=root_url, tenant_id=req_tenant).exists():
+            msg = f"Table with root url '{root_url}' and tenant_id '{req_tenant}' already exists in ManageTables table. " \
                   f"Table name: {table_name}"
             logger.warning(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
@@ -731,7 +731,7 @@ class DynamicView(RoleSessionMixin, APIView):
             return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
-            table = ManageTables.objects.get(root_url=root_url)
+            table = ManageTables.objects.get(root_url=root_url, tenant_id=req_tenant)
         except ManageTables.DoesNotExist:
             msg = f"Table with root url {root_url} does not exist."
             logger.warning(msg)
@@ -794,7 +794,7 @@ class DynamicView(RoleSessionMixin, APIView):
             return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
-            table = ManageTables.objects.get(root_url=root_url)
+            table = ManageTables.objects.get(root_url=root_url, tenant_id=req_tenant)
         except ManageTables.DoesNotExist:
             msg = f"Table with root url {root_url} does not exist."
             logger.warning(msg)
@@ -876,7 +876,7 @@ class DynamicView(RoleSessionMixin, APIView):
         where_clause = result_dict.get("where", None)
 
         try:
-            table = ManageTables.objects.get(root_url=root_url)
+            table = ManageTables.objects.get(root_url=root_url, tenant_id=req_tenant)
         except ManageTables.DoesNotExist:
             msg = f"Table with root url {root_url} does not exist."
             logger.warning(msg)
@@ -945,7 +945,7 @@ class DynamicViewById(RoleSessionMixin, APIView):
             return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
-            table = ManageTables.objects.get(root_url=root_url)
+            table = ManageTables.objects.get(root_url=root_url, tenant_id=req_tenant)
         except ManageTables.DoesNotExist:
             msg = f"Table with root url {root_url} does not exist."
             logger.warning(msg)
@@ -982,7 +982,7 @@ class DynamicViewById(RoleSessionMixin, APIView):
             return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
-            table = ManageTables.objects.get(root_url=root_url)
+            table = ManageTables.objects.get(root_url=root_url, tenant_id=req_tenant)
         except ManageTables.DoesNotExist:
             msg = f"Table with root url {root_url} does not exist."
             logger.warning(msg)
@@ -1048,7 +1048,7 @@ class DynamicViewById(RoleSessionMixin, APIView):
             return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
-            table = ManageTables.objects.get(root_url=root_url)
+            table = ManageTables.objects.get(root_url=root_url, tenant_id=req_tenant)
         except ManageTables.DoesNotExist:
             msg = f"Table with root url {root_url} does not exist."
             logger.warning(msg)
@@ -1184,7 +1184,7 @@ class ViewManagement(RoleSessionMixin, APIView):
             return HttpResponseBadRequest(make_error(msg=msg))
 
         if ManageViews.objects.filter(root_url=root_url).exists():
-            msg = f"View with root url \'{root_url}\' already exists in ManageViews table. " \
+            msg = f"View with root url \'{root_url}\' and tenant_id {req_tenant} already exists in ManageViews table. " \
                   f"View name: {view_name}"
             logger.warning(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
@@ -1375,7 +1375,7 @@ class ViewsResource(RoleSessionMixin, APIView):
             return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
-            view = ManageViews.objects.get(root_url=root_url)
+            view = ManageViews.objects.get(root_url=root_url, tenant_id=req_tenant)
         except ManageViews.DoesNotExist:
             msg = f"View with root url {root_url} does not exist."
             logger.warning(msg)

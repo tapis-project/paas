@@ -10,9 +10,9 @@ from django.utils import tree
 class ManageViews(models.Model):
     manage_view_id = models.AutoField(primary_key=True)
     # view name for SQL statement
-    view_name = models.CharField(max_length=255, unique=True)
+    view_name = models.CharField(max_length=255)
     # Will be the base url, used to help identify in the dynamic view
-    root_url = models.CharField(max_length=255, unique=True)
+    root_url = models.CharField(max_length=255)
     # Definition of view
     view_definition = JSONField()
     # Tenant id to use.
@@ -31,9 +31,9 @@ class ManageViews(models.Model):
 class ManageTables(models.Model):
     manage_table_id = models.AutoField(primary_key=True)
     # table name for SQL statement
-    table_name = models.CharField(max_length=255, unique=True)
+    table_name = models.CharField(max_length=255)
     # Will be the base url, used to help identify in the dynamic view
-    root_url = models.CharField(max_length=255, unique=True)
+    root_url = models.CharField(max_length=255)
     # Defines the columns, used in SQL statement to create the table. Can specify:
     # null (boolean) - default is False
     # type - required
