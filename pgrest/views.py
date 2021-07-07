@@ -1399,18 +1399,16 @@ class ViewsResource(RoleSessionMixin, APIView):
             logger.warning(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
-        query_dict = dict()
-
         try:
             if limit is None:
                 limit = 10
             if offset is None:
                 offset = 0
             if order is not None:
-                result = view_data.get_rows_from_view(view.view_name, query_dict, req_tenant,
+                result = view_data.get_rows_from_view(view.view_name, params, req_tenant,
                                                       limit, offset, db_instance, view.manage_view_id, order=order)
             else:
-                result = view_data.get_rows_from_view(view.view_name, query_dict, req_tenant, limit, offset, db_instance, view.manage_view_id)
+                result = view_data.get_rows_from_view(view.view_name, params, req_tenant, limit, offset, db_instance, view.manage_view_id)
         except Exception as e:
             msg = f"Failed to retrieve rows from view {view.view_name} on tenant {req_tenant}. {e}"
             logger.error(msg)

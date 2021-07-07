@@ -79,11 +79,52 @@ def get_row_from_view(view_name, pk_id, tenant, primary_key, db_instance=None):
         raise Exception(msg)
 
 
-def get_rows_from_view(view_name, query_dict, tenant, limit, offset, db_instance, primary_key, **kwargs):
+def get_rows_from_view(view_name, query_params, tenant, limit, offset, db_instance, primary_key, **kwargs):
     """
     Gets all rows from given table with an optional limit and filter.
     """
     logger.info(f"Getting rows from table {tenant}.{view_name}")
+    
+    if query_params:
+        # If we have params we first have to get the view description to check to ensure
+        # parameters entered are indeed values in the query and not something bad.
+        try:
+            command = f"SELECT * FROM {tenant}.{view_name}"
+            if db_instance:
+                params = config.config(db_instance)
+            else:
+                params = config.config()
+            conn = psycopg2.connect(**params)
+            cur = conn.cursor()
+            cur.execute(command)
+            view_description = cur.description
+            cur.close()
+            conn.commit()
+            # Success.
+            logger.info(f"Got column description for view: {tenant}.{view_name}. Description: {view_description}")
+        except psycopg2.DatabaseError as e:
+            msg = f"Error accessing database: {e}"
+            logger.error(msg)
+            raise Exception(msg)
+        except Exception as e:
+            msg = f"Error retrieving description from view {tenant}.{view_name}: {e}"
+            logger.error(msg)
+            raise Exception(msg)
+
+        if view_description:
+            view_columns = []
+            for row in view_description:
+                view_columns.append(row[0])
+
+        query_dict = dict()
+        for query_param in query_params:
+            if query_param.lower().startswith('where'):
+                if query_param[6:] in view_columns:
+                    query_dict.update({query_param[6:]: query_params[query_param]})
+                else:
+                    msg = f"Invalid query parameter: {query_param[6:]}"
+                    logger.warning(msg)
+                    raise Exception(msg)
 
     try:
         command = f"SELECT * FROM {tenant}.{view_name}"
@@ -135,7 +176,7 @@ def get_rows_from_view(view_name, query_dict, tenant, limit, offset, db_instance
         logger.error(msg)
         raise Exception(msg)
     except Exception as e:
-        msg = f"Error retrieving rows from table {tenant}.{view_name}: {e}"
+        msg = f"Error retrieving rows from view {tenant}.{view_name}: {e}"
         logger.error(msg)
         raise Exception(msg)
 
