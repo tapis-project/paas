@@ -16,14 +16,14 @@ build-core:
 
 # Builds core locally and then runs pgrest in daemon mode
 local-deploy: build-core
-	@docker-compose run api python manage.py makemigrations
-	@docker-compose run api python manage.py migrate
+	@docker-compose run api python /home/tapis/manage.py makemigrations
+	@docker-compose run api python /home/tapis/manage.py migrate
 	@docker-compose up -d api
 
 
 # Running the pgrest/test.py file
 test:
-	@docker-compose run api python manage.py test -v 2
+	@docker-compose run api python /home/tapis/manage.py test -v 2
 
 
 # Pulls all Docker images not yet available but needed to run pgrest

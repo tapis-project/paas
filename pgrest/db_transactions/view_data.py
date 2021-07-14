@@ -85,6 +85,7 @@ def get_rows_from_view(view_name, query_params, tenant, limit, offset, db_instan
     """
     logger.info(f"Getting rows from table {tenant}.{view_name}")
     
+    query_dict = dict()
     if query_params:
         # If we have params we first have to get the view description to check to ensure
         # parameters entered are indeed values in the query and not something bad.
@@ -116,7 +117,6 @@ def get_rows_from_view(view_name, query_params, tenant, limit, offset, db_instan
             for row in view_description:
                 view_columns.append(row[0])
 
-        query_dict = dict()
         for query_param in query_params:
             if query_param.lower().startswith('where'):
                 if query_param[6:] in view_columns:

@@ -8,6 +8,6 @@ from pgrest.pycommon.auth import t
 for idx, db_conf in enumerate(conf.databases):
     if db_conf['dbpassword'] == "":
         name = db_conf['dbinstancename']
-        with open(f'/code/databases/{name}', 'r') as f:
+        with open(f'/home/tapis/databases/{name}', 'r') as f:
             dbpass = f.read()
         conf.databases[idx]['dbpassword'] = dbpass

@@ -4,7 +4,7 @@
   "test_token": "",
   "tenants": ["dev"],
   "log_level": "DEBUG",
-  "log_file": "/code/pgrest.log",
+  "log_file": "/home/tapis/pgrest.log",
   "show_traceback": false,
   "databases": [
     {
