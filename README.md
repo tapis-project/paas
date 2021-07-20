@@ -24,7 +24,7 @@ table. Do that with the following command, once the API container and database a
 make add-tenants
 ```
 
-Speaking of whcih, to take down current containers and postgres volume:  
+Speaking of which, to take down current containers and postgres volume:  
 ```
 make down-volumes
 ```
@@ -43,29 +43,11 @@ It's also useful to bring it all together to rebuild and test all at once:
 make down-volumes local-deploy test
 ```
 
+Developer Quick-Start Guide
+===========================
+PgREST gives a friendly API to connect to a postgres backend. The API currently features tables and views. Tables are created with a table definition and then given rows after the table is initialized. Table creation and deletion are accessible via the `/manage/tables` endpoint. To access these tables and add rows, we use the `/data/{table_id}` endpoint. Views is similar, using `/manage/views` for creation and deletion. The get a view, you can use the `/views/{view_name}` endpoint. A description of tables and view definitions are below.
 
-Manual Testing
---------------
-Get a v2 token from the tacc tenant (api.tacc.utexas.edu) representing a user with admin role:
-```
-export tok=<???>
-```
-Create a table:
-```
-curl -H "tapis-v2-token: $tok" -H "Content-type: application/json" -d "@sample.json" localhost:5000/v3/pgrest/manage/tables
-```
-Add some rows:
-```
-curl -H "tapis-v2-token: $tok" -H "Content-type: application/json" -d '{"data": {"col_one": "col 1 value", "col_two": 3, "col_three": 8, "col_four": false}}' localhost:5000/v3/pgrest/data/init
-
-curl -H "tapis-v2-token: $tok" -H "Content-type: application/json" -d '{"data": {"col_one": "another col 1 value", "col_two": 47, "col_three": -9, "col_four": true, "col_five": "hi"}}' localhost:5000/v3/pgrest/data/init
-```
-List the data:
-```
-curl -H "tapis-v2-token: $tok" localhost:5000/v3/pgrest/data/init
-```
-
-
+Once you understand table and view definitions, put it all to work by looking at our quick start Jupyter notebook here: [quick start notebook.](https://github.com/tapis-project/paas/blob/dev/quick-start-notebook.ipynb) This notebook contains all the code neccessary to work with PgREST, modify it to your wishes or copy and paste into whatever scripts you have.
 
 Table Definitions and Features
 ------------------------------
@@ -246,6 +228,29 @@ The /manage/views endpoints for PgREST expects a json formatted view definition.
                initial_table_2. Only users with the
                lab_6_admin and cii_rep role can view this.'
 }
+
+
+
+Manual Testing
+--------------
+Get a v2 token from the tacc tenant (api.tacc.utexas.edu) representing a user with admin role:
+```
+export tok=<???>
+```
+Create a table:
+```
+curl -H "tapis-v2-token: $tok" -H "Content-type: application/json" -d "@sample.json" localhost:5000/v3/pgrest/manage/tables
+```
+Add some rows:
+```
+curl -H "tapis-v2-token: $tok" -H "Content-type: application/json" -d '{"data": {"col_one": "col 1 value", "col_two": 3, "col_three": 8, "col_four": false}}' localhost:5000/v3/pgrest/data/init
+
+curl -H "tapis-v2-token: $tok" -H "Content-type: application/json" -d '{"data": {"col_one": "another col 1 value", "col_two": 47, "col_three": -9, "col_four": true, "col_five": "hi"}}' localhost:5000/v3/pgrest/data/init
+```
+List the data:
+```
+curl -H "tapis-v2-token: $tok" localhost:5000/v3/pgrest/data/init
+```
 
 # Old, Manual Instructions (You Probably Want to Use the Makefile)
 
