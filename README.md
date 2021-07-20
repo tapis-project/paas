@@ -129,7 +129,7 @@ The /manage/tables endpoints for PgREST expect a json formatted table definition
              - "CASCADE" deletes this column if the foreign key's column is deleted.
              - "SET NULL" set this column to null if the foreign key's column is deleted.
 
-Example of a table definition with many different column types.
+### Example of a table definition with many different column types.
 ```
 {
   "table_name": "UserProfile",
@@ -217,6 +217,8 @@ The /manage/views endpoints for PgREST expects a json formatted view definition.
    - List of roles required to view this view.
    - If nothing is given, view is open to all.
 
+### Example of a view definition.
+```
 {
   'view_name': 'test_view', 
   'root_url': 'just_a_cool_url',
@@ -228,7 +230,7 @@ The /manage/views endpoints for PgREST expects a json formatted view definition.
                initial_table_2. Only users with the
                lab_6_admin and cii_rep role can view this.'
 }
-
+```
 
 
 Manual Testing
