@@ -1,4 +1,4 @@
-Developer Quick-Start Guide
+PgREST Developer Quick-Start Guide
 ===========================
 PgREST gives a friendly API to connect to a postgres backend. The API currently features tables and views. Tables are created with a table definition and then given rows after the table is initialized. Table creation and deletion are accessible via the `/manage/tables` endpoint. To access these tables and add rows, we use the `/data/{table_id}` endpoint. Views is similar, using `/manage/views` for creation and deletion. The get a view, you can use the `/views/{view_name}` endpoint. A description of tables and view definitions are below.
 
