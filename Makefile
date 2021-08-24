@@ -22,7 +22,7 @@ local-deploy: build-core
 
 
 # Running the pgrest/test.py file
-test:
+test: local-deploy
 	@docker-compose run api python /home/tapis/manage.py test -v 2
 
 

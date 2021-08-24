@@ -257,6 +257,74 @@ class Tenants(object):
         logger.debug(f"site admin tenants for service: {admin_tenants}")
         return admin_tenants
 
+    def get_base_url_admin_tenant_primary_site(self):
+        """
+        Returns the base URL for the admin tenants of the primary site.
+        :return:
+        """
+        admin_tenant_id = self.primary_site.site_admin_tenant_id
+        return self.get_tenant_config(tenant_id=admin_tenant_id).base_url
+
+    def get_site_and_base_url_for_service_request(self, tenant_id, service):
+        """
+        Returns the site_id and base_url that should be used for a service request based on the tenant_id and the
+        service to which the request is targeting.
+
+        `tenant_id` should be the tenant that the object(s) of the request live in (i.e., the value of the
+        X-Tapis-Tenant header).  Note that in the case of service=tenants, the value of tenant_id id now
+        well defined and is ignored.
+
+        `service` should be the service being requested (e.g., apps, files, sk, tenants, etc.)
+
+        """
+        logger.debug(f"top of get_site_and_base_url_for_service_request() for tenant_id: {tenant_id} and service: {service}")
+        site_id_for_request = None
+        base_url = None
+        # requests to the tenants service should always go to the primary site
+        if service == 'tenants':
+            site_id_for_request = self.primary_site.site_id
+            base_url =self.get_base_url_admin_tenant_primary_site()
+            logger.debug(f"call to tenants API, returning site_id: {site_id_for_request}; base url: {base_url}")
+            return site_id_for_request, base_url
+
+        # the SK and token services always use the same site as the site the service is running on --
+        tenant_config = self.get_tenant_config(tenant_id=tenant_id)
+        if service == 'sk' or service == 'security' or service == 'tokens':
+            site_id_for_request = conf.service_site_id
+            # if the site_id for the service is the same as the site_id for the request, use the tenant URL:
+            if conf.service_site_id == tenant_config.site_id:
+                base_url = tenant_config.base_url
+                logger.debug(f"service '{service}' is SK or tokens and tenant's site was the same as the "
+                             f"configured site; returning site_id: {site_id_for_request}; base_url: {base_url}")
+                return site_id_for_request, base_url
+            else:
+                # otherwise, we use the primary site (NOTE: if we are here, the configured site_id is different from the
+                # tenant's owning site. this only happens when the running service is at the primary site; services at
+                # associate sites never handle requests for tenants they do not own.
+                site_id_for_request = self.primary_site.site_id
+                base_url = self.get_base_url_for_tenant_primary_site(tenant_id)
+                logger.debug(f'request for {tenant_id} and {service}; returning site_id: {site_id_for_request}; '
+                             f'base URL: {base_url}')
+                return site_id_for_request, base_url
+        # if the service is hosted by the site, we use the base_url associated with the tenant --
+        try:
+            # get the services hosted by the owning site of the tenant
+            site_services = tenant_config.site.services
+        except AttributeError:
+            logger.info("tenant_config had no site or services; setting site_service to [].")
+            site_services = []
+        if service in site_services:
+            site_id_for_request = conf.service_site_id
+            base_url = tenant_config.base_url
+            logger.debug(f"service {service} was hosted at site; returning site_id: {site_id_for_request}; "
+                         f"tenant's base_url: {base_url}")
+            return site_id_for_request, base_url
+        # otherwise, we use the primary site
+        site_id_for_request = self.primary_site.site_id
+        base_url = self.get_base_url_for_tenant_primary_site(tenant_id)
+        logger.debug(f'request was for {tenant_id} and {service}; returning site_id: {site_id_for_request};'
+                     f'base URL: {base_url}')
+        return site_id_for_request, base_url
 
     def validate_token(self, token):
         """
