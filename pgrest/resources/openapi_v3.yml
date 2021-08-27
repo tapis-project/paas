@@ -136,17 +136,16 @@ paths:
         required: true
         schema:
           type: string
-      parameters:
-        - name: limit
-          in: query
-          description: limit the number of records returned.
-          schema:
-            type: integer
-        - name: offset
-          in: query
-          description: index (offset) to start list.
-          schema:
-            type: integer
+      - name: limit
+        in: query
+        description: limit the number of records returned.
+        schema:
+          type: integer
+      - name: offset
+        in: query
+        description: index (offset) to start list.
+        schema:
+          type: integer
       responses:
         '200':
           description: OK
@@ -422,17 +421,16 @@ paths:
         required: true
         schema:
           type: string
-      parameters:
-        - name: limit
-          in: query
-          description: limit the number of records returned.
-          schema:
-            type: integer
-        - name: offset
-          in: query
-          description: index (offset) to start list.
-          schema:
-            type: integer
+      - name: limit
+        in: query
+        description: limit the number of records returned.
+        schema:
+          type: integer
+      - name: offset
+        in: query
+        description: index (offset) to start list.
+        schema:
+          type: integer
       responses:
         '200':
           description: OK
