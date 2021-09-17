@@ -10,7 +10,8 @@ from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseServer
 import requests
 from rest_framework.views import APIView
 
-from pgrest.models import ManageTables, ManageTablesTransition, Tenants, ManageViews
+from tenants_only.models import Tenants
+from pgrest.models import ManageTables, ManageTablesTransition, ManageViews
 from pgrest.db_transactions import manage_tables, table_data, bulk_data, view_data
 from pgrest.pycommon.auth import t, get_tenant_id_from_base_url
 from pgrest.pycommon import errors
@@ -173,6 +174,7 @@ class RoleSessionMixin:
                 make_error(msg=f"There was an error parsing the authentication headers. Details: {e}"))
         logger.info(f"request username: {username}")
 
+        # Grab data about roles from SK.
         try:
             roles = t.sk.getUserRoles(user=username, tenant=tenant_id)
             role_list = list()
@@ -216,7 +218,7 @@ class TableManagement(RoleSessionMixin, APIView):
         details = self.request.query_params.get('details')
 
         # Display information for each table based on details variable.
-        tables = ManageTables.objects.filter(tenant_id=req_tenant)
+        tables = ManageTables.objects.filter()
 
         result = list()
         # If details, form information about the columns and endpoints of the table
@@ -1080,17 +1082,18 @@ class CreateTenant(APIView):
             return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
-            Tenants.objects.get_or_create(tenant_name=schema_name, db_instance_name=db_instance)
+            tenant = Tenants(schema_name = schema_name,
+                             tenant_name = schema_name,
+                             db_instance_name = db_instance)
         except Exception as e:
-            msg = f"Unable to insert new role into Tenants Django table for tenant " \
-                  f"{schema_name} and db_instance {db_instance}: {e}"
-            logger.warning(msg)
+            msg = f"Unable to create new tenant for Tenants table"
+            logger.warning(msg + f" e: {e}")
             return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
-            manage_tables.create_schema(schema_name, db_instance)
+            tenant.save()
         except Exception as e:
-            msg = f"Failed to create new schema {schema_name} in db_instance {db_instance}. {e}"
+            msg = f"Failed to create new tenant {schema_name} in db_instance {db_instance}. {e}"
             logger.error(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 

@@ -1,4 +1,5 @@
-django==2.0
+django==2.1
+django-tenants==3.3.2 # Neccessary for Django schema/tenant seperation
 djangorestframework==3.8.2
 requests
 psycopg2==2.8.6

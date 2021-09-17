@@ -12,41 +12,50 @@
       "default": "https://admin.staging.tapis.io"
     },
     "databases": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": [
-          "dbinstancename",
-          "dbhost",
-          "dbport",
-          "dbname",
-          "dbuser",
-          "dbpassword"
-        ],
-        "properties": {
-          "dbinstancename": {
-            "type": "string",
-            "description": "A name used to refer to this database configuration."
-          },
-          "dbhost": {
-            "type": "string",
-            "description": "The host to use to connect to this database."
-          },
-          "dbport": {
-            "type": "integer",
-            "description": "The port to use to connect to this database."
-          },
-          "dbname": {
-            "type": "string",
-            "description": "The name of the database to use when connecting to this database."
-          },
-          "dbuser": {
-            "type": "string",
-            "description": "The user to use to connect to this database."
-          },
-          "dbpassword": {
-            "type": "string",
-            "description": "The password to use to connect to this database."
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^.*": {
+          "type": "object",
+          "description": "Object containing database config properties.",
+          "additionalProperties": false,
+          "required": [
+            "NAME",
+            "USER",
+            "PASSWORD",
+            "HOST",
+            "PORT"
+          ],
+          "properties": {
+            "ENGINE": {
+              "type": "string",
+              "description": "Engine options for connection. Use 'django_tenants.postgresql_backend' for Django Tenants support",
+              "default": "django_tenants.postgresql_backend"
+            },
+            "NAME": {
+              "type": "string",
+              "description": "The name of the database to use when connecting to this database."
+            },
+            "USER": {
+              "type": "string",
+              "description": "The user to use to connect to this database."
+            },
+            "PASSWORD": {
+              "type": "string",
+              "description": "The password to use to connect to this database."
+            },
+            "HOST": {
+              "type": "string",
+              "description": "The host to use to connect to this database."
+            },
+            "PORT": {
+              "type": "integer",
+              "description": "The port to use to connect to this database."
+            },
+            "OPTIONS": {
+              "type": "object",
+              "description": "Postgres connection options."
+            }
           }
         }
       }

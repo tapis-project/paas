@@ -3,8 +3,9 @@
 import json
 
 from django.test import TestCase
-
-from rest_framework.test import APIClient
+from django.db import connection
+from django_tenants.test.cases import TenantTestCase
+from django_tenants.test.client import TenantClient
 
 from pgrest import test_data
 from pgrest.pycommon.config import conf
@@ -15,10 +16,26 @@ from pgrest.pycommon.config import conf
 # V2
 auth_headers = {'HTTP_TAPIS_V2_TOKEN': conf.test_token}
 
-class ResponseTestCase(TestCase):
+
+class ResponseTestCase(TenantTestCase):
 
     init_resp_1 = {}
     init_resp_2 = {}
+
+    @classmethod
+    def setup_tenant(cls, tenant):
+        """
+        Add any additional setting to the tenant before it get saved. This is required if you have
+        required fields.
+        """
+        tenant.schema_name = "dev"
+        tenant.tenant_name = "dev"
+        tenant.db_instance_name = "default"
+        return tenant
+
+    @classmethod
+    def get_test_schema_name(cls):
+        return 'dev'
 
     def createTable(self):
         init_resp_1 = self.client.post('/v3/pgrest/manage/tables',
@@ -33,19 +50,9 @@ class ResponseTestCase(TestCase):
                                        **auth_headers)
         self.init_resp_2 = init_resp_2.json()
 
-    def createTenants(self):
-        self.client.post('/v3/pgrest/manage/tenants',
-                         data=json.dumps({"schema_name": "admin", "db_instance": "local"}),
-                         content_type='application/json',
-                         **auth_headers)
-        self.client.post('/v3/pgrest/manage/tenants',
-                         data=json.dumps({"schema_name": "dev", "db_instance": "local"}),
-                         content_type='application/json',
-                         **auth_headers)
-
     def setUp(self):
-        self.client = APIClient()
-        self.createTenants()
+        super().setUp()
+        self.c = TenantClient(self.tenant)
         self.createTable()
 
     def tearDown(self):

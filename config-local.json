@@ -7,14 +7,17 @@
   "log_level": "DEBUG",
   "log_file": "/home/tapis/pgrest.log",
   "show_traceback": false,
-  "databases": [
-    {
-      "dbinstancename": "local",
-      "dbhost": "db",
-      "dbport":  5432,
-      "dbname": "postgres",
-      "dbuser": "postgres",
-      "dbpassword": "<TODO>"
+  "databases": {
+    "default": {
+      "NAME": "postgres",
+      "USER": "postgres",
+      "PASSWORD": "<TODO>",
+      "HOST": "db",
+      "PORT": 5432,
+      "ENGINE": "django_tenants.postgresql_backend",
+      "OPTIONS": {
+        "options": "-c search_path=public"
+      }
     }
-  ]
+  }
 }
