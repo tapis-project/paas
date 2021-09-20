@@ -1,5 +1,6 @@
 import jwt
-from tapipy.tapis import Tapis, TapisResult
+import datetime
+from tapipy.tapis import Tapis
 
 from pgrest.pycommon.config import conf
 from pgrest.pycommon import errors
@@ -14,6 +15,11 @@ class Tenants(object):
     def __init__(self):
         self.primary_site = None
         self.service_running_at_primary_site = None
+        # this timedelta determines how frequently the code will refresh the tenants_cashe, looking for updates
+        # to the tenant definition. note that this configuration guarantees it will not refresh any MORE often than
+        # the configuration -- it only refreshes when it encoutners a tenant it does not recognize or it fails
+        # to validate the signature of an access token
+        self.update_tenant_cache_timedelta = datetime.timedelta(seconds=90)
         self.tenants = self.get_tenants()
 
     def extend_tenant(self, t):
@@ -39,7 +45,9 @@ class Tenants(object):
         # code that makes direct db access to get necessary data.
         if conf.service_name == 'tenants':
             self.service_running_at_primary_site = True
-            return self.get_tenants_for_tenants_api()
+            self.last_tenants_cache_update = datetime.datetime.now()
+            result = self.get_tenants_for_tenants_api()
+            return result
         else:
             logger.debug("this is not the tenants service; calling tenants API to get sites and tenants...")
             # if this case, this is not the tenants service, so we will try to get
@@ -50,6 +58,7 @@ class Tenants(object):
             # t = Tapis(base_url=conf.primary_site_admin_tenant_base_url, resource_set='local') # TODO -- remove resource_set='local'
             t = Tapis(base_url=conf.primary_site_admin_tenant_base_url)
             try:
+                self.last_tenants_cache_update = datetime.datetime.now()
                 tenants = t.tenants.list_tenants()
                 sites = t.tenants.list_sites()
             except Exception as e:
@@ -175,7 +184,7 @@ class Tenants(object):
         else:
             raise errors.BaseTapisError("Invalid call to get_tenant_config; either tenant_id or url must be passed.")
         if t:
-            logger.debug(f"found tenant: {t.base_url}")
+            logger.debug(f"found base_url: {t.base_url}")
             return t
         # try one reload and then give up -
         logger.debug(f"did not find tenant; going to reload tenants.")
@@ -361,11 +370,22 @@ class Tenants(object):
         if not public_key_str:
             raise errors.AuthenticationError("Could not find the public key for the tenant_id associated with the tenant.")
         # check signature and decode
-        try:
-            claims = jwt.decode(token, public_key_str)
-        except Exception as e:
-            logger.debug(f"Got exception trying to decode token; exception: {e}")
-            raise errors.AuthenticationError("Token signature validation failed.")
+        tries = 0
+        while tries < 2:
+            tries = tries + 1
+            try:
+                claims = jwt.decode(token, public_key_str)
+            except Exception as e:
+                # if we get an exception decoding it could be that the tenant's public key has changed (i.e., that
+                # the public key in out tenant_cache is stale. if we haven't updated the tenant_cache in the last
+                # update_tenant_cache_timedelta then go ahead and update and try the decode again.
+                if ( (datetime.datetime.now() > tenants.last_tenants_cache_update + tenants.update_tenant_cache_timedelta)
+                        and tries == 1):
+                    tenants.get_tenants()
+                    continue
+                # otherwise, we were using a recent public key, so just fail out.
+                logger.debug(f"Got exception trying to decode token; exception: {e}")
+                raise errors.AuthenticationError("Invalid Tapis token.")
         # if the token is a service token (i.e., this is a service to service request), do additional checks:
         return claims
 
