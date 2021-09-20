@@ -1,8 +1,9 @@
 from django.apps import AppConfig
 from django.db import connection
+from django.http import HttpResponseForbidden
+
 from django_tenants.utils import get_tenant_model
 from django_tenants.middleware.main import TenantMainMiddleware
-from django.http import HttpResponseForbidden
 from pgrest.utils import make_error
 from pgrest.pycommon.auth import t, get_tenant_id_from_base_url
 from pgrest.pycommon.logs import get_logger
@@ -10,7 +11,7 @@ from pgrest.pycommon.logs import get_logger
 logger = get_logger(__name__)
 
 class TenantsOnlyConfig(AppConfig):
-    name = 'tenants_only'
+    name = 'database_tenants'
 
 class GetTenantsFromRequest(TenantMainMiddleware):
     """

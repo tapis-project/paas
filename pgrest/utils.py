@@ -197,7 +197,6 @@ create_roles(tenants)
 # set up project admins --
 admins = ['jstubbs', 'cgarcia']
 
-
 for a in admins:
     for tn in tenants:
         grant_role(tn, a, 'PGREST_ADMIN')

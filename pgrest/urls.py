@@ -3,13 +3,14 @@
 from django.conf.urls import url
 from rest_framework.urlpatterns import format_suffix_patterns
 from pgrest import views
+from database_tenants import views as tenant_views
 
 
 urlpatterns = [
 
     # ---- table management --- #
     # Tenants: POST
-    url('^v3/pgrest/manage/tenants', views.CreateTenant.as_view()),
+    url('^v3/pgrest/manage/tenants', tenant_views.CreateTenant.as_view()),
 
     # Tables: GET SINGLE, PUT, DELETE
     url('^v3/pgrest/manage/tables/(?P<manage_table_id>.+)', views.TableManagementById.as_view()),

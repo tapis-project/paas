@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from tenants_only.models import Tenants
+from database_tenants.models import Tenants
 
 
 @admin.register(Tenants)

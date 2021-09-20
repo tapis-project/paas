@@ -37,7 +37,7 @@ ALLOWED_HOSTS = ['localhost', '.tapis.io', '.develop.tapis.io', '.staging.tapis.
 SHARED_APPS = (
     'django_tenants',  # mandatory
 
-    'tenants_only.apps.TenantsOnlyConfig', # you must list the app where your tenant model resides in
+    'database_tenants.apps.TenantsOnlyConfig', # you must list the app where your tenant model resides in
 
     'django.contrib.contenttypes',
 
@@ -63,7 +63,7 @@ TENANT_APPS = (
 INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in SHARED_APPS]
 
 MIDDLEWARE = [
-    'tenants_only.apps.GetTenantsFromRequest', # django_tenants.middleware.main.TenantMainMiddleware is default, we write it a bit to get tenant with tapipy
+    'database_tenants.apps.GetTenantsFromRequest', # django_tenants.middleware.main.TenantMainMiddleware is default, we write it a bit to get tenant with tapipy
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -98,8 +98,8 @@ WSGI_APPLICATION = 'paas.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/3.1/ref/settings/#databases
 
-TENANT_MODEL = "tenants_only.Tenants"
-TENANT_DOMAIN_MODEL = "tenants_only.Domain"
+TENANT_MODEL = "database_tenants.Tenants"
+TENANT_DOMAIN_MODEL = "database_tenants.Domain"
 
 DATABASES = conf.databases
 

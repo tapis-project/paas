@@ -14,8 +14,8 @@ COPY configschema.json /home/tapis/configschema.json
 COPY ./manage.py /home/tapis/manage.py
 COPY pgrest /home/tapis/service/pgrest
 COPY pgrest /home/tapis/pgrest
-COPY tenants_only /home/tapis/service/tenants_only
-COPY tenants_only /home/tapis/tenants_only
+COPY database_tenants /home/tapis/service/database_tenants
+COPY database_tenants /home/tapis/database_tenants
 COPY paas /home/tapis/service/paas
 COPY paas /home/tapis/paas
 RUN mkdir /home/tapis/databases
