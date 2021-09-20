@@ -654,3 +654,75 @@ class ResponseTestCase(TenantTestCase):
         response = self.client.delete(f'/v3/pgrest/manage/views/22', **auth_headers)
         print(response)
         self.assertEqual(response.status_code, 404)
+
+
+    ###############
+    # ROLES TESTS #
+    ###############
+
+    # PGREST_TEST is deleted at startup of PgREST everytime.
+    # Ensures it's fresh during tests and ensures no one can "overwrite" our permission to it between runs.
+    def test_get_roles(self):
+        response = self.client.get(f'/v3/pgrest/manage/roles', **auth_headers)
+        self.assertEqual(response.status_code, 200)
+
+    def test_roles(self):
+        # Create role
+        response = self.client.post(f'/v3/pgrest/manage/roles', **auth_headers,
+                                    data=json.dumps({'role_name': 'PGREST_TEST', 
+                                                     'description': 'PgREST testing role. Do not delete, do not touch.'}),
+                                    content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+
+        # Get role info after role created
+        response = self.client.get(f'/v3/pgrest/manage/roles/PGREST_TEST', **auth_headers)
+        self.assertEqual(response.status_code, 200)
+        res_dict = response.json()
+        self.assertEqual(res_dict['result']['name'], 'PGREST_TEST')
+        self.assertEqual(res_dict['result']['owner'], 'pgrest')
+
+        # Create role when it was already created
+        response = self.client.post(f'/v3/pgrest/manage/roles', **auth_headers,
+                                    data=json.dumps({'role_name': 'PGREST_TEST', 
+                                                     'description': 'PgREST testing role. Do not delete, do not touch.'}),
+                                    content_type='application/json')
+        self.assertEqual(response.status_code, 400)
+
+        # Grant role
+        response = self.client.post(f'/v3/pgrest/manage/roles/PGREST_TEST', **auth_headers,
+                                    data=json.dumps({'method': 'grant', 
+                                                     'username': 'cgarcia'}),
+                                    content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        
+        # Grant role when already granted
+        response = self.client.post(f'/v3/pgrest/manage/roles/PGREST_TEST', **auth_headers,
+                                    data=json.dumps({'method': 'grant', 
+                                                     'username': 'cgarcia'}),
+                                    content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        res_dict = response.json()
+        self.assertEqual(res_dict['result'], 'No changes made. User already has role')
+
+        # Get role_info after grant
+        # role info should return usernames that have the role, 'cgarcia' should now have the role
+        response = self.client.get(f'/v3/pgrest/manage/roles/PGREST_TEST', **auth_headers)
+        self.assertEqual(response.status_code, 200)
+        res_dict = response.json()
+        self.assertIn('cgarcia', res_dict['result']['usersInRole'])
+
+        # Revoke role
+        response = self.client.post(f'/v3/pgrest/manage/roles/PGREST_TEST', **auth_headers,
+                                    data=json.dumps({'method': 'revoke', 
+                                                     'username': 'cgarcia'}),
+                                    content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+
+        # Revoke role when already revoked
+        response = self.client.post(f'/v3/pgrest/manage/roles/PGREST_TEST', **auth_headers,
+                                    data=json.dumps({'method': 'revoke', 
+                                                     'username': 'cgarcia'}),
+                                    content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        res_dict = response.json()
+        self.assertEqual(res_dict['result'], "No changes made. User already didn't have role")

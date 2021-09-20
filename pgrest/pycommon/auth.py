@@ -42,7 +42,8 @@ def get_service_tapis_client(tenant_id=None,
               custom_spec_dict=custom_spec_dict,
               download_latest_specs=download_latest_specs,
               tenants=tenants,
-              is_tapis_service=True)
+              is_tapis_service=True,
+              debug_prints=False)
     logger.debug("got tapis client")
     if not jwt:
         logger.debug("calling get_tokens")

@@ -15,7 +15,7 @@ from pgrest.models import ManageTables, ManageTablesTransition, ManageViews
 from pgrest.db_transactions import manage_tables, table_data, bulk_data, view_data
 from pgrest.pycommon.auth import t, get_tenant_id_from_base_url
 from pgrest.pycommon import errors
-from pgrest.utils import create_validate_schema, can_read, can_write, is_admin, make_error, make_success
+from pgrest.utils import create_validate_schema, can_read, can_write, is_admin, is_role_admin, make_error, make_success
 from pgrest.pycommon.logs import get_logger
 logger = get_logger(__name__)
 
@@ -1344,7 +1344,7 @@ class ViewsResource(RoleSessionMixin, APIView):
         try:
             root_url = self.kwargs['root_url']
         except KeyError as e:
-            msg = f"\'{e.args}\' is required to list rows in a view."
+            msg = f"{e.args} is required to list rows in a view."
             logger.warning(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
@@ -1389,4 +1389,207 @@ class ViewsResource(RoleSessionMixin, APIView):
             return HttpResponseBadRequest(make_error(msg=msg))
 
         return HttpResponse(make_success(result=result), content_type='application/json')
+
+
+### Roles
+class RoleManagement(RoleSessionMixin, APIView):
+    """
+    GET: Gets all PGREST_* views and returns them in a list.
+    POST: Create a new role
+    All of these endpoints are restricted to ROLE_ADMIN role only, these endpoints can get
+    information about any roles with follow `PGREST_*` formatting.
+    """
+    @is_role_admin
+    def get(self, request, *args, **kwargs):
+        logger.debug("top of get /manage/roles")
+        req_tenant = request.session['tenant_id']
         
+        try:
+            full_tenant_role_list = t.sk.getRoleNames(tenant = req_tenant).names
+        except Exception as e:
+            msg = f"Error getting roles for tenant '{req_tenant}' from sk."
+            logger.critical(msg + f" e: {e}")
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        try:
+            pgrest_role_list = []
+            for role in full_tenant_role_list:
+                if role.startswith("PGREST_"):
+                    pgrest_role_list.append(role) 
+        except Exception as e:
+            msg = f"Error parsing roles received from sk."
+            logger.critical(msg + f" e: {e}")
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        return HttpResponse(make_success(result=pgrest_role_list), content_type='application/json')
+
+    @is_role_admin
+    def post(self, request, *args, **kwargs):
+        logger.debug("top of post /manage/roles")
+        req_tenant = request.session['tenant_id']
+
+        # Parse out required fields.
+        try:
+            role_name = request.data['role_name']
+            role_description = request.data['description']
+        except KeyError as e:
+            msg = f"{e.args} is required when creating a new role."
+            logger.warning(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        if not role_name.startswith("PGREST_"):
+            msg = f'User created role names must start with "PGREST_", got {role_name}'
+            logger.critical(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        privileged_roles = ["PGREST_ADMIN", "PGREST_ROLE_ADMIN", "PGREST_WRITE", "PGREST_READ"]
+        if role_name.upper() in privileged_roles:
+            msg = f"User created role names can't be in {privileged_roles}, regardless of case, got {role_name}."
+            logger.critical(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        # Check to see if role already exists
+        try:
+            role_info = t.sk.getRoleByName(tenant = req_tenant, roleName = role_name)
+            msg = f"Role with name {role_name} already exists for this tenant"
+            logger.critical(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+        except Exception as e:
+            # Means the role didn't exist, so we pass
+            pass
+
+        try:
+            t.sk.createRole(roleTenant = req_tenant, roleName = role_name, description = role_description)
+        except Exception as e:
+            msg = f"Error calling sk and creating role. e: {e}"
+            logger.critical(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+        
+        return HttpResponse(make_success(result="Role successfully created"), content_type='application/json')
+
+
+class RoleManagementByName(RoleSessionMixin, APIView):
+    """
+    GET: Gets sk info about the role along with all users granted the role.
+    POST: Manages who's in the role, grant and revoke methods are available.
+    """
+    @is_role_admin
+    def get(self, request, *args, **kwargs):
+        logger.debug("top of get /manage/roles/{role_name}")
+        req_tenant = request.session['tenant_id']
+
+        # Parse out required fields.
+        try:
+            role_name = self.kwargs['role_name']
+        except KeyError as e:
+            msg = f"{e.args} is required to get the role."
+            logger.warning(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        if not role_name.startswith("PGREST_"):
+            msg = f'User created role names must start with "PGREST_", got {role_name}'
+            logger.critical(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        # Get role info
+        try:
+            role_info = t.sk.getRoleByName(tenant = req_tenant, roleName = role_name)
+            role_info = role_info.__dict__
+        except Exception as e:
+            msg = f"Error getting role info. e: {e}"
+            logger.critical(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        # Get users in role
+        try:
+            role_user_list = t.sk.getUsersWithRole(tenant = req_tenant, roleName = role_name).names
+        except Exception as e:
+            msg = f"Error getting users in role. e: {e}"
+            logger.critical(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        # Add users in role to role info dict
+        try:
+            role_info['usersInRole'] = role_user_list
+        except Exception as e:
+            msg = f"Error adding users in role list to role info dict. e: {e}"
+            logger.critical(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        return HttpResponse(make_success(result=role_info), content_type='application/json')
+
+    @is_role_admin
+    def post(self, request, *args, **kwargs):
+        logger.debug("top of post /manage/roles/{role_name}")
+        req_tenant = request.session['tenant_id']
+
+        # Parse out required fields.
+        try:
+            role_name = self.kwargs['role_name']
+        except KeyError as e:
+            msg = f"{e.args} is required to grant/revoke a role."
+            logger.warning(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        # Get required fields from data.
+        try:
+            method = request.data['method']
+            username = request.data['username']
+        except KeyError as e:
+            msg = f"{e.args} is required to grant/revoke a role."
+            logger.warning(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        if not isinstance(method, str):
+            msg = f"Method must be of type str, got type {type(method)}"
+            logger.critical(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        method = method.lower()
+        if not method in ['grant', 'revoke']:
+            msg = f'Must specify method of either "grant" or "revoke", got "{method}"'
+            logger.critical(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        if not role_name.startswith("PGREST_"):
+            msg = f'User created role names must start with "PGREST_", got {role_name}'
+            logger.critical(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        privileged_roles = ["PGREST_ADMIN", "PGREST_ROLE_ADMIN", "PGREST_WRITE", "PGREST_READ"]
+        if role_name.upper() in privileged_roles:
+            msg = f"Can't manage the following privileged roles, {privileged_roles}, got {role_name}."
+            logger.critical(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        if not isinstance(username, str):
+            msg = f"Username must be of type str, got type {type(username)}"
+            logger.critical(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        if method == "grant":
+            try:
+                granted_role = t.sk.grantRole(tenant = req_tenant, roleName = role_name, user = username)
+                # returns 'changes': 1 if a change was made, otherwise 0.
+                if granted_role.changes:
+                    return HttpResponse(make_success(result="Role granted to user"), content_type='application/json')
+                else:
+                    return HttpResponse(make_success(result="No changes made. User already has role"), content_type='application/json')
+            except Exception as e:
+                msg = f"Error calling sk and granting role {role_name} to user {username}. e: {e}"
+                logger.critical(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+        elif method == "revoke":
+            try:
+                revoked_role = t.sk.revokeUserRole(tenant = req_tenant, roleName = role_name, user = username)
+                # returns 'changes': 1 if a change was made, otherwise 0.
+                if revoked_role.changes:
+                    return HttpResponse(make_success(result="Role revoked from user"), content_type='application/json')
+                else:
+                    return HttpResponse(make_success(result="No changes made. User already didn't have role"), content_type='application/json')
+            except Exception as e:
+                msg = f"Error calling sk and revoking role {role_name} to user {username}. e: {e}"
+                logger.critical(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+        else:
+            return HttpResponseBadRequest(make_error(msg=f"It should be impossible to get here. {method}, {username}"))

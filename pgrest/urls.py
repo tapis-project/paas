@@ -22,6 +22,11 @@ urlpatterns = [
     # Views: GET ALL, POST
     url('^v3/pgrest/manage/views', views.ViewManagement.as_view()),
 
+    # Roles: GET SINGLE, DELETE
+    url('^v3/pgrest/manage/roles/(?P<role_name>.+)', views.RoleManagementByName.as_view()),
+    # Roles: GET ALL, POST
+    url('^v3/pgrest/manage/roles', views.RoleManagement.as_view()),
+
 
     # ---- dynamic views --- #
     # Tables: GET SINGLE, PUT, DELETE
