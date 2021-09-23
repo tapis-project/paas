@@ -1461,7 +1461,7 @@ class RoleManagement(RoleSessionMixin, APIView):
         try:
             t.sk.createRole(roleTenant = req_tenant, roleName = role_name, description = role_description)
         except Exception as e:
-            msg = f"Error calling sk and creating role. e: {e}"
+            msg = f"Error creating role. e: {e}"
             logger.critical(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
         
@@ -1471,7 +1471,9 @@ class RoleManagement(RoleSessionMixin, APIView):
 class RoleManagementByName(RoleSessionMixin, APIView):
     """
     GET: Gets sk info about the role along with all users granted the role.
+        - Takes role_name
     POST: Manages who's in the role, grant and revoke methods are available.
+        - Takes role_name, method (revoke, grant), username
     """
     @is_role_admin
     def get(self, request, *args, **kwargs):
