@@ -277,8 +277,8 @@ create_table_9 = {
       "data_type": "integer",
       "reference_table": "initial_table",
       "reference_column": "initial_table_id",
-      "on_delete": "CASCADE"
-
+      "on_event": "on delete",
+      "event_action": "CASCADE"
     },
     "col_four": {
       "null": False,
@@ -311,41 +311,8 @@ create_table_10 = {
       "data_type": "integer",
       "reference_table": "initial_table",
       "reference_column": "initial_table_id",
-      "on_delete": "set null"
-
-    },
-    "col_four": {
-      "null": False,
-      "data_type": "boolean",
-      "default": True
-    },
-    "col_five": {
-      "null": True,
-      "data_type": "varchar",
-      "char_len": 255
-    }
-  }
-}
-
-create_table_11 = {
-  "table_name": "create_table_9",
-  "root_url": "create-table-9",
-  "columns": {
-    "col_one": {
-      "null": True,
-      "data_type": "varchar",
-      "char_len": 255
-    },
-    "col_two": {
-      "data_type": "SERIAL"
-    },
-    "col_three": {
-      "null": True,
-      "foreign_key": True,
-      "data_type": "integer",
-      "reference_table": "initial_table",
-      "reference_column": "initial_table_id",
-      "on_delete": "set null"
+      "on_event": "on delete",
+      "event_action": "set null"
     },
     "col_four": {
       "null": False,

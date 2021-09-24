@@ -12,7 +12,7 @@ https://docs.djangoproject.com/en/3.1/ref/settings/
 
 from pathlib import Path
 import os
-from paas import get_django_db
+from pgrest.pycommon.config import conf
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -33,19 +33,37 @@ ALLOWED_HOSTS = ['localhost', '.tapis.io', '.develop.tapis.io', '.staging.tapis.
 
 
 # Application definition
+# Rework of apps using django_tenants package. Shared apps are put in public namespace, tenants are in each tenant.
+SHARED_APPS = (
+    'django_tenants',  # mandatory
 
-INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
+    'database_tenants.apps.TenantsOnlyConfig', # you must list the app where your tenant model resides in
+
     'django.contrib.contenttypes',
+
+    # everything below here is optional
+    'django.contrib.auth',
     'django.contrib.sessions',
+    'django.contrib.sites',
     'django.contrib.messages',
+    'django.contrib.admin',
+
     'django.contrib.staticfiles',
-    'rest_framework',
-    'pgrest.apps.ProtoConfig'
-]
+    'rest_framework'
+)
+
+TENANT_APPS = (
+    # The following Django contrib apps must be in TENANT_APPS
+    'django.contrib.contenttypes',
+
+    # your tenant-specific apps
+    'pgrest.apps.PgRESTConfig'
+)
+
+INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in SHARED_APPS]
 
 MIDDLEWARE = [
+    'database_tenants.apps.GetTenantsFromRequest', # django_tenants.middleware.main.TenantMainMiddleware is default, we write it a bit to get tenant with tapipy
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -64,6 +82,7 @@ TEMPLATES = [
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
+                'django.template.context_processors.request',
                 'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
@@ -79,19 +98,15 @@ WSGI_APPLICATION = 'paas.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/3.1/ref/settings/#databases
 
-db_parms = get_django_db()
+TENANT_MODEL = "database_tenants.Tenants"
+TENANT_DOMAIN_MODEL = "database_tenants.Domain"
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': db_parms['dbname'],
-        'USER': db_parms['dbuser'],
-        'PASSWORD': db_parms['dbpassword'],
-        'HOST': db_parms['dbhost'],
-        'PORT': db_parms['dbport'],
-    }
-}
+DATABASES = conf.databases
 
+# Database Routers (Control which schemas everything is sent to rather than defaulting to public)
+DATABASE_ROUTERS = (
+    'django_tenants.routers.TenantSyncRouter',
+)
 
 # Password validation
 # https://docs.djangoproject.com/en/3.1/ref/settings/#auth-password-validators

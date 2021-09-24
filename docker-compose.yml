@@ -6,13 +6,13 @@ services:
     command: bash -c "uwsgi --http :5000 --module paas.wsgi"
     volumes:
     - .:/code
-    - ./config-local.json:/code/config-local.json
-    - ./pgrest.log:/code/pgrest.log
+    - ./config-local.json:/home/tapis/config-local.json
+    - ./pgrest.log:/home/tapis/pgrest.log
     ports:
     - "5000:5000"
     environment:
-      TAPIS_CONFIGSCHEMA_PATH: /code/pgrest/configschema.json
-      TAPIS_CONFIG_PATH: /code/config-local.json
+      TAPIS_CONFIGSCHEMA_PATH: /home/tapis/configschema.json
+      TAPIS_CONFIG_PATH: /home/tapis/config-local.json
       #Uncomment to enable django debug --
       #PGREST_DEBUG: "true"
     depends_on:

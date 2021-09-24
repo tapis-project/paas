@@ -136,17 +136,16 @@ paths:
         required: true
         schema:
           type: string
-      parameters:
-        - name: limit
-          in: query
-          description: limit the number of records returned.
-          schema:
-            type: integer
-        - name: offset
-          in: query
-          description: index (offset) to start list.
-          schema:
-            type: integer
+      - name: limit
+        in: query
+        description: limit the number of records returned.
+        schema:
+          type: integer
+      - name: offset
+        in: query
+        description: index (offset) to start list.
+        schema:
+          type: integer
       responses:
         '200':
           description: OK
@@ -311,7 +310,7 @@ paths:
     get:
       tags:
         - Manage
-      summary: List views.
+      summary: list_views
       description: List views in the tenant's schema.
       operationId: list_views
       x-swagger-router-controller: connexContr
@@ -329,7 +328,7 @@ paths:
     post:
       tags:
         - Manage
-      summary: Create a view.
+      summary: create_view
       description: Create a view.
       operationId: create_view
       x-swagger-router-controller: connexContr
@@ -359,9 +358,9 @@ paths:
     get:
       tags:
         - Manage
-      summary: Get details of a specific view.
+      summary: get_manage_view
       description: Get details of a specific view.
-      operationId: get_view
+      operationId: get_manage_view
       x-swagger-router-controller: connexContr
       parameters:
       - name: view_name
@@ -389,7 +388,7 @@ paths:
     delete:
       tags:
         - Manage
-      summary: Delete a specific view. No data is deleted.
+      summary: delete_view
       description: Delete a specific view. WARNING -- this action cannot be undone.
       operationId: delete_view
       x-swagger-router-controller: connexContr
@@ -413,7 +412,8 @@ paths:
     get:
       tags:
         - View
-      summary: List objects in the view with root_url {view_name}.
+      summary: get_view
+      description: List objects in the view with root_url {view_name}.
       operationId: get_view
       parameters:
       - name: view_name
@@ -422,17 +422,16 @@ paths:
         required: true
         schema:
           type: string
-      parameters:
-        - name: limit
-          in: query
-          description: limit the number of records returned.
-          schema:
-            type: integer
-        - name: offset
-          in: query
-          description: index (offset) to start list.
-          schema:
-            type: integer
+      - name: limit
+        in: query
+        description: limit the number of records returned.
+        schema:
+          type: integer
+      - name: offset
+        in: query
+        description: index (offset) to start list.
+        schema:
+          type: integer
       responses:
         '200':
           description: OK
@@ -444,6 +443,123 @@ paths:
                 properties:
                   result:
                     $ref: '#/components/schemas/CollectionArray'
+
+
+  /v3/pgrest/manage/roles:
+    get:
+      tags:
+        - Manage
+      summary: list_roles
+      description: List all roles for the tenant.
+      operationId: list_roles
+      x-swagger-router-controller: connexContr
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BasicResponse'
+                properties:
+                  result:
+                    type: array
+                    items:
+                      type: string
+                    description: Roles in tenant
+    post:
+      tags:
+        - Manage
+      summary: create_role
+      description: Create a role.
+      operationId: create_role
+      x-swagger-router-controller: connexContr
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRole'
+            examples:
+              create_role:
+                summary: Create role name PGREST_My_New_Role
+                value: {"role_name": "PGREST_My_New_Role", "description": "This is my new example role made for this example!"}
+      responses:
+        '200':
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BasicResponse'
+                properties:
+                  result:
+                    type: string
+
+  /v3/pgrest/manage/roles/{role_name}:
+    get:
+      tags:
+        - Manage
+      summary: get_role
+      description: Get role info and users in the role
+      operationId: get_role
+      x-swagger-router-controller: connexContr
+      parameters:
+      - name: role_name
+        in: path
+        description: The name of the role.
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BasicResponse'
+                properties:
+                  result:
+                    $ref: '#/components/schemas/RoleInfo'
+    post:
+      tags:
+        - Manage
+      summary: manage_role
+      description: Either grant or revoke role for users.
+      operationId: manage_role
+      x-swagger-router-controller: connexContr
+      parameters:
+      - name: role_name
+        in: path
+        description: The name of the role.
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManageRole'
+            examples:
+              grant_role:
+                summary: Granting a role to userTest
+                value: {"username": "userTest", "method": "grant"}
+              revoke_role:
+                summary: Revoking a role from userTest
+                value: {"username": "userTest", "method": "revoke"}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BasicResponse'
+                properties:
+                  result:
+                    type: string
 
 
 components:
@@ -477,6 +593,72 @@ components:
           type: string
           description: The url path used for the root collection associated with the records in the table.
 
+    RoleInfo:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: The id of the role.
+        tenant:
+          type: string
+          description: Tenant the role is in.
+        description:
+          type: string
+          description: Description of the role defined at role creation.
+        owner:
+          type: string
+          description: The owner of the role.
+        ownerTenant:
+          type: string
+          description: The tenant of the owner of the role.
+        created:
+          type: string
+          description: When the role was created.
+        createdby:
+          type: string
+          description: Who created the role.
+        createdbyTenant:
+          type: string
+          description: The tenant of the creator of the role.
+        updated:
+          type: string
+          description: When the role was last updated.
+        updatedby:
+          type: string
+          description: Who last updated the role.
+        updatedbyTenant:
+          type: string
+          description: The tenant of the user who last updated the role.
+        usersInRole:
+          type: array
+          items:
+            type: string
+          description: Users who currently have this role granted to them.
+
+    CreateRole:
+      type: object
+      properties:
+        role_name:
+          type: string
+          description: The name of the role to create.
+        description:
+          type: string
+          description: A description of the role.
+      required: [role_name, description]
+
+
+    ManageRole:
+      type: object
+      properties:
+        username:
+          type: string
+          description: The username to manage role for.
+        method:
+          type: string
+          description: Whether to revoke or grant role
+          enum: [grant, revoke]
+      required: [method, username]
+
     NewTable:
       type: object
       properties:
@@ -489,7 +671,7 @@ components:
         columns:
           $ref: '#/components/schemas/Columns'
         comments:
-          type: text
+          type: string
           description: Text area to describe table. Returned when calling table.
         create:
           type: boolean
@@ -527,7 +709,7 @@ components:
           type: integer
           description: For columns of type "varchar", the max length of the column.
         comments:
-          type: text
+          type: string
           description: Text area to describe column. Disregarded in code, for user use only.
       additionalProperties:
         type: object

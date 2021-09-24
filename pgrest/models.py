@@ -70,10 +70,3 @@ class ManageTablesTransition(models.Model):
     validate_json_create_tn = JSONField()
     validate_json_update_tn = JSONField()
     table_name_tn = models.CharField(max_length=255, unique=True, null=True, blank=True)
-
-
-class Tenants(models.Model):
-    tenant_id = models.AutoField(primary_key=True)
-    tenant_name = models.CharField(max_length=255, unique=True)
-    db_instance_name = models.CharField(max_length=255)
-

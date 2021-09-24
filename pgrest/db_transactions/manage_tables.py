@@ -66,31 +66,48 @@ def create_table(table_name, columns, existing_enum_names, constraints, tenant, 
         # Handle foreign keys.
         if "foreign_key" in column_args and column_args["foreign_key"]:
             try:
+                # On_event means either on_delete or on_update for foreign keys. During that event
+                # postgres will complete the event_action specified by the user.
                 # check we have we need
                 ref_table = column_args["reference_table"]
                 ref_column = column_args["reference_column"]
-                on_delete = column_args["on_delete"]
-
-                # Do some input checking on delete action.
-                delete_options = ["SET NULL", "SET DEFAULT", "RESTRICT", "NO ACTION", "CASCADE"]
-                if on_delete.upper() not in delete_options:
-                    msg = f"Invalid delete supplied: {on_delete}. Valid delete actions: {delete_options}."
-                    logger.warning(msg)
-                    raise Exception(msg)
-                # Cannot set on delete action to SET NULL if the column does not allow nulls.
-                if on_delete.upper() == "SET NULL" and "null" in column_args and not column_args["null"]:
-                    msg = f"Cannot set delete action on column {column_name} " \
-                          f"as it does not allow nulls in column definition."
-                    logger.warning(msg)
-                    raise Exception(msg)
-
-                column_type = f"{column_type} REFERENCES {tenant}.{ref_table}({ref_column}) ON DELETE {on_delete}"
-
+                on_event = column_args["on_event"]
+                event_action = column_args["event_action"]
             except KeyError as e:
-                msg = f"Required key {e.args[0]} not received for column {column_name}. " \
+                msg = f"Required key {e.args[0]} for foreign key not received for column {column_name}. " \
                       f"Cannot create table {table_name}."
                 logger.warning(msg)
                 raise Exception(msg)
+
+            try:
+                on_event = on_event.upper()
+                event_action = event_action.upper()
+            except:
+                msg = f"on_event and event_action must both be strings, got {type(on_event)} and {type(event_action)}"
+                logger.warning(msg)
+                raise Exception(msg)
+
+            # Check that on_event is either DELETE or UPDATE
+            events = ["ON DELETE", "ON UPDATE"]
+            if on_event not in events:
+                msg = f"Invalid on event supplied: {on_event}. Valid event actions: {events}."
+                logger.warning(msg)
+                raise Exception(msg)
+            # Do some input checking on event action.
+            event_options = ["SET NULL", "SET DEFAULT", "RESTRICT", "NO ACTION", "CASCADE"]
+            if event_action not in event_options:
+                msg = f"Invalid event action supplied: {event_action}. Valid event actions: {event_options}."
+                logger.warning(msg)
+                raise Exception(msg)
+            # Cannot set on event action to SET NULL if the column does not allow nulls.
+            if event_action == "SET NULL" and "null" in column_args and not column_args["null"]:
+                msg = f"Cannot set event action on column {column_name} " \
+                        f"as it does not allow nulls in column definition."
+                logger.warning(msg)
+                raise Exception(msg)
+
+            column_type = f"{column_type} REFERENCES {tenant}.{ref_table}({ref_column}) {on_event} {event_action}"
+
 
         col_str_list = list()
         col_string = f"{column_name} {column_type}"
@@ -129,7 +146,7 @@ def create_table(table_name, columns, existing_enum_names, constraints, tenant, 
                 col_str_list.append("PRIMARY KEY")
             elif key == "comments":
                 continue
-            elif key not in ["data_type", "char_len", "foreign_key", "reference_table", "reference_column", "on_delete"]:
+            elif key not in ["data_type", "char_len", "foreign_key", "reference_table", "reference_column", "on_event", "event_action"]:
                 msg = f"{key} is an invalid argument for column {column_name}. Cannot create table {table_name}"
                 logger.warning(msg)
                 raise Exception(msg)

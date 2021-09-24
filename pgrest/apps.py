@@ -1,5 +1,5 @@
 from django.apps import AppConfig
 
 
-class ProtoConfig(AppConfig):
+class PgRESTConfig(AppConfig):
     name = 'pgrest'

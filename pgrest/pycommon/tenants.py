@@ -1,5 +1,6 @@
 import jwt
-from tapipy.tapis import Tapis, TapisResult
+import datetime
+from tapipy.tapis import Tapis
 
 from pgrest.pycommon.config import conf
 from pgrest.pycommon import errors
@@ -14,6 +15,11 @@ class Tenants(object):
     def __init__(self):
         self.primary_site = None
         self.service_running_at_primary_site = None
+        # this timedelta determines how frequently the code will refresh the tenants_cashe, looking for updates
+        # to the tenant definition. note that this configuration guarantees it will not refresh any MORE often than
+        # the configuration -- it only refreshes when it encoutners a tenant it does not recognize or it fails
+        # to validate the signature of an access token
+        self.update_tenant_cache_timedelta = datetime.timedelta(seconds=90)
         self.tenants = self.get_tenants()
 
     def extend_tenant(self, t):
@@ -39,7 +45,9 @@ class Tenants(object):
         # code that makes direct db access to get necessary data.
         if conf.service_name == 'tenants':
             self.service_running_at_primary_site = True
-            return self.get_tenants_for_tenants_api()
+            self.last_tenants_cache_update = datetime.datetime.now()
+            result = self.get_tenants_for_tenants_api()
+            return result
         else:
             logger.debug("this is not the tenants service; calling tenants API to get sites and tenants...")
             # if this case, this is not the tenants service, so we will try to get
@@ -50,6 +58,7 @@ class Tenants(object):
             # t = Tapis(base_url=conf.primary_site_admin_tenant_base_url, resource_set='local') # TODO -- remove resource_set='local'
             t = Tapis(base_url=conf.primary_site_admin_tenant_base_url)
             try:
+                self.last_tenants_cache_update = datetime.datetime.now()
                 tenants = t.tenants.list_tenants()
                 sites = t.tenants.list_sites()
             except Exception as e:
@@ -175,7 +184,7 @@ class Tenants(object):
         else:
             raise errors.BaseTapisError("Invalid call to get_tenant_config; either tenant_id or url must be passed.")
         if t:
-            logger.debug(f"found tenant: {t.base_url}")
+            logger.debug(f"found base_url: {t.base_url}")
             return t
         # try one reload and then give up -
         logger.debug(f"did not find tenant; going to reload tenants.")
@@ -257,6 +266,74 @@ class Tenants(object):
         logger.debug(f"site admin tenants for service: {admin_tenants}")
         return admin_tenants
 
+    def get_base_url_admin_tenant_primary_site(self):
+        """
+        Returns the base URL for the admin tenants of the primary site.
+        :return:
+        """
+        admin_tenant_id = self.primary_site.site_admin_tenant_id
+        return self.get_tenant_config(tenant_id=admin_tenant_id).base_url
+
+    def get_site_and_base_url_for_service_request(self, tenant_id, service):
+        """
+        Returns the site_id and base_url that should be used for a service request based on the tenant_id and the
+        service to which the request is targeting.
+
+        `tenant_id` should be the tenant that the object(s) of the request live in (i.e., the value of the
+        X-Tapis-Tenant header).  Note that in the case of service=tenants, the value of tenant_id id now
+        well defined and is ignored.
+
+        `service` should be the service being requested (e.g., apps, files, sk, tenants, etc.)
+
+        """
+        logger.debug(f"top of get_site_and_base_url_for_service_request() for tenant_id: {tenant_id} and service: {service}")
+        site_id_for_request = None
+        base_url = None
+        # requests to the tenants service should always go to the primary site
+        if service == 'tenants':
+            site_id_for_request = self.primary_site.site_id
+            base_url =self.get_base_url_admin_tenant_primary_site()
+            logger.debug(f"call to tenants API, returning site_id: {site_id_for_request}; base url: {base_url}")
+            return site_id_for_request, base_url
+
+        # the SK and token services always use the same site as the site the service is running on --
+        tenant_config = self.get_tenant_config(tenant_id=tenant_id)
+        if service == 'sk' or service == 'security' or service == 'tokens':
+            site_id_for_request = conf.service_site_id
+            # if the site_id for the service is the same as the site_id for the request, use the tenant URL:
+            if conf.service_site_id == tenant_config.site_id:
+                base_url = tenant_config.base_url
+                logger.debug(f"service '{service}' is SK or tokens and tenant's site was the same as the "
+                             f"configured site; returning site_id: {site_id_for_request}; base_url: {base_url}")
+                return site_id_for_request, base_url
+            else:
+                # otherwise, we use the primary site (NOTE: if we are here, the configured site_id is different from the
+                # tenant's owning site. this only happens when the running service is at the primary site; services at
+                # associate sites never handle requests for tenants they do not own.
+                site_id_for_request = self.primary_site.site_id
+                base_url = self.get_base_url_for_tenant_primary_site(tenant_id)
+                logger.debug(f'request for {tenant_id} and {service}; returning site_id: {site_id_for_request}; '
+                             f'base URL: {base_url}')
+                return site_id_for_request, base_url
+        # if the service is hosted by the site, we use the base_url associated with the tenant --
+        try:
+            # get the services hosted by the owning site of the tenant
+            site_services = tenant_config.site.services
+        except AttributeError:
+            logger.info("tenant_config had no site or services; setting site_service to [].")
+            site_services = []
+        if service in site_services:
+            site_id_for_request = conf.service_site_id
+            base_url = tenant_config.base_url
+            logger.debug(f"service {service} was hosted at site; returning site_id: {site_id_for_request}; "
+                         f"tenant's base_url: {base_url}")
+            return site_id_for_request, base_url
+        # otherwise, we use the primary site
+        site_id_for_request = self.primary_site.site_id
+        base_url = self.get_base_url_for_tenant_primary_site(tenant_id)
+        logger.debug(f'request was for {tenant_id} and {service}; returning site_id: {site_id_for_request};'
+                     f'base URL: {base_url}')
+        return site_id_for_request, base_url
 
     def validate_token(self, token):
         """
@@ -293,11 +370,22 @@ class Tenants(object):
         if not public_key_str:
             raise errors.AuthenticationError("Could not find the public key for the tenant_id associated with the tenant.")
         # check signature and decode
-        try:
-            claims = jwt.decode(token, public_key_str)
-        except Exception as e:
-            logger.debug(f"Got exception trying to decode token; exception: {e}")
-            raise errors.AuthenticationError("Token signature validation failed.")
+        tries = 0
+        while tries < 2:
+            tries = tries + 1
+            try:
+                claims = jwt.decode(token, public_key_str)
+            except Exception as e:
+                # if we get an exception decoding it could be that the tenant's public key has changed (i.e., that
+                # the public key in out tenant_cache is stale. if we haven't updated the tenant_cache in the last
+                # update_tenant_cache_timedelta then go ahead and update and try the decode again.
+                if ( (datetime.datetime.now() > tenants.last_tenants_cache_update + tenants.update_tenant_cache_timedelta)
+                        and tries == 1):
+                    tenants.get_tenants()
+                    continue
+                # otherwise, we were using a recent public key, so just fail out.
+                logger.debug(f"Got exception trying to decode token; exception: {e}")
+                raise errors.AuthenticationError("Invalid Tapis token.")
         # if the token is a service token (i.e., this is a service to service request), do additional checks:
         return claims
 
