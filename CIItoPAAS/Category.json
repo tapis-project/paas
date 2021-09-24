@@ -17,7 +17,8 @@
       "foreign_key": true,
       "reference_table": "Category",
       "reference_column": "category_id",
-      "on_delete": "cascade"
+      "on_event": "on delete",
+      "event_action": "cascade"
     }
   }
 }

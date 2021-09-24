@@ -16,7 +16,8 @@
       "foreign_key": true,
       "reference_table": "BenchmarkingLab",
       "reference_column": "benchmarking_lab_id",
-      "on_delete": "cascade"
+      "on_event": "on delete",
+      "event_action": "cascade"
     },
     "level": {
       "data_type": "membershiplevel"
@@ -26,7 +27,8 @@
       "foreign_key": true,
       "reference_table": "Account",
       "reference_column": "account_id",
-      "on_delete": "cascade"
+      "on_event": "on delete",
+      "event_action": "cascade"
     },
     "created_at": {
       "data_type": "timestamp",
