@@ -180,6 +180,20 @@ def can_read(view):
     return wrapper
 
 
+def is_user(view):
+    """
+    Determines if a user has an user role, or read role, or write role, or admin role, and returns a 403 if they do not.
+    """
+    def wrapper(self, request, *args, **kwargs):
+        roles = request.session["roles"]
+        if "PGREST_ADMIN" not in roles and "PGREST_WRITE" not in roles and "PGREST_READ" not in roles and "PGREST_USER" not in roles:
+            msg = f"User {request.session['username']} is not a user on this tenant for PgREST."
+            return HttpResponseForbidden(make_error(msg=msg))
+        else:
+            return view(self, request, *args, **kwargs)
+    return wrapper
+
+
 def create_roles(tenants=[]):
     """
     Creates the basic set of roles required by PgREST in SK for a given set of tenants.

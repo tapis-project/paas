@@ -1,28 +1,32 @@
+import datetime
 import json
 import re
 import timeit
 
-import datetime
-from cerberus import Validator
-from django.db import transaction
-from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseServerError, HttpResponseNotFound, \
-    HttpResponseForbidden
 import requests
+from cerberus import Validator
+from database_tenants.models import Tenants
+from django.db import transaction
+from django.http import (HttpResponse, HttpResponseBadRequest,
+                         HttpResponseForbidden, HttpResponseNotFound,
+                         HttpResponseServerError)
 from rest_framework.views import APIView
 
-from database_tenants.models import Tenants
+from pgrest.db_transactions import (bulk_data, manage_tables, table_data,
+                                    view_data)
 from pgrest.models import ManageTables, ManageTablesTransition, ManageViews
-from pgrest.db_transactions import manage_tables, table_data, bulk_data, view_data
-from pgrest.pycommon.auth import t, get_tenant_id_from_base_url
 from pgrest.pycommon import errors
-from pgrest.utils import create_validate_schema, can_read, can_write, is_admin, is_role_admin, make_error, make_success
+from pgrest.pycommon.auth import get_tenant_id_from_base_url, t
 from pgrest.pycommon.logs import get_logger
-logger = get_logger(__name__)
+from pgrest.utils import (can_read, can_write, create_validate_schema,
+                          is_admin, is_role_admin, is_user, make_error,
+                          make_success)
 
+logger = get_logger(__name__)
 
 # We create a forbidden regex for quick parsing
 # Forbidden: \ ` ' " ~  / ? # [ ] ( ) @ ! $ & * + = - . , : ;
-FORBIDDEN_CHARS =  re.compile("^[^<>\\\/{}[\]~` $'\".:-?#@!$&()*+,;=]*$")
+FORBIDDEN_CHARS = re.compile("^[^<>\\\/{}[\]~` $'\".:-?#@!$&()*+,;=]*$")
 
 
 # Error views
@@ -31,10 +35,12 @@ def error_404(request, exception, template_name=None):
                         content_type='application/json',
                         status=404)
 
+
 def error_400(request, exception, template_name=None):
     return HttpResponse(make_error(msg="The HTTP path and/or method are not available from this service."),
                         content_type='application/json',
                         status=400)
+
 
 def error_500(request):
     return HttpResponse(make_error(msg="Something went wrong, Please try your request again later."),
@@ -87,7 +93,7 @@ def get_username_for_request(request, tenant_id):
         # Note: any HTTP headers in the request are converted to META keys by converting all characters to
         # uppercase, replacing any hyphens with underscores and adding an HTTP_ prefix to the name.
         v2_token = request.META['HTTP_TAPIS_V2_TOKEN']
-    except KeyError as e:
+    except KeyError:
         logger.debug("No v2 token header found; will look for a v3 token...")
         return resolve_tapis_v3_token(request, tenant_id)
 
@@ -138,6 +144,7 @@ class RoleSessionMixin:
     Retrieves username from Agave for tacc.prod token, then retrieves roles for this user in SK and stores data
     in django session.
     """
+
     # Override dispatch to decode token and store variables before routing the request.
     def dispatch(self, request, *args, **kwargs):
         logger.info(f"top of dispatch; headers: {request.META.keys()}")
@@ -206,7 +213,7 @@ class RoleSessionMixin:
 class TableManagement(RoleSessionMixin, APIView):
     """
     GET: Returns information about all of the tables.
-    POST: Creates a new table in ManageTables, and then a new table from the json provided by the user.
+    POST: Creates a new table based on user JSON in the tenant and adds table to list of tables in tenant.
     All of these endpoints are restricted to ADMIN role only.
     """
     @is_admin
@@ -225,27 +232,31 @@ class TableManagement(RoleSessionMixin, APIView):
         # TODO Fix up this format.
         if details:
             for table in tables:
-                result.append({"table_name": table.table_name,
-                               "table_id": table.pk,
-                               "root_url": table.root_url,
-                               "tenant": table.tenant_id,
-                               "endpoints": table.endpoints,
-                               "primary_key": table.primary_key,
-                               "columns": table.column_definition,
-                               "update_schema": table.validate_json_update,
-                               "create_schema": table.validate_json_create,
-                               "tenant_id": table.tenant_id,
-                               "comments": table.comments})
+                result.append({
+                    "table_name": table.table_name,
+                    "table_id": table.pk,
+                    "root_url": table.root_url,
+                    "tenant": table.tenant_id,
+                    "endpoints": table.endpoints,
+                    "primary_key": table.primary_key,
+                    "columns": table.column_definition,
+                    "update_schema": table.validate_json_update,
+                    "create_schema": table.validate_json_create,
+                    "tenant_id": table.tenant_id,
+                    "comments": table.comments
+                })
         else:
             for table in tables:
-                result.append({"table_name": table.table_name,
-                               "table_id": table.pk,
-                               "root_url": table.root_url,
-                               "tenant": table.tenant_id,
-                               "endpoints": table.endpoints,
-                               "tenant_id": table.tenant_id,
-                               "primary_key": table.primary_key,
-                               "comments": table.comments})
+                result.append({
+                    "table_name": table.table_name,
+                    "table_id": table.pk,
+                    "root_url": table.root_url,
+                    "tenant": table.tenant_id,
+                    "endpoints": table.endpoints,
+                    "tenant_id": table.tenant_id,
+                    "primary_key": table.primary_key,
+                    "comments": table.comments
+                })
 
         return HttpResponse(make_success(result=result), content_type='application/json')
 
@@ -313,7 +324,7 @@ class TableManagement(RoleSessionMixin, APIView):
 
         # We grab enums to do some checks
         try:
-            existing_enums = manage_tables.get_enums(db_instance_name)    
+            existing_enums = manage_tables.get_enums(db_instance_name)
             if existing_enums.get(req_tenant):
                 existing_enums_names = list(existing_enums.get(req_tenant).keys())
             else:
@@ -339,7 +350,8 @@ class TableManagement(RoleSessionMixin, APIView):
                         return HttpResponseBadRequest(make_error(msg=msg))
                     else:
                         primary_key = column_key
-                if column_args.get("default") in ["CREATETIME", "UPDATETIME"] and column_args.get('data_type') in ['timestamp', 'date']:
+                if column_args.get("default") in ["CREATETIME", "UPDATETIME"
+                                                  ] and column_args.get('data_type') in ['timestamp', 'date']:
                     # Create new managetables column for parsing during create/update row.
                     special_rules[column_args["default"]].append(column_key)
                     # Change the defaults to "NOW()" so the columns automatically update time during creation.
@@ -359,7 +371,8 @@ class TableManagement(RoleSessionMixin, APIView):
 
         # Create a validation schema
         try:
-            validate_json_create, validate_json_update = create_validate_schema(columns, req_tenant, existing_enums_names)
+            validate_json_create, validate_json_update = create_validate_schema(columns, req_tenant,
+                                                                                existing_enums_names)
         except Exception as e:
             msg = f"Unable to create json validation schema for table {table_name}: {e}" \
                   f"\nFailed to create table {table_name}. "
@@ -368,8 +381,9 @@ class TableManagement(RoleSessionMixin, APIView):
 
         # Create table
         try:
-            result = self.post_transaction(table_name, root_url, primary_key, columns, validate_json_create, validate_json_update,
-                                           endpoints, existing_enums_names, special_rules, comments, constraints, req_tenant, db_instance_name)
+            result = self.post_transaction(table_name, root_url, primary_key, columns, validate_json_create,
+                                           validate_json_update, endpoints, existing_enums_names, special_rules,
+                                           comments, constraints, req_tenant, db_instance_name)
         except Exception as e:
             msg = f"Failed to create table {table_name}. {e}"
             logger.error(msg)
@@ -379,16 +393,23 @@ class TableManagement(RoleSessionMixin, APIView):
 
     @transaction.atomic
     def post_transaction(self, table_name, root_url, primary_key, columns, validate_json_create, validate_json_update,
-                         endpoints, existing_enum_names, special_rules, comments, constraints, tenant_id, db_instance_name):
+                         endpoints, existing_enum_names, special_rules, comments, constraints, tenant_id,
+                         db_instance_name):
 
-        new_table = ManageTables.objects.create(table_name=table_name, root_url=root_url, column_definition=columns,
+        new_table = ManageTables.objects.create(table_name=table_name,
+                                                root_url=root_url,
+                                                column_definition=columns,
                                                 validate_json_create=validate_json_create,
                                                 validate_json_update=validate_json_update,
-                                                endpoints=endpoints, special_rules=special_rules,
-                                                comments=comments, constraints=constraints,
-                                                tenant_id=tenant_id, primary_key=primary_key)
+                                                endpoints=endpoints,
+                                                special_rules=special_rules,
+                                                comments=comments,
+                                                constraints=constraints,
+                                                tenant_id=tenant_id,
+                                                primary_key=primary_key)
 
-        ManageTablesTransition.objects.create(manage_table=new_table, column_definition_tn=columns,
+        ManageTablesTransition.objects.create(manage_table=new_table,
+                                              column_definition_tn=columns,
                                               validate_json_create_tn=validate_json_create,
                                               validate_json_update_tn=validate_json_update)
 
@@ -409,7 +430,7 @@ class TableManagement(RoleSessionMixin, APIView):
 class TableManagementById(RoleSessionMixin, APIView):
     """
     GET: Returns the table with the provided ID.
-    PUT: Updates the table with the provided ID. Work in progress.
+    PUT: Updates the table with the provided ID.
     DELETE: Drops the table with the provided ID.
     All of these endpoints are restricted to ADMIN role only.
     """
@@ -587,7 +608,7 @@ class TableManagementById(RoleSessionMixin, APIView):
                     transition_table.save()
 
                 # We grab enums to do some checks
-                existing_enums = manage_tables.get_enums(db_instance_name)    
+                existing_enums = manage_tables.get_enums(db_instance_name)
                 if existing_enums.get(req_tenant):
                     existing_enums_names = list(existing_enums.get(req_tenant).keys())
                 else:
@@ -595,7 +616,8 @@ class TableManagementById(RoleSessionMixin, APIView):
                 logger.info(f"Got list of existing enum_names: {existing_enums_names}")
 
                 try:
-                    validate_json_create_tn, validate_json_update_tn = create_validate_schema(current_cols, req_tenant, existing_enums)
+                    validate_json_create_tn, validate_json_update_tn = create_validate_schema(
+                        current_cols, req_tenant, existing_enums)
                     transition_table.validate_json_create_tn = validate_json_create_tn
                     transition_table.validate_json_update_tn = validate_json_update_tn
                     transition_table.save()
@@ -609,7 +631,6 @@ class TableManagementById(RoleSessionMixin, APIView):
                 # apply and roll back, error if it does not work
                 # if works, open process that creates a new file and pipes generated migration into it.
 
-
     # def create_update_table_migration(swlf, table_name, tenant, update_dict):
     #     logger.info(f"Generating script to update table {tenant}.{table_name}...")
     #
@@ -621,7 +642,6 @@ class TableManagementById(RoleSessionMixin, APIView):
     #         for col_name, col_info in update_dict["columns"].items():
     #             if col["action"] == "DROP":
     #                 command = command + " DROP %s IF EXISTS column %s" % col_name, col_info["on_delete"]
-
 
         return HttpResponse(make_success(msg="Table put successfully."), content_type='application/json')
 
@@ -663,7 +683,9 @@ class TableManagementById(RoleSessionMixin, APIView):
 
 class TableManagementDump(RoleSessionMixin, APIView):
     """
-    Work in progress.
+    From Brandi, looks like an endpoint that dumps table contents to specified text file on host.
+    POST: Dumps table_name in req_tenant to file_path on host.
+    WIP. Hasn't been touched since Brandi.
     """
     @is_admin
     def post(self, request, *args, **kwargs):
@@ -677,7 +699,7 @@ class TableManagementDump(RoleSessionMixin, APIView):
             for table_name, info in request.data.items():
                 try:
                     file_path = info["file_path"]
-                except KeyError as e:
+                except KeyError:
                     msg = f"file_path is required to dump data from table {table_name}."
                     logger.warning(msg)
                     return HttpResponseBadRequest(make_error(msg=msg))
@@ -694,12 +716,16 @@ class TableManagementDump(RoleSessionMixin, APIView):
 
 class TableManagementLoad(RoleSessionMixin, APIView):
     """
-    Work in progress.
+    From Brandi, looks like an opposite of dump, presume give file_name and load the previously
+    dumped data back into the database.
+    POST: ?
+    WIP. Hasn't been touched since Brandi.
     """
     @is_admin
     def post(self, request, *args, **kwargs):
         # req_tenant = "public"
         req_tenant = request.session['tenant_id']
+
 
 # For dynamic views, all end users will end up here. We will find the corresponding table
 # based on the url to get here. We then will formulate a SQL statement to do the need actions.
@@ -761,10 +787,17 @@ class DynamicView(RoleSessionMixin, APIView):
             if offset is None:
                 offset = 0
             if order is not None:
-                result = table_data.get_rows_from_table(table.table_name, query_dict, req_tenant,
-                                                        limit, offset, db_instance, table.primary_key, order=order)
+                result = table_data.get_rows_from_table(table.table_name,
+                                                        query_dict,
+                                                        req_tenant,
+                                                        limit,
+                                                        offset,
+                                                        db_instance,
+                                                        table.primary_key,
+                                                        order=order)
             else:
-                result = table_data.get_rows_from_table(table.table_name, query_dict, req_tenant, limit, offset, db_instance, table.primary_key)
+                result = table_data.get_rows_from_table(table.table_name, query_dict, req_tenant, limit, offset,
+                                                        db_instance, table.primary_key)
         except Exception as e:
             msg = f"Failed to retrieve rows from table {table.table_name} on tenant {req_tenant}. {e}"
             logger.error(msg)
@@ -845,14 +878,21 @@ class DynamicView(RoleSessionMixin, APIView):
             return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
-            result_id = table_data.create_row(table.table_name, data, req_tenant, table.primary_key,
+            result_id = table_data.create_row(table.table_name,
+                                              data,
+                                              req_tenant,
+                                              table.primary_key,
                                               db_instance=db_instance)
         except Exception as e:
             msg = f"Failed to retrieve rows from table {table.table_name} on tenant {req_tenant}. {e}"
             logger.error(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
         try:
-            result = table_data.get_row_from_table(table.table_name, result_id, req_tenant, table.primary_key, db_instance=db_instance)
+            result = table_data.get_row_from_table(table.table_name,
+                                                   result_id,
+                                                   req_tenant,
+                                                   table.primary_key,
+                                                   db_instance=db_instance)
         except Exception as e:
             msg = f"Failed to retrieve rows from table {table.table_name} on tenant {req_tenant}. {e}"
             logger.error(msg)
@@ -1019,14 +1059,23 @@ class DynamicViewById(RoleSessionMixin, APIView):
             return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
-            table_data.update_row_with_pk(table.table_name, pk_id, data, req_tenant, table.primary_key, db_instance=db_instance)
+            table_data.update_row_with_pk(table.table_name,
+                                          pk_id,
+                                          data,
+                                          req_tenant,
+                                          table.primary_key,
+                                          db_instance=db_instance)
         except Exception as e:
             msg = f"Failed to update row in table {table.table_name} with pk {pk_id} in tenant {req_tenant}. {e}"
             logger.error(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
-            result = table_data.get_row_from_table(table.table_name, pk_id, req_tenant, table.primary_key, db_instance=db_instance)
+            result = table_data.get_row_from_table(table.table_name,
+                                                   pk_id,
+                                                   req_tenant,
+                                                   table.primary_key,
+                                                   db_instance=db_instance)
         except Exception as e:
             msg = f"Failed to retrieve row from table {table.table_name} with pk {pk_id} on tenant {req_tenant}. {e}"
             logger.error(msg)
@@ -1074,8 +1123,8 @@ class DynamicViewById(RoleSessionMixin, APIView):
 ### Views
 class ViewManagement(RoleSessionMixin, APIView):
     """
-    GET: Returns information about all of the views.
-    POST: Creates a new table in ManageViews, and then a new view from the json provided by the user.
+    GET: Returns information about all of the views in the req_tenant.
+    POST: Creates a new view based on user JSON in the tenant and adds table to list of views in tenant.
     All of these endpoints are restricted to ADMIN role only.
     """
     @is_admin
@@ -1094,22 +1143,26 @@ class ViewManagement(RoleSessionMixin, APIView):
         # TODO Fix up this format.
         if details:
             for table in tables:
-                result.append({"view_name": table.view_name,
-                               "manage_view_id": table.pk,
-                               "root_url": table.root_url,
-                               "view_definition": table.view_definition,
-                               "permission_rules": table.permission_rules,
-                               "endpoints": table.endpoints,
-                               "tenant_id": table.tenant_id,
-                               "comments": table.comments})
+                result.append({
+                    "view_name": table.view_name,
+                    "manage_view_id": table.pk,
+                    "root_url": table.root_url,
+                    "view_definition": table.view_definition,
+                    "permission_rules": table.permission_rules,
+                    "endpoints": table.endpoints,
+                    "tenant_id": table.tenant_id,
+                    "comments": table.comments
+                })
         else:
             for table in tables:
-                result.append({"view_name": table.view_name,
-                               "manage_view_id": table.pk,
-                               "root_url": table.root_url,
-                               "endpoints": table.endpoints,
-                               "tenant_id": table.tenant_id,
-                               "comments": table.comments})
+                result.append({
+                    "view_name": table.view_name,
+                    "manage_view_id": table.pk,
+                    "root_url": table.root_url,
+                    "endpoints": table.endpoints,
+                    "tenant_id": table.tenant_id,
+                    "comments": table.comments
+                })
 
         return HttpResponse(make_success(result=result), content_type='application/json')
 
@@ -1185,13 +1238,12 @@ class ViewManagement(RoleSessionMixin, APIView):
             endpoints = []
 
         # Create view_definition
-        view_definition = {"select_query": select_query,
-                           "from_table": from_table,
-                           "where_query": where_query}
+        view_definition = {"select_query": select_query, "from_table": from_table, "where_query": where_query}
 
         # Create view
         try:
-            result = self.post_view_transaction(view_name, root_url, view_definition, permission_rules, endpoints, comments, req_tenant, db_instance_name)
+            result = self.post_view_transaction(view_name, root_url, view_definition, permission_rules, endpoints,
+                                                comments, req_tenant, db_instance_name)
         except Exception as e:
             msg = f"Failed to create view {view_name}. {e}"
             logger.error(msg)
@@ -1200,10 +1252,15 @@ class ViewManagement(RoleSessionMixin, APIView):
         return HttpResponse(make_success(result=result), content_type='application/json')
 
     @transaction.atomic
-    def post_view_transaction(self, view_name, root_url, view_definition, permission_rules, endpoints, comments, tenant_id, db_instance_name):
+    def post_view_transaction(self, view_name, root_url, view_definition, permission_rules, endpoints, comments,
+                              tenant_id, db_instance_name):
 
-        new_view = ManageViews.objects.create(view_name=view_name, root_url=root_url, view_definition=view_definition,
-                                              permission_rules=permission_rules, endpoints=endpoints, comments=comments,
+        new_view = ManageViews.objects.create(view_name=view_name,
+                                              root_url=root_url,
+                                              view_definition=view_definition,
+                                              permission_rules=permission_rules,
+                                              endpoints=endpoints,
+                                              comments=comments,
                                               tenant_id=tenant_id)
 
         view_data.create_view(view_name, view_definition, tenant_id, db_instance=db_instance_name)
@@ -1221,8 +1278,8 @@ class ViewManagement(RoleSessionMixin, APIView):
 
 class ViewManagementById(RoleSessionMixin, APIView):
     """
-    GET: Returns information about all of the views.
-    POST: Creates a new table in ManageViews, and then a new view from the json provided by the user.
+    GET: Returns information about view with view_id in req_tenant.
+    DEL: Deletes view with view_id in req_tenant.
     All of these endpoints are restricted to ADMIN role only.
     """
     @is_admin
@@ -1260,21 +1317,25 @@ class ViewManagementById(RoleSessionMixin, APIView):
             return HttpResponseNotFound(make_error(msg=msg))
 
         if details:
-            result = {"view_name": table.view_name,
-                      "manage_view_id": table.pk,
-                      "root_url": table.root_url,
-                      "view_definition": table.view_definition,
-                      "permission_rules": table.permission_rules,
-                      "endpoints": table.endpoints,
-                      "tenant_id": table.tenant_id,
-                      "comments": table.comments}
+            result = {
+                "view_name": table.view_name,
+                "manage_view_id": table.pk,
+                "root_url": table.root_url,
+                "view_definition": table.view_definition,
+                "permission_rules": table.permission_rules,
+                "endpoints": table.endpoints,
+                "tenant_id": table.tenant_id,
+                "comments": table.comments
+            }
         else:
-            result = {"view_name": table.view_name,
-                      "manage_view_id": table.pk,
-                      "root_url": table.root_url,
-                      "endpoints": table.endpoints,
-                      "tenant_id": table.tenant_id,
-                      "comments": table.comments}
+            result = {
+                "view_name": table.view_name,
+                "manage_view_id": table.pk,
+                "root_url": table.root_url,
+                "endpoints": table.endpoints,
+                "tenant_id": table.tenant_id,
+                "comments": table.comments
+            }
 
         return HttpResponse(make_success(result=result), content_type='application/json')
 
@@ -1323,12 +1384,11 @@ class ViewManagementById(RoleSessionMixin, APIView):
 
 class ViewsResource(RoleSessionMixin, APIView):
     """
-    GET: Lists the rows in the given view based on root url. Restricted to READ and above role.
-    POST: Creates a new row in the view based on root URL. Restricted to WRITE and above role.
-    PUT: Updates the rows in the given view based on filter. If no filter is provided, updates the entire table.
-    Restricted to WRITE and above role.
+    GET: Lists the rows in the given view based on root url. Restricted to USER role and above.
+    If the user is solely PGREST_USER then the only access they have is to `view` endpoints
+    with permission rules that their user follows.
     """
-    @can_read
+    @is_user
     def get(self, request, *args, **kwargs):
         logger.debug("top of get /views/<root_url>")
         req_tenant = request.session['tenant_id']
@@ -1379,10 +1439,17 @@ class ViewsResource(RoleSessionMixin, APIView):
             if offset is None:
                 offset = 0
             if order is not None:
-                result = view_data.get_rows_from_view(view.view_name, params, req_tenant,
-                                                      limit, offset, db_instance, view.manage_view_id, order=order)
+                result = view_data.get_rows_from_view(view.view_name,
+                                                      params,
+                                                      req_tenant,
+                                                      limit,
+                                                      offset,
+                                                      db_instance,
+                                                      view.manage_view_id,
+                                                      order=order)
             else:
-                result = view_data.get_rows_from_view(view.view_name, params, req_tenant, limit, offset, db_instance, view.manage_view_id)
+                result = view_data.get_rows_from_view(view.view_name, params, req_tenant, limit, offset, db_instance,
+                                                      view.manage_view_id)
         except Exception as e:
             msg = f"Failed to retrieve rows from view {view.view_name} on tenant {req_tenant}. {e}"
             logger.error(msg)
@@ -1395,17 +1462,17 @@ class ViewsResource(RoleSessionMixin, APIView):
 class RoleManagement(RoleSessionMixin, APIView):
     """
     GET: Gets all PGREST_* views and returns them in a list.
-    POST: Create a new role
-    All of these endpoints are restricted to ROLE_ADMIN role only, these endpoints can get
-    information about any roles with follow `PGREST_*` formatting.
+    POST: Create a new role in the security kernel with PgREST owner.
+    All of these endpoints are restricted to ROLE_ADMIN role only.
+    Role endpoints only deal with roles using `PGREST_*` formatting.
     """
     @is_role_admin
     def get(self, request, *args, **kwargs):
         logger.debug("top of get /manage/roles")
         req_tenant = request.session['tenant_id']
-        
+
         try:
-            full_tenant_role_list = t.sk.getRoleNames(tenant = req_tenant).names
+            full_tenant_role_list = t.sk.getRoleNames(tenant=req_tenant).names
         except Exception as e:
             msg = f"Error getting roles for tenant '{req_tenant}' from sk."
             logger.critical(msg + f" e: {e}")
@@ -1415,7 +1482,7 @@ class RoleManagement(RoleSessionMixin, APIView):
             pgrest_role_list = []
             for role in full_tenant_role_list:
                 if role.startswith("PGREST_"):
-                    pgrest_role_list.append(role) 
+                    pgrest_role_list.append(role)
         except Exception as e:
             msg = f"Error parsing roles received from sk."
             logger.critical(msg + f" e: {e}")
@@ -1442,7 +1509,7 @@ class RoleManagement(RoleSessionMixin, APIView):
             logger.critical(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
-        privileged_roles = ["PGREST_ADMIN", "PGREST_ROLE_ADMIN", "PGREST_WRITE", "PGREST_READ"]
+        privileged_roles = ["PGREST_ADMIN", "PGREST_ROLE_ADMIN", "PGREST_WRITE", "PGREST_READ", "PGREST_USER"]
         if role_name.upper() in privileged_roles:
             msg = f"User created role names can't be in {privileged_roles}, regardless of case, got {role_name}."
             logger.critical(msg)
@@ -1450,7 +1517,7 @@ class RoleManagement(RoleSessionMixin, APIView):
 
         # Check to see if role already exists
         try:
-            role_info = t.sk.getRoleByName(tenant = req_tenant, roleName = role_name)
+            role_info = t.sk.getRoleByName(tenant=req_tenant, roleName=role_name)
             msg = f"Role with name {role_name} already exists for this tenant"
             logger.critical(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
@@ -1459,21 +1526,19 @@ class RoleManagement(RoleSessionMixin, APIView):
             pass
 
         try:
-            t.sk.createRole(roleTenant = req_tenant, roleName = role_name, description = role_description)
+            t.sk.createRole(roleTenant=req_tenant, roleName=role_name, description=role_description)
         except Exception as e:
             msg = f"Error creating role. e: {e}"
             logger.critical(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
-        
+
         return HttpResponse(make_success(result="Role successfully created"), content_type='application/json')
 
 
 class RoleManagementByName(RoleSessionMixin, APIView):
     """
     GET: Gets sk info about the role along with all users granted the role.
-        - Takes role_name
     POST: Manages who's in the role, grant and revoke methods are available.
-        - Takes role_name, method (revoke, grant), username
     """
     @is_role_admin
     def get(self, request, *args, **kwargs):
@@ -1495,7 +1560,7 @@ class RoleManagementByName(RoleSessionMixin, APIView):
 
         # Get role info
         try:
-            role_info = t.sk.getRoleByName(tenant = req_tenant, roleName = role_name)
+            role_info = t.sk.getRoleByName(tenant=req_tenant, roleName=role_name)
             role_info = role_info.__dict__
         except Exception as e:
             msg = f"Error getting role info. e: {e}"
@@ -1504,7 +1569,7 @@ class RoleManagementByName(RoleSessionMixin, APIView):
 
         # Get users in role
         try:
-            role_user_list = t.sk.getUsersWithRole(tenant = req_tenant, roleName = role_name).names
+            role_user_list = t.sk.getUsersWithRole(tenant=req_tenant, roleName=role_name).names
         except Exception as e:
             msg = f"Error getting users in role. e: {e}"
             logger.critical(msg)
@@ -1558,6 +1623,7 @@ class RoleManagementByName(RoleSessionMixin, APIView):
             logger.critical(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
+        # Users are allowed to manage the PGREST_USER endpoint
         privileged_roles = ["PGREST_ADMIN", "PGREST_ROLE_ADMIN", "PGREST_WRITE", "PGREST_READ"]
         if role_name.upper() in privileged_roles:
             msg = f"Can't manage the following privileged roles, {privileged_roles}, got {role_name}."
@@ -1571,24 +1637,26 @@ class RoleManagementByName(RoleSessionMixin, APIView):
 
         if method == "grant":
             try:
-                granted_role = t.sk.grantRole(tenant = req_tenant, roleName = role_name, user = username)
+                granted_role = t.sk.grantRole(tenant=req_tenant, roleName=role_name, user=username)
                 # returns 'changes': 1 if a change was made, otherwise 0.
                 if granted_role.changes:
                     return HttpResponse(make_success(result="Role granted to user"), content_type='application/json')
                 else:
-                    return HttpResponse(make_success(result="No changes made. User already has role"), content_type='application/json')
+                    return HttpResponse(make_success(result="No changes made. User already has role"),
+                                        content_type='application/json')
             except Exception as e:
                 msg = f"Error calling sk and granting role {role_name} to user {username}. e: {e}"
                 logger.critical(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
         elif method == "revoke":
             try:
-                revoked_role = t.sk.revokeUserRole(tenant = req_tenant, roleName = role_name, user = username)
+                revoked_role = t.sk.revokeUserRole(tenant=req_tenant, roleName=role_name, user=username)
                 # returns 'changes': 1 if a change was made, otherwise 0.
                 if revoked_role.changes:
                     return HttpResponse(make_success(result="Role revoked from user"), content_type='application/json')
                 else:
-                    return HttpResponse(make_success(result="No changes made. User already didn't have role"), content_type='application/json')
+                    return HttpResponse(make_success(result="No changes made. User already didn't have role"),
+                                        content_type='application/json')
             except Exception as e:
                 msg = f"Error calling sk and revoking role {role_name} to user {username}. e: {e}"
                 logger.critical(msg)
