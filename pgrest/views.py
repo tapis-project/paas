@@ -350,8 +350,9 @@ class TableManagement(RoleSessionMixin, APIView):
                         return HttpResponseBadRequest(make_error(msg=msg))
                     else:
                         primary_key = column_key
-                if column_args.get("default") in ["CREATETIME", "UPDATETIME"
-                                                  ] and column_args.get('data_type') in ['timestamp', 'date']:
+                if (isinstance(column_args.get("default"), str)
+                    and column_args.get("default").upper() in ["CREATETIME", "UPDATETIME"]
+                    and column_args.get('data_type') in ['timestamp', 'date']):
                     # Create new managetables column for parsing during create/update row.
                     special_rules[column_args["default"]].append(column_key)
                     # Change the defaults to "NOW()" so the columns automatically update time during creation.
