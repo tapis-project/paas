@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('pgrest', '0002_tenants'),
+        ('pgrest', '0001_tables'),
     ]
 
     operations = [

@@ -3,8 +3,9 @@
 import json
 
 from django.test import TestCase
-
-from rest_framework.test import APIClient
+from django.db import connection
+from django_tenants.test.cases import TenantTestCase
+from django_tenants.test.client import TenantClient
 
 from pgrest import test_data
 from pgrest.pycommon.config import conf
@@ -15,10 +16,26 @@ from pgrest.pycommon.config import conf
 # V2
 auth_headers = {'HTTP_TAPIS_V2_TOKEN': conf.test_token}
 
-class ResponseTestCase(TestCase):
+
+class ResponseTestCase(TenantTestCase):
 
     init_resp_1 = {}
     init_resp_2 = {}
+
+    @classmethod
+    def setup_tenant(cls, tenant):
+        """
+        Add any additional setting to the tenant before it get saved. This is required if you have
+        required fields.
+        """
+        tenant.schema_name = "dev"
+        tenant.tenant_name = "dev"
+        tenant.db_instance_name = "default"
+        return tenant
+
+    @classmethod
+    def get_test_schema_name(cls):
+        return 'dev'
 
     def createTable(self):
         init_resp_1 = self.client.post('/v3/pgrest/manage/tables',
@@ -33,19 +50,9 @@ class ResponseTestCase(TestCase):
                                        **auth_headers)
         self.init_resp_2 = init_resp_2.json()
 
-    def createTenants(self):
-        self.client.post('/v3/pgrest/manage/tenants',
-                         data=json.dumps({"schema_name": "admin", "db_instance": "local"}),
-                         content_type='application/json',
-                         **auth_headers)
-        self.client.post('/v3/pgrest/manage/tenants',
-                         data=json.dumps({"schema_name": "dev", "db_instance": "local"}),
-                         content_type='application/json',
-                         **auth_headers)
-
     def setUp(self):
-        self.client = APIClient()
-        self.createTenants()
+        super().setUp()
+        self.c = TenantClient(self.tenant)
         self.createTable()
 
     def tearDown(self):
@@ -647,3 +654,75 @@ class ResponseTestCase(TestCase):
         response = self.client.delete(f'/v3/pgrest/manage/views/22', **auth_headers)
         print(response)
         self.assertEqual(response.status_code, 404)
+
+
+    ###############
+    # ROLES TESTS #
+    ###############
+
+    # PGREST_TEST is deleted at startup of PgREST everytime.
+    # Ensures it's fresh during tests and ensures no one can "overwrite" our permission to it between runs.
+    def test_get_roles(self):
+        response = self.client.get(f'/v3/pgrest/manage/roles', **auth_headers)
+        self.assertEqual(response.status_code, 200)
+
+    def test_roles(self):
+        # Create role
+        response = self.client.post(f'/v3/pgrest/manage/roles', **auth_headers,
+                                    data=json.dumps({'role_name': 'PGREST_TEST', 
+                                                     'description': 'PgREST testing role. Do not delete, do not touch.'}),
+                                    content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+
+        # Get role info after role created
+        response = self.client.get(f'/v3/pgrest/manage/roles/PGREST_TEST', **auth_headers)
+        self.assertEqual(response.status_code, 200)
+        res_dict = response.json()
+        self.assertEqual(res_dict['result']['name'], 'PGREST_TEST')
+        self.assertEqual(res_dict['result']['owner'], 'pgrest')
+
+        # Create role when it was already created
+        response = self.client.post(f'/v3/pgrest/manage/roles', **auth_headers,
+                                    data=json.dumps({'role_name': 'PGREST_TEST', 
+                                                     'description': 'PgREST testing role. Do not delete, do not touch.'}),
+                                    content_type='application/json')
+        self.assertEqual(response.status_code, 400)
+
+        # Grant role
+        response = self.client.post(f'/v3/pgrest/manage/roles/PGREST_TEST', **auth_headers,
+                                    data=json.dumps({'method': 'grant', 
+                                                     'username': 'cgarcia'}),
+                                    content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        
+        # Grant role when already granted
+        response = self.client.post(f'/v3/pgrest/manage/roles/PGREST_TEST', **auth_headers,
+                                    data=json.dumps({'method': 'grant', 
+                                                     'username': 'cgarcia'}),
+                                    content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        res_dict = response.json()
+        self.assertEqual(res_dict['result'], 'No changes made. User already has role')
+
+        # Get role_info after grant
+        # role info should return usernames that have the role, 'cgarcia' should now have the role
+        response = self.client.get(f'/v3/pgrest/manage/roles/PGREST_TEST', **auth_headers)
+        self.assertEqual(response.status_code, 200)
+        res_dict = response.json()
+        self.assertIn('cgarcia', res_dict['result']['usersInRole'])
+
+        # Revoke role
+        response = self.client.post(f'/v3/pgrest/manage/roles/PGREST_TEST', **auth_headers,
+                                    data=json.dumps({'method': 'revoke', 
+                                                     'username': 'cgarcia'}),
+                                    content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+
+        # Revoke role when already revoked
+        response = self.client.post(f'/v3/pgrest/manage/roles/PGREST_TEST', **auth_headers,
+                                    data=json.dumps({'method': 'revoke', 
+                                                     'username': 'cgarcia'}),
+                                    content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        res_dict = response.json()
+        self.assertEqual(res_dict['result'], "No changes made. User already didn't have role")
