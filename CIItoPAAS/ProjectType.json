@@ -17,7 +17,8 @@
       "foreign_key": true,
       "reference_table": "BenchmarkingLab",
       "reference_column": "benchmarking_lab_id",
-      "on_delete": "cascade"
+      "on_event": "on delete",
+      "event_action": "cascade"
     },
     "parent_id": {
       "null": true,
@@ -25,7 +26,8 @@
       "foreign_key": true,
       "reference_table": "ProjectType",
       "reference_column": "project_type_id",
-      "on_delete": "cascade"
+      "on_event": "on delete",
+      "event_action": "cascade"
     },
     "industry_group_id": {
       "null": true,
@@ -33,7 +35,8 @@
       "foreign_key": true,
       "reference_table": "IndustryGroup",
       "reference_column": "industry_group_id",
-      "on_delete": "cascade"
+      "on_event": "on delete",
+      "event_action": "cascade"
     }
   }
 }

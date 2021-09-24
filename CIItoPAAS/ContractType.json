@@ -18,7 +18,8 @@
       "foreign_key": true,
       "reference_table": "ContractType",
       "reference_column": "contract_type_id",
-      "on_delete": "cascade"
+      "on_event": "on delete",
+      "event_action": "cascade"
     },
     "display": {
       "data_type": "boolean"

@@ -30,14 +30,16 @@
       "foreign_key": true,
       "reference_table": "UserProfile",
       "reference_column": "user_profile_id",
-      "on_delete": "cascade"
+      "on_event": "on delete",
+      "event_action": "cascade"
     },
     "created_by_id": {
       "data_type": "integer",
       "foreign_key": true,
       "reference_table": "UserProfile",
       "reference_column": "user_profile_id",
-      "on_delete": "cascade"
+      "on_event": "on delete",
+      "event_action": "cascade"
     },
     "created_at": {
       "data_type": "timestamp",
@@ -58,7 +60,8 @@
       "foreign_key": true,
       "reference_table": "Account",
       "reference_column": "account_id",
-      "on_delete": "cascade"
+      "on_event": "on delete",
+      "event_action": "cascade"
     },
     "work_involvement": {
       "null": true,
@@ -75,7 +78,8 @@
       "foreign_key": true,
       "reference_table": "Workflow",
       "reference_column": "workflow_id",
-      "on_delete": "cascade"
+      "on_event": "on delete",
+      "event_action": "cascade"
     },
     "section_id": {
       "data_type": "integer"

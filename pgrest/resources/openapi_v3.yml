@@ -24,7 +24,7 @@ paths:
     get:
       tags:
         - Manage
-      summary: List tables.
+      summary: list_tables
       description: List tables in the tenant's schema.
       operationId: list_tables
       x-swagger-router-controller: connexContr
@@ -42,7 +42,7 @@ paths:
     post:
       tags:
         - Manage
-      summary: Create a tale.
+      summary: create_table
       description: Create a table.
       operationId: create_table
       x-swagger-router-controller: connexContr
@@ -72,9 +72,9 @@ paths:
     get:
       tags:
         - Manage
-      summary: Get details of a specific table.
-      description: Get details of a specific table.
-      operationId: get_table
+      summary: get_manage_table
+      description: Get details about a specific table.
+      operationId: get_manage_table
       x-swagger-router-controller: connexContr
       parameters:
       - name: table_id
@@ -102,7 +102,7 @@ paths:
     delete:
       tags:
         - Manage
-      summary: Delete a specific table and all associted data.
+      summary: delete_table
       description: Delete a specific table and all associted data. WARNING -- this action cannot be undone.
       operationId: delete_table
       x-swagger-router-controller: connexContr
@@ -127,8 +127,9 @@ paths:
     get:
       tags:
         - Data
-      summary: List objects in the table with root_url {collection}.
-      operationId: list_in_collection
+      summary: get_table
+      description: List objects in the table with specified root_url {collection}.
+      operationId: get_table
       parameters:
       - name: collection
         in: path
@@ -160,8 +161,9 @@ paths:
     post:
       tags:
         - Data
-      summary: Create a new object in the table with root_url {collection}
-      operationId: create_in_collection
+      summary: add_table_row
+      description: Create a new object in the table with specified root_url {collection}.
+      operationId: add_table_row
       parameters:
       - name: collection
         in: path
@@ -189,8 +191,9 @@ paths:
     put:
       tags:
         - Data
-      summary: Update multiple rows in a table atomically.
-      operationId: update_multiple_in_collection
+      summary: update_table_rows
+      description: Update multiple rows in a table atomically based on filter, if no filter, update all.
+      operationId: update_table_rows
       parameters:
       - name: collection
         in: path
@@ -218,8 +221,9 @@ paths:
     get:
       tags:
         - Data
-      summary: Get details about the specific object with id {item} on the table with root_url {collection}.
-      operationId: get_in_collection
+      summary: get_table_row
+      description: Get details about the specific object with id {item} on the table with root_url {collection}.
+      operationId: get_table_row
       parameters:
       - name: collection
         in: path
@@ -247,8 +251,9 @@ paths:
     put:
       tags:
         - Data
-      summary: Update a specific object with id {item} from the table with root_url {collection}.
-      operationId: update_in_collection
+      summary: update_table_row
+      description: Update a specific object with id {item} from the table with root_url {collection}.
+      operationId: update_table_row
       parameters:
       - name: collection
         in: path
@@ -282,8 +287,9 @@ paths:
     delete:
       tags:
         - Data
-      summary: Delete a specific object with id {item} from the table with root_url {collection}.
-      operationId: delete_in_collection
+      summary: delete_table_row
+      description: Delete a specific object with id {item} from the table with root_url {collection}.
+      operationId: delete_table_row
       parameters:
       - name: collection
         in: path
@@ -340,7 +346,7 @@ paths:
               $ref: '#/components/schemas/NewTable'
             examples:
               widgets:
-                summary: An example of defining a simple table that holds "widgets".
+                summary: An example of defining a simple view that shows initial_table table.
                 value: {"view_name": "HELLO_View", "select_query": "*", "from_table": "initial_table", "permission_rules": ["hello_team_admin", "hello_team_member", "citizen_of_hello_world"]}
       responses:
         '201':
@@ -482,7 +488,7 @@ paths:
               $ref: '#/components/schemas/CreateRole'
             examples:
               create_role:
-                summary: Create role name PGREST_My_New_Role
+                summary: Create role named PGREST_My_New_Role
                 value: {"role_name": "PGREST_My_New_Role", "description": "This is my new example role made for this example!"}
       responses:
         '200':
@@ -710,7 +716,33 @@ components:
           description: For columns of type "varchar", the max length of the column.
         comments:
           type: string
-          description: Text area to describe column. Disregarded in code, for user use only.
+          description: Text area to describe column. Shown in manage endpoints.
+        unique:
+          type: boolean
+          description: Whether the column can contain null values.
+        default:
+          type: boolean
+          description: Whether the column can contain null values.
+        primary_key:
+          type: string
+          description: Allows user to specify which column to act as a primary_key rather than defaulting to {table_name}_id.
+        foreign_key:
+          type: boolean
+          description: Whether this column should reference a foreign key in another table.
+        reference_table:
+          type: string
+          description: Only if foreign_key, sets which table to reference.
+        reference_column:
+          type: string
+          description: Only if foreign_key, sets when table column to reference.
+        on_event:
+          type: string
+          description: Only if foreign_key, sets whether to use ON DELETE or ON UPDATE postgres definition.
+          enum: [ON DELETE, ON UPDATE]
+        event_action:
+          type: string
+          description: Only if foreign_key, sets which event action to call when on_event event occurs.
+          enum: [CASCADE, SET NULL, SET DEFAULT, RESTRICT, NO ACTION]
       additionalProperties:
         type: object
       required: [data_type]

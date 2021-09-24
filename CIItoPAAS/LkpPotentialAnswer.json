@@ -12,7 +12,8 @@
       "foreign_key": true,
       "reference_table": "Question",
       "reference_column": "question_id",
-      "on_delete": "cascade"
+      "on_event": "on delete",
+      "event_action": "cascade"
     },
     "label": {
       "data_type": "text"
