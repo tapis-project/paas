@@ -5,7 +5,10 @@ The PgREST service provides an friendly HTTP-based API to a managed Postgres dat
 **PgREST Documentation:** https://tapis.readthedocs.io/en/latest/technical/pgrest.html  
 **PgREST Automated API Documentation:** https://tapis-project.github.io/live-docs/#tag/user
 
-Once you understand PgREST, put it all to work by looking at our quick-start Jupyter notebook here: [quick start-notebook.](https://github.com/tapis-project/paas/blob/dev/quick-start-notebook.ipynb) This notebook contains all the code neccessary to work with PgREST, modify it to your wishes or copy and paste into whatever scripts you have.
+Once you understand PgREST, put it all to work by looking at our quick-start Jupyter notebook. This notebook contains all the code neccessary to work with PgREST, modify it to your wishes or copy and paste code snippets into whatever scripts you have.
+
+**Quick-Start Jupyter Notebook:** https://github.com/tapis-project/paas/blob/dev/quick-start-notebook.ipynb
+
 
 Local Development
 =================
