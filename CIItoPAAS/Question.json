@@ -30,7 +30,8 @@
       "foreign_key": true,
       "reference_table": "QuestionType",
       "reference_column": "question_type_id",
-      "on_delete": "cascade"
+      "on_event": "on delete",
+      "event_action": "cascade"
     },
     "skip_if_false": {
       "data_type": "integer",
@@ -46,7 +47,8 @@
       "foreign_key": true,
       "reference_table": "Category",
       "reference_column": "category_id",
-      "on_delete": "cascade"
+      "on_event": "on delete",
+      "event_action": "cascade"
     },
     "is_healthcare": {
       "data_type": "boolean",

@@ -23,7 +23,8 @@
       "foreign_key": true,
       "reference_table": "UserProfile",
       "reference_column": "user_profile_id",
-      "on_delete": "cascade"
+      "on_event": "on delete",
+      "event_action": "cascade"
     },
     "email": {
       "null": true,
@@ -36,7 +37,8 @@
       "foreign_key": true,
       "reference_table": "Account",
       "reference_column": "account_id",
-      "on_delete": "cascade"
+      "on_event": "on delete",
+      "event_action": "cascade"
     },
     "active": {
       "data_type": "boolean",
