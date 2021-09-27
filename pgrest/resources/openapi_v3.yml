@@ -19,6 +19,17 @@ servers:
   description: Develop Instance
 #security:
 #  - TapisJWT: []
+tags:
+  - name: Tables
+    description: Data API that allows users to get tables and add/update/delete rows in those tables. Users require role of PGREST_READ and above. This tag manages `/v3/pgrest/data` endpoints.
+  - name: Views
+    description: View API that allows users to get views that they satisfy the permission_rules for. Users require role of PGREST_USER and above. This tag manages `/v3/pgrest/views` endpoints.
+  - name: Manage Tables
+    description: Manage API that allows admins to create tables and configure their columns. Also allows for table deletion. Users require role of PGREST_ADMIN. This tag manages `/v3/pgrest/manage/tables` endpoints.
+  - name: Manage Views
+    description: Manage API that allows admins create PG views with specified permission rules and content. Also allows for view deletion. Users require role of PGREST_ADMIN. This tag manages `/v3/pgrest/manage/views` endpoints.
+  - name: Manage Roles
+    description: Manage API that allows admins to create SK roles and grant or revoke said roles to users. This allows admins to specify which users get to see which views. Users require role of PGREST_ROLE_ADMIN and above. This tag manages `/v3/pgrest/manage/roles` endpoints.
 paths:
   #=== TABLES ===#
   /v3/pgrest/manage/tables:
