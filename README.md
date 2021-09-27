@@ -3,7 +3,7 @@ PgREST - Postgres as a RESTful API
 The PgREST service provides an friendly HTTP-based API to a managed Postgres database. As with the other Tapis v3 service, PgREST utilizes a REST architecture. The API currently features tables, views, and roles. Tables, views, and roles are created with PgREST endpoints that are described in detail in our documentation.
   
 **PgREST Documentation:** https://tapis.readthedocs.io/en/latest/technical/pgrest.html  
-**PgREST Automated API Documentation:** https://tapis-project.github.io/live-docs/#tag/user
+**PgREST Automated Live-Docs:** https://tapis-project.github.io/live-docs/#tag/user
 
 Once you understand PgREST, put it all to work by looking at our quick-start Jupyter notebook. This notebook contains all the code neccessary to work with PgREST, modify it to your wishes or copy and paste code snippets into whatever scripts you have.
 
