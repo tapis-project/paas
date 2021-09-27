@@ -1,7 +1,7 @@
 openapi: 3.0.1
 info:
-  title: Tapis Pgrest API
-  description: The Tapis Pgrest API provides a RESTful interface to a manged SQL-db-as-a-service.
+  title: Tapis PgREST API
+  description: The Tapis PgREST API provides a RESTful interface to a managed SQL-db-as-a-service.
   contact:
     name: CICSupport
     email: cicsupport@tacc.utexas.edu
