@@ -6,7 +6,9 @@ from django.core.serializers.json import DjangoJSONEncoder
 
 from pgrest.pycommon import errors as common_errors
 from pgrest.pycommon.auth import t
+from pgrest.pycommon.config import conf
 from pgrest.pycommon.logs import get_logger
+
 logger = get_logger(__name__)
 
 PGREST_ROLES = ['PGREST_ADMIN', 'PGREST_WRITE', 'PGREST_READ', 'PGREST_ROLE_ADMIN']
@@ -228,7 +230,7 @@ def grant_role(tenant, username, role):
     t.sk.grantRole(user=username, tenant=tenant, roleName=role)
 
 
-tenants = ['a2cps', 'cii', 'tacc', 'dev', 'admin']
+tenants = conf.tenants
 
 # make sure roles exist --
 create_roles(tenants)

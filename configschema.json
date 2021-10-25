@@ -7,10 +7,6 @@
       "description": "URL to postgres db, including port and database.",
       "default": "postgres:5432/pgrest"
     },
-    "service_tenant_base_url": {
-      "type": "string",
-      "default": "https://admin.staging.tapis.io"
-    },
     "databases": {
       "type": "object",
       "additionalProperties": false,

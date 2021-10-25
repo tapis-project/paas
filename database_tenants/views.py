@@ -9,12 +9,12 @@ from pgrest.pycommon.logs import get_logger
 logger = get_logger(__name__)
 
 
-# Create your views here.
+# Create tenants here.
 class CreateTenant(APIView):
     def post(self, request, *args, **kwargs):
         logger.debug("top of post /manage/tenants")
         try:
-            schema_name = request.data['schema_name']
+            schema_name = request.data['schema_name'].replace('-', '_')
             db_instance = request.data['db_instance']
         except KeyError as e:
             msg = f"\'{e.args}\' is required when creating new row in a table."
