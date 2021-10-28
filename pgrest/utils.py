@@ -31,29 +31,35 @@ def get_version():
     return "dev" # TODO
 
 
-def make_error(msg=None):
+def make_error(msg=None, metadata={}):
     """
     Create an error JSON response in the standard Tapis 4-stanza format.
     """
     if not msg:
         msg = "There was an error."
+    if not isinstance(metadata, dict):
+        raise TypeError("Got exception formatting response. Metadata should be dict.")
     d = {"status": "error",
          "message": msg,
          "version": get_version(),
-         "result": None}
+         "result": None,
+         "metadata": metadata}
     return json.dumps(d)
 
 
-def make_success(result=None, msg=None):
+def make_success(result=None, msg=None, metadata={}):
     """
     Create an error JSON response in the standard Tapis 4-stanza format.
     """
     if not msg:
         msg = "The request was successful."
+    if not isinstance(metadata, dict):
+        raise TypeError("Got exception formatting response. Metadata should be dict.")
     d = {"status": "success",
          "message": msg,
          "version": get_version(),
-         "result": result}    
+         "result": result,
+         "metadata": metadata}
     return json.dumps(d, default=timestampJSONEncoder)
 
 

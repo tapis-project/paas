@@ -184,8 +184,9 @@ def get_rows_from_view(view_name, query_params, tenant, limit, offset, db_instan
 def create_view(view_name, view_definition, tenant, db_instance=None):
     """Create view in the PostgreSQL database"""
     try:
-        select_query = view_definition['select_query']
         from_table = view_definition['from_table']
+        raw_sql = view_definition['raw_sql']
+        select_query = view_definition['select_query']
         where_query = view_definition['where_query']
     except KeyError:
         msg = f"Error reading view variables from view_definition. v_d: {view_definition}"
@@ -193,10 +194,16 @@ def create_view(view_name, view_definition, tenant, db_instance=None):
         raise Exception(msg)
 
     logger.info(f"Creating view {tenant}.{view_name}...")
-    if where_query:
-        command = f"CREATE OR REPLACE VIEW {tenant}.{view_name} AS SELECT {select_query} FROM {tenant}.{from_table} WHERE {where_query};"
+
+    if raw_sql:
+        command = f"CREATE OR REPLACE VIEW {tenant}.{view_name} {raw_sql}"
     else:
-        command = f"CREATE OR REPLACE VIEW {tenant}.{view_name} AS SELECT {select_query} FROM {tenant}.{from_table};"
+        if where_query:
+            command = f"CREATE OR REPLACE VIEW {tenant}.{view_name} AS SELECT {select_query} FROM {tenant}.{from_table} WHERE {where_query};"
+        else:
+            command = f"CREATE OR REPLACE VIEW {tenant}.{view_name} AS SELECT {select_query} FROM {tenant}.{from_table};"
+
+    metadata = {"command": command}
 
     logger.debug(f"Create db command for view {tenant}.{view_name}: {command}")
 
@@ -208,14 +215,15 @@ def create_view(view_name, view_definition, tenant, db_instance=None):
         if conn:
             conn.close()
         msg = f"Error accessing database: {e}"
-        logger.error(msg)
-        raise Exception(msg)
+        logger.error(f"{msg} -- Command: {command}")
+        raise Exception(msg, metadata)
     except Exception as e:
         if conn:
             conn.close()
         msg = f"Error creating view {tenant}.{view_name}: {e}"
-        logger.error(msg)
-        raise Exception(msg)
+        logger.error(f"{msg} -- Command: {command}")
+        raise Exception(msg, metadata)
+    return metadata
 
 
 def delete_view(view_name, tenant, db_instance=None):

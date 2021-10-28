@@ -112,7 +112,7 @@ def get_username_for_request(request, tenant_id):
         username = response.json()['result']['username']
     except KeyError:
         msg = "Unable to validate v2 token; either the token is invalid, " \
-              "expired, or does not reoresnt a valid user in the v2 TACC tenant."
+              "expired, or does not represent a valid user in the v2 TACC tenant."
         logger.error(msg)
         return None, HttpResponseForbidden(make_error(msg=msg))
     logger.debug(f"got username: {username}")
@@ -744,7 +744,7 @@ class DynamicView(RoleSessionMixin, APIView):
     """
     @can_read
     def get(self, request, *args, **kwargs):
-        logger.debug("top of get /data/<data_root_url>")
+        logger.debug("top of get /data/<root_url>")
         req_tenant = request.session['tenant_id']
         db_instance = request.session['db_instance_name']
 
@@ -810,7 +810,7 @@ class DynamicView(RoleSessionMixin, APIView):
 
     @can_write
     def post(self, request, *args, **kwargs):
-        logger.debug("top of post /data/<data_root_url>")
+        logger.debug("top of post /data/<root_url>")
         try:
             req_tenant = request.session['tenant_id']
             db_instance = request.session['db_instance_name']
@@ -905,7 +905,7 @@ class DynamicView(RoleSessionMixin, APIView):
 
     @can_write
     def put(self, request, *args, **kwargs):
-        logger.debug("top of put /data/<data_root_url>")
+        logger.debug("top of put /data/<root_url>")
         req_tenant = request.session['tenant_id']
         db_instance = request.session['db_instance_name']
 
@@ -1178,7 +1178,6 @@ class ViewManagement(RoleSessionMixin, APIView):
         # Parse out required fields.
         try:
             view_name = request.data['view_name']
-            select_query = request.data['select_query']
             from_table = request.data['from_table']
         except KeyError as e:
             msg = f"\'{e.args}\' is required when creating a new table."
@@ -1187,6 +1186,8 @@ class ViewManagement(RoleSessionMixin, APIView):
 
         # Parse out optional fields.
         root_url = request.data.get('root_url', view_name)
+        raw_sql = request.data.get('raw_sql', None)
+        select_query = request.data.get('select_query', None)
         where_query = request.data.get('where_query', None)
         permission_rules = request.data.get('permission_rules', [])
         list_all = request.data.get('list_all', True)
@@ -1197,7 +1198,19 @@ class ViewManagement(RoleSessionMixin, APIView):
         endpoints = request.data.get('endpoints', True)
         comments = request.data.get('comments', "")
 
-        # view_name checks
+        # Check required selection parameters.
+        # If raw_sql being used, select_query and where_query are disallowed.
+        if raw_sql:
+            if select_query:
+                msg = f"User may only specify raw_sql or select_query, got both."
+                logger.error(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+            if where_query:
+                msg = f"When using a raw_sql query, where_query is not allowed, got both."
+                logger.error(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+        # Check view_name is acceptable
         if not isinstance(view_name, str):
             msg = f"The view_name must be of type string. Got type: {type(view_name)}"
             logger.error(msg)
@@ -1207,18 +1220,20 @@ class ViewManagement(RoleSessionMixin, APIView):
             logger.error(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
-        # Check for existence of view_name, table_name, and root_url
+        # Check for existence of view_name in tenant.
         if ManageViews.objects.filter(view_name=view_name, tenant_id=req_tenant).exists():
             msg = f"View with name \'{view_name}\' and tenant_id \'{req_tenant}\' already exists in ManageViews table."
             logger.warning(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
+        # Check for existence of root_url in tenant.
         if ManageViews.objects.filter(root_url=root_url).exists():
             msg = f"View with root url \'{root_url}\' and tenant_id {req_tenant} already exists in ManageViews table. " \
                   f"View name: {view_name}"
             logger.warning(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
+        # Check for existence of from_table in tenant.
         if not ManageTables.objects.filter(table_name=from_table, tenant_id=req_tenant).exists():
             msg = f"Table with name \'{from_table}\' and tenant_id \'{req_tenant}\' does not exist in ManageTables table."
             logger.warning(msg)
@@ -1241,18 +1256,21 @@ class ViewManagement(RoleSessionMixin, APIView):
             endpoints = []
 
         # Create view_definition
-        view_definition = {"select_query": select_query, "from_table": from_table, "where_query": where_query}
+        view_definition = {"from_table": from_table, "raw_sql": raw_sql, "select_query": select_query, "where_query": where_query}
 
         # Create view
         try:
-            result = self.post_view_transaction(view_name, root_url, view_definition, permission_rules, endpoints,
+            result, metadata = self.post_view_transaction(view_name, root_url, view_definition, permission_rules, endpoints,
                                                 comments, req_tenant, db_instance_name)
-        except Exception as e:
-            msg = f"Failed to create view {view_name}. {e}"
+        except Exception as er:
+            logger.error(er)
+            error = er.args[0]
+            metadata = er.args[1]
+            msg = f"Failed to create view {view_name}. {error}"
             logger.error(msg)
-            return HttpResponseBadRequest(make_error(msg=msg))
+            return HttpResponseBadRequest(make_error(msg=msg, metadata=metadata))
 
-        return HttpResponse(make_success(result=result), content_type='application/json')
+        return HttpResponse(make_success(result=result, metadata=metadata), content_type='application/json')
 
     @transaction.atomic
     def post_view_transaction(self, view_name, root_url, view_definition, permission_rules, endpoints, comments,
@@ -1266,7 +1284,7 @@ class ViewManagement(RoleSessionMixin, APIView):
                                               comments=comments,
                                               tenant_id=tenant_id)
 
-        view_data.create_view(view_name, view_definition, tenant_id, db_instance=db_instance_name)
+        metadata = view_data.create_view(view_name, view_definition, tenant_id, db_instance=db_instance_name)
 
         result = {
             "view_name": new_view.view_name,
@@ -1276,7 +1294,7 @@ class ViewManagement(RoleSessionMixin, APIView):
             "comments": new_view.comments
         }
 
-        return result
+        return result, metadata
 
 
 class ViewManagementById(RoleSessionMixin, APIView):
