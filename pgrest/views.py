@@ -1174,6 +1174,7 @@ class ViewManagement(RoleSessionMixin, APIView):
         logger.debug("top of post /manage/views")
         req_tenant = request.session['tenant_id']
         db_instance_name = request.session['db_instance_name']
+        req_username = request.session['username']
 
         # Parse out required fields.
         try:
@@ -1201,6 +1202,14 @@ class ViewManagement(RoleSessionMixin, APIView):
         # Check required selection parameters.
         # If raw_sql being used, select_query and where_query are disallowed.
         if raw_sql:
+            # Permission check, ensure user has PGREST_ADMIN role.
+            # Get all user roles from sk and check if user has role.
+            user_roles = get_user_sk_roles(req_tenant, req_username)
+            if not "PGREST_ADMIN" in user_roles:
+                msg = f"User {req_username} in tenant {req_tenant} requires PGREST_ADMIN role for raw_sql view creation."
+                logger.debug(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
             if select_query:
                 msg = f"User may only specify raw_sql or select_query, got both."
                 logger.error(msg)
