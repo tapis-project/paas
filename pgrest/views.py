@@ -785,7 +785,9 @@ class DynamicView(RoleSessionMixin, APIView):
                     return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
-            if limit is None:
+            if limit == -1:
+                limit = None
+            elif limit is None:
                 limit = 10
             if offset is None:
                 offset = 0
@@ -1464,7 +1466,9 @@ class ViewsResource(RoleSessionMixin, APIView):
             return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
-            if limit is None:
+            if limit == -1:
+                limit = None
+            elif limit is None:
                 limit = 10
             if offset is None:
                 offset = 0
