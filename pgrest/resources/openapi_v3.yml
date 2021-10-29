@@ -630,6 +630,10 @@ components:
         comments:
           type: string
           description: Text area to describe table. Returned when calling manage endpoints.
+        constraints:
+          $ref: '#/components/schemas/TableConstraints'
+        enums:
+          $ref: '#/components/schemas/TableEnums'
         create:
           type: boolean
           description: Whether the "created" endpoint (HTTP verb "POST") for creating new rows is available.
@@ -651,6 +655,18 @@ components:
           description: Whether the "update" endpoint (HTTP verb "PUT") for updating a specific row is available.
           default: True
       required: [table_name, root_url, columns]
+
+    TableEnums:
+      type: object
+      description: Definition for enum to create. {enum_name":" [enum_val_1, ...]}
+
+    TableConstraints:
+      type: object
+      description: A description of the table constraints. Unique constraint is the only current constraint.
+      properties:
+        unique:
+          type: object
+          description: Object of constraint_name as key and list of columns to keep unique as value.
 
     TableColumns:
       type: object
