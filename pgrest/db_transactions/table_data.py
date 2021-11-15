@@ -1,6 +1,7 @@
 import re
 import psycopg2
 from . import config
+from .data_utils import do_transaction, parse_object_data, search_parse, order_parse, expose_primary_key
 from pgrest.pycommon.logs import get_logger
 logger = get_logger(__name__)
 
@@ -8,29 +9,6 @@ logger = get_logger(__name__)
 # Forbidden: \ ` ' " ~  / ? # [ ] ( ) @ ! $ & * + = - . , : ;
 FORBIDDEN_CHARS =  re.compile("^[^<>\\\/{}[\]~` $'\".:-?#@!$&()*+,;=]*$")
 
-
-def dict_fetch_all(cursor):
-    """
-    Return all rows from a cursor as a dict
-    """
-    columns = [col[0] for col in cursor.description]
-    return [
-        dict(zip(columns, row))
-        for row in cursor.fetchall()
-    ]
-
-def expose_primary_key(result_list, primary_key):
-    list_with_id_field = []
-    if result_list:
-        for result_dict in result_list:
-            try:
-                list_entry = result_dict.update({'_pkid': result_dict[primary_key]})
-            except:
-                msg = f"Error finding 'primary_key' field, {primary_key} in result list: {result_list}"
-                logger.error(msg)
-                raise Exception(msg)
-            list_with_id_field.append(list_entry)
-    return list_with_id_field
 
 def get_row_from_table(table_name, pk_id, tenant, primary_key, db_instance=None):
     """
@@ -41,96 +19,61 @@ def get_row_from_table(table_name, pk_id, tenant, primary_key, db_instance=None)
         command = f"SELECT * FROM {tenant}.{table_name} WHERE {primary_key} = {pk_id};"
     else:
         command = f"SELECT * FROM {tenant}.{table_name} WHERE {primary_key} = '{pk_id}';"
-
-    logger.info(f"Command: {command}")
+    
+    # Run command
     try:
-        # Read the connection parameters and connect to database.
-        if db_instance:
-            params = config.config(db_instance)
-        else:
-            params = config.config()
-        conn = psycopg2.connect(**params)
-        cur = conn.cursor()
-        cur.execute(command)
-        result = dict_fetch_all(cur)
+        obj_description, obj_unparsed_data, _ = do_transaction(command, db_instance)
+        result = parse_object_data(obj_description, obj_unparsed_data)
         if len(result) == 0:
-            raise Exception
-        cur.close()
-        conn.commit()
-        # Success.
-        logger.info(f"Row {pk_id} successfully retrieved from table {tenant}.{table_name}.")
+            msg = f"Error. Received no result when retrieving row with pk \'{pk_id}\' from view {tenant}.{table_name}."
+            logger.error(msg)
+            raise Exception(msg)
         expose_primary_key(result, primary_key)
-        return result
-    except psycopg2.DatabaseError as e:
-        msg = f"Error accessing database: {e}"
-        logger.error(msg)
-        raise Exception(msg)
+        logger.info(f"Row {pk_id} successfully retrieved from view {tenant}.{table_name}.")
     except Exception as e:
-        msg = f"Error retrieving row with pk \'{pk_id}\' from table {tenant}.{table_name}: {e}"
+        msg = f"Error retrieving row with pk \'{pk_id}\' from view {tenant}.{table_name}: {e}"
         logger.error(msg)
         raise Exception(msg)
+    return result
 
 
-def get_rows_from_table(table_name, query_dict, tenant, limit, offset, db_instance, primary_key, **kwargs):
+def get_rows_from_table(table_name, search_params, tenant, limit, offset, db_instance, primary_key, **kwargs):
     """
     Gets all rows from given table with an optional limit and filter.
     """
     logger.info(f"Getting rows from table {tenant}.{table_name}")
+    command = f"SELECT * FROM {tenant}.{table_name}"
 
+    # Add search params, order, limit, and offset to command
     try:
-        command = f"SELECT * FROM {tenant}.{table_name}"
-        if len(query_dict) > 0:
-            first = True
-            for key, value in query_dict.items():
-                if first:
-                    if type(value) == 'int' or type(value) == 'float':
-                        query = f" WHERE \"{key}\" = {value}"
-                    else:
-                        query = f" WHERE \"{key}\" = \'{value}\'"
-                    first = False
-                else:
-                    if type(value) == 'int' or type(value) == 'float':
-                        query = f" AND \"{key}\" = {value}"
-                    else:
-                        query = f" AND \"{key}\" = \'{value}\'"
-                command = command + query
+        parameterized_values = []
+        if search_params:
+            search_command, parameterized_values = search_parse(search_params, tenant, table_name, db_instance)
+            command += search_command
+
         if "order" in kwargs:
-            order = kwargs["order"].replace(",", " ").strip()
-            command = f"{command} ORDER BY {order} "
+            order = kwargs["order"]
+            order_command = order_parse(order, tenant, table_name, db_instance)
+            command += order_command
 
         command = command + f" LIMIT {int(limit)} "
         command = command + f" OFFSET {int(offset)};"
-
     except Exception as e:
-        msg = f"Unable to form database query for table {tenant}.{table_name} with query(ies) {query_dict}: {e}"
+        msg = f"Unable to add order, limit, and offset for table {tenant}.{table_name}: {e}"
         logger.warning(msg)
         raise Exception(msg)
 
-    logger.info(f"Command: {command}")
+    # Run command
     try:
-        # Read the connection parameters and connect to database.
-        if db_instance:
-            params = config.config(db_instance)
-        else:
-            params = config.config()
-        conn = psycopg2.connect(**params)
-        cur = conn.cursor()
-        cur.execute(command)
-        result = dict_fetch_all(cur)
-        cur.close()
-        conn.commit()
-        # Success.
-        logger.info(f"Rows successfully retrieved from table {tenant}.{table_name}.")
+        obj_description, obj_unparsed_data, _ = do_transaction(command, db_instance, parameterized_values)
+        result = parse_object_data(obj_description, obj_unparsed_data)
         expose_primary_key(result, primary_key)
-        return result
-    except psycopg2.DatabaseError as e:
-        msg = f"Error accessing database: {e}"
-        logger.error(msg)
-        raise Exception(msg)
+        logger.info(f"Rows successfully retrieved from table {tenant}.{table_name}.")
     except Exception as e:
         msg = f"Error retrieving rows from table {tenant}.{table_name}: {e}"
         logger.error(msg)
         raise Exception(msg)
+    return result
 
 
 def create_row(table_name, data, tenant, primary_key, db_instance=None):
@@ -150,35 +93,23 @@ def create_row(table_name, data, tenant, primary_key, db_instance=None):
         command = f"{command} {k}, "
 
     # Get the correct number of '%s' for the SQL query. (e.g. "%s, %s, %s, %s, %s, %s")
-    values = list(data.values())
-    value_str = '%s, ' * len(values)
+    parameterized_values = list(data.values())
+    value_str = '%s, ' * len(parameterized_values)
     value_str = value_str[:-2]
     command = command[:-2] + f") VALUES({value_str}) RETURNING {primary_key};"
 
-    logger.info(f"Command: {command}")
+    # Run command
     try:
-        # Read the connection parameters and connect to database.
-        if db_instance:
-            params = config.config(db_instance)
-        else:
-            params = config.config()
-        conn = psycopg2.connect(**params)
-        cur = conn.cursor()
-        cur.execute(command, values)
-        result_id = cur.fetchone()[0]
-        cur.close()
-        conn.commit()
-        # Success.
+        obj_description, obj_unparsed_data, _ = do_transaction(command, db_instance, parameterized_values)
+        result = parse_object_data(obj_description, obj_unparsed_data)
+        # We used "RETURNING %pk" in command, so we should get the PK value for later use.
+        result_id = result[0][primary_key]
         logger.info(f"Rows successfully created in table {tenant}.{table_name}.")
-        return result_id
-    except psycopg2.DatabaseError as e:
-        msg = f"Error accessing database: {e}"
-        logger.error(msg)
-        raise Exception(msg)
     except Exception as e:
         msg = f"Error creating row in table {tenant}.{table_name}: {e}"
         logger.error(msg)
         raise Exception(msg)
+    return result_id
 
 
 def delete_row(table_name, pk_id, tenant, primary_key, db_instance=None):
@@ -191,27 +122,14 @@ def delete_row(table_name, pk_id, tenant, primary_key, db_instance=None):
     else:
         command = f"DELETE FROM {tenant}.{table_name} WHERE {primary_key} = '{pk_id}';"
 
-    logger.info(f"Command: {command}")
+    # Run command
     try:
-        # Read the connection parameters and connect to database.
-        if db_instance:
-            params = config.config(db_instance)
-        else:
-            params = config.config()
-        conn = psycopg2.connect(**params)
-        cur = conn.cursor()
-        cur.execute(command)
-        result_count = cur.rowcount
-        if result_count == 0:
-            raise Exception
-        cur.close()
-        conn.commit()
-        # Success.
-        logger.info(f"Rows successfully created in table {tenant}.{table_name}.")
-    except psycopg2.DatabaseError as e:
-        msg = f"Error accessing database: {e}"
-        logger.error(msg)
-        raise Exception(msg)
+        _, _, affected_rows = do_transaction(command, db_instance)
+        if affected_rows == 0:
+            msg = f"Error. Delete row affected 0 rows, expected to delete 1."
+            logger.error(msg)
+            raise Exception(msg)
+        logger.info(f"Row successfully deleted from table {tenant}.{table_name}.")
     except Exception as e:
         msg = f"Error deleting row ID {pk_id} in table {tenant}.{table_name}: {e}"
         logger.error(msg)
@@ -234,36 +152,21 @@ def update_row_with_pk(table_name, pk_id, data, tenant, primary_key, db_instance
     else:
         command = command[:-2] + f" WHERE {primary_key} = '{pk_id}';"
 
-    logger.info(f"Command: {command}")
+    # Run command
     try:
-        # Read the connection parameters and connect to database.
-        if db_instance:
-            params = config.config(db_instance)
-        else:
-            params = config.config()
-        conn = psycopg2.connect(**params)
-        cur = conn.cursor()
-        cur.execute(command)
-
-        result_count = cur.rowcount
-        if result_count == 0:
-            raise Exception
-        cur.close()
-        conn.commit()
-        # Success.
+        _, _, affected_rows = do_transaction(command, db_instance)
+        if affected_rows == 0:
+            msg = f"Error. Delete row affected 0 rows, expected to delete 1."
+            logger.error(msg)
+            raise Exception(msg)
         logger.info(f"Row {pk_id} successfully updated in table {tenant}.{table_name}.")
-        return result_count
-    except psycopg2.DatabaseError as e:
-        msg = f"Error executing statement in database: {e}"
-        logger.error(msg)
-        raise Exception(msg)
     except Exception as e:
         msg = f"Error updating row ID {pk_id} in table {tenant}.{table_name}: {e}"
         logger.error(msg)
         raise Exception(msg)
 
 
-def update_rows_with_where(table_name, data, tenant, db_instance, where_clause=None):
+def update_rows_with_where(table_name, data, tenant, db_instance, search_params=None):
     """
     Updates 1+ row(s) on a table with the given columns and associated values based on a where clause. If a where clause
     is not specified, the entire table is updated.
@@ -277,45 +180,19 @@ def update_rows_with_where(table_name, data, tenant, db_instance, where_clause=N
             command = f"{command} {col} = ({data[col]}), "
 
     command = command[:-2]
-    if where_clause:
-        first = True
-        for key, value in where_clause.items():
-            if first:
-                if type(value) == int or type(value) == float:
-                    query = f" WHERE \"{key}\" {value['operator']} {value['value']}"
-                else:
-                    query = f" WHERE \"{key}\" {value['operator']} \'{value['value']}\'"
-                first = False
-            else:
-                if type(value) == 'int' or type(value) == 'float':
-                    query = f" AND \"{key}\" {value['operator']} {value['value']}"
-                else:
-                    query = f" AND \"{key}\" {value['operator']} \'{value['value']}\'"
-            command = command + query
+    
+    parameterized_values = []
+    if search_params:
+        search_command, parameterized_values = search_parse(search_params, tenant, table_name, db_instance)
+        command += search_command
     command = command + ';'
-
-    logger.info(f"Command: {command}")
+    
+    # Run command
     try:
-        # Read the connection parameters and connect to database.
-        if db_instance:
-            params = config.config(db_instance)
-        else:
-            params = config.config()
-        conn = psycopg2.connect(**params)
-        cur = conn.cursor()
-        cur.execute(command)
-
-        result_count = cur.rowcount
-        cur.close()
-        conn.commit()
-        # Success.
-        logger.info(f"{result_count} rows were successfully updated in table {tenant}.{table_name}.")
-        return result_count
-    except psycopg2.DatabaseError as e:
-        msg = f"Error executing update statement in database: {e}"
-        logger.error(msg)
-        raise Exception(msg)
+        obj_description, obj_unparsed_data, affected_rows = do_transaction(command, db_instance, parameterized_values)
+        logger.info(f"{affected_rows} rows were successfully updated in table {tenant}.{table_name}.")
     except Exception as e:
         msg = f"Error updating rows in table {tenant}.{table_name}: {e}"
         logger.error(msg)
         raise Exception(msg)
+    return affected_rows

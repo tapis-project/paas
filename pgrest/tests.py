@@ -358,7 +358,7 @@ class ResponseTestCase(TenantTestCase):
                                         content_type='application/json', **auth_headers)
             self.assertEqual(response.status_code, 200)
 
-        response = self.client.get(f'/v3/pgrest/data/{root_url}?where_col_one=hi', **auth_headers)
+        response = self.client.get(f'/v3/pgrest/data/{root_url}?col_one.eq=hi', **auth_headers)
         self.assertEqual(len(response.json()["result"]), 1)
         self.assertEqual(response.status_code, 200)
 
@@ -375,7 +375,7 @@ class ResponseTestCase(TenantTestCase):
                                         content_type='application/json', **auth_headers)
             self.assertEqual(response.status_code, 200)
 
-        response = self.client.get(f'/v3/pgrest/data/{root_url}?where_col_one=goodbye&where_col_three=95',
+        response = self.client.get(f'/v3/pgrest/data/{root_url}?col_one.eq=goodbye&col_three.eq=95',
                                    **auth_headers)
         self.assertEqual(len(response.json()["result"]), 1)
         self.assertEqual(response.status_code, 200)
@@ -395,7 +395,7 @@ class ResponseTestCase(TenantTestCase):
 
         response = self.client.get(f'/v3/pgrest/data/{root_url}', **auth_headers)
         self.assertEqual(len(response.json()["result"]), 5)
-        response = self.client.get(f'/v3/pgrest/data/{root_url}?where_col_one=goodbye&where_col_four=True',
+        response = self.client.get(f'/v3/pgrest/data/{root_url}?col_one.eq=goodbye&col_four.eq=True',
                                    **auth_headers)
         self.assertEqual(len(response.json()["result"]), 1)
         self.assertEqual(response.status_code, 200)
@@ -442,11 +442,11 @@ class ResponseTestCase(TenantTestCase):
                                         content_type='application/json', **auth_headers)
             self.assertEqual(response.status_code, 200)
 
-        response = self.client.get(f'/v3/pgrest/data/{root_url}?where_col_one=goodbye', **auth_headers)
+        response = self.client.get(f'/v3/pgrest/data/{root_url}?col_one.eq=goodbye', **auth_headers)
         self.assertEqual(response.json()["result"][0]["col_three"], 95)
         self.assertEqual(response.json()["result"][1]["col_three"], 94)
 
-        response = self.client.get(f'/v3/pgrest/data/{root_url}?where_col_one=goodbye&order=col_three,ASC',
+        response = self.client.get(f'/v3/pgrest/data/{root_url}?col_one.eq=goodbye&order=col_three,ASC',
                                    **auth_headers)
         self.assertEqual(response.json()["result"][0]["col_three"], 94)
         self.assertEqual(response.json()["result"][1]["col_three"], 95)
@@ -530,7 +530,7 @@ class ResponseTestCase(TenantTestCase):
 
         # now, update
         where_clause = {"col_five": {
-            "operator": "=",
+            "operator": "eq",
             "value": "haha"
         }}
         data = {"col_one": "lata"}
@@ -558,7 +558,7 @@ class ResponseTestCase(TenantTestCase):
             self.assertEqual(response.status_code, 200)
 
         where_clause = {"col_three": {
-            "operator": ">=",
+            "operator": "gte",
             "value": 95
         }}
         data = {"col_one": "lata"}
@@ -586,7 +586,7 @@ class ResponseTestCase(TenantTestCase):
             self.assertEqual(response.status_code, 200)
 
         where_clause = {"col_three": {
-            "operator": ">=",
+            "operator": "gte",
             "value": 95
         }}
 

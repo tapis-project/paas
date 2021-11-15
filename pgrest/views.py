@@ -212,6 +212,7 @@ class RoleSessionMixin:
         return super().dispatch(request, *args, **kwargs)
 
 
+### Manage Tables
 class TableManagement(RoleSessionMixin, APIView):
     """
     GET: Returns information about all of the tables.
@@ -245,6 +246,7 @@ class TableManagement(RoleSessionMixin, APIView):
                     "update_schema": table.validate_json_update,
                     "create_schema": table.validate_json_create,
                     "tenant_id": table.tenant_id,
+                    "constraints": table.constraints,
                     "comments": table.comments
                 })
         else:
@@ -257,6 +259,7 @@ class TableManagement(RoleSessionMixin, APIView):
                     "endpoints": table.endpoints,
                     "tenant_id": table.tenant_id,
                     "primary_key": table.primary_key,
+                    "constraints": table.constraints,
                     "comments": table.comments
                 })
 
@@ -291,6 +294,11 @@ class TableManagement(RoleSessionMixin, APIView):
 
         if ManageTables.objects.filter(table_name=table_name, tenant_id=req_tenant).exists():
             msg = f"Table with name '{table_name}' and tenant_id '{req_tenant}' already exists in ManageTables table."
+            logger.warning(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+        
+        if ManageViews.objects.filter(view_name=table_name, tenant_id=req_tenant).exists():
+            msg = f"View with name '{table_name}' and tenant_id '{req_tenant}' already exists in ManageViews table. View and Table names can collide."
             logger.warning(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
@@ -423,6 +431,7 @@ class TableManagement(RoleSessionMixin, APIView):
             "table_id": new_table.pk,
             "root_url": new_table.root_url,
             "endpoints": new_table.endpoints,
+            "constraints": new_table.constraints,
             "comments": new_table.comments
         }
 
@@ -487,6 +496,7 @@ class TableManagementById(RoleSessionMixin, APIView):
                 "update schema": table.validate_json_update,
                 "create schema": table.validate_json_create,
                 "primary_key": table.primary_key,
+                "constraints": table.constraints,
                 "comments": table.comments
             }
         else:
@@ -497,6 +507,7 @@ class TableManagementById(RoleSessionMixin, APIView):
                 "endpoints": table.endpoints,
                 "tenant_id": table.tenant_id,
                 "primary_key": table.primary_key,
+                "constraints": table.constraints,
                 "comments": table.comments
             }
 
@@ -504,7 +515,20 @@ class TableManagementById(RoleSessionMixin, APIView):
 
     @is_admin
     def put(self, request, *args, **kwargs):
-        logger.debug("top of put /manage/tables/<id>")
+        """Alter tables using Postgres Alter table commands. This is complicated because
+        each table has it's column_definition saved in managetables along with table name.
+        We use these to ensure row puts are in the proper formatting and that we call the correct
+        tables inside of a tenant.
+        
+        This means that we'll need to 
+
+        Args:
+            request ([type]): [description]
+
+        Returns:
+            [type]: [description]
+        """
+        logger.debug("top of put /manage/tables/<table_id>")
         req_tenant = request.session['tenant_id']
         db_instance_name = request.session['db_instance_name']
 
@@ -734,6 +758,7 @@ class TableManagementLoad(RoleSessionMixin, APIView):
 # based on the url to get here. We then will formulate a SQL statement to do the need actions.
 
 
+### Table Rows
 # Once we figure out the table and row, these are just simple SQL crud operations.
 class DynamicView(RoleSessionMixin, APIView):
     """
@@ -773,18 +798,28 @@ class DynamicView(RoleSessionMixin, APIView):
             logger.warning(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
-        query_dict = dict()
-        for param in params:
-            if param.lower().startswith('where'):
-                table_columns = table.column_definition.keys()
-                if param[6:] in table_columns or param[6:] == 'pk':
-                    query_dict.update({param[6:]: params[param]})
-                else:
-                    msg = f"Invalid query parameter: {param[6:]}"
-                    logger.warning(msg)
+        try:
+            # Parse params, if the key contains a search operation, throw it into search_params
+            # search_params list is [[key, oper, value], ...]
+            search_params = []
+            opers = ['.neq', '.eq', '.lte', '.lt', '.gte', '.gt', '.nin', '.in',
+                     '.null', '.between', '.nbetween', '.like', '.nlike']
+            for full_key, value in params.items():
+                # Check that value is not list, if it is that means the user had two query parameters that were
+                # exactly the same and the request object consolidated the inputs, we don't want/need this.
+                if isinstance(value, list):
+                    msg = f"You may only specify a query value once, ex. ?col1.eq=2&col1.eq=2 is NOT allowed."
+                    logger.critical(msg + f" e: {e}")
                     return HttpResponseBadRequest(make_error(msg=msg))
 
-        try:
+                # If param ends with the operation, we remove the operation and use it later. That
+                # should leave only the key value that we can check later against the view's columns
+                for oper in opers:
+                    if full_key.endswith(oper):
+                        key = full_key.replace(oper, "")
+                        search_params.append([key, oper, value])
+                        break
+            logger.info(f"Search params: {search_params}")
             if limit == -1:
                 limit = None
             elif limit is None:
@@ -793,7 +828,7 @@ class DynamicView(RoleSessionMixin, APIView):
                 offset = 0
             if order is not None:
                 result = table_data.get_rows_from_table(table.table_name,
-                                                        query_dict,
+                                                        search_params,
                                                         req_tenant,
                                                         limit,
                                                         offset,
@@ -801,7 +836,7 @@ class DynamicView(RoleSessionMixin, APIView):
                                                         table.primary_key,
                                                         order=order)
             else:
-                result = table_data.get_rows_from_table(table.table_name, query_dict, req_tenant, limit, offset,
+                result = table_data.get_rows_from_table(table.table_name, search_params, req_tenant, limit, offset,
                                                         db_instance, table.primary_key)
         except Exception as e:
             msg = f"Failed to retrieve rows from table {table.table_name} on tenant {req_tenant}. {e}"
@@ -959,7 +994,44 @@ class DynamicView(RoleSessionMixin, APIView):
 
         try:
             if where_clause:
-                table_data.update_rows_with_where(table.table_name, data, req_tenant, db_instance, where_clause)
+                # where_clause comes in as {variable: {"operator": oper, "value": value}, ...}
+                # Need to parse dict to search_param format. [[key, oper, value], ...]
+                logger.info(f"Parsing where_clause: {where_clause}")
+                search_params = []
+                if not isinstance(where_clause, dict):
+                    msg = f"Error, where clause should come as a dict, got {type(where_clause)}"
+                    logger.error(msg)
+                    return HttpResponseBadRequest(make_error(msg=msg))
+                for where_key, where_dict in where_clause.items():
+                    if not isinstance(where_dict, dict):
+                        msg = f"Error in where_clause. Got key, but value should be of type dict, got {where_dict}"
+                        logger.error(msg)
+                        return HttpResponseBadRequest(make_error(msg=msg))
+                    where_oper = where_dict.get("operator")
+                    where_value = where_dict.get("value")
+                    if not where_oper:
+                        msg = f"'operator' must be a key in where_clause dict. where_clause dict: {where_dict}"
+                        logger.error(msg)
+                        return HttpResponseBadRequest(make_error(msg=msg))
+                    if not where_value:
+                        msg = f"'value' must be a key in where_clause dict. where_clause dict: {where_dict}"
+                        logger.error(msg)
+                        return HttpResponseBadRequest(make_error(msg=msg))
+                    if not isinstance(where_oper, str):
+                        msg = f"'operator' must be a string, got: {where_oper}, type: {type(where_oper)}"
+                        logger.error(msg)
+                        return HttpResponseBadRequest(make_error(msg=msg))
+                    
+                    logger.info('HERE WHERE_CLAUSE')
+                    opers = ['neq', 'eq', 'lte', 'lt', 'gte', 'gt', 'nin', 'in', 'nlike', 'like', 'between', 'nbetween', 'null']
+                    if where_oper not in opers:
+                        msg = f"where_oper must be in {opers}, got {where_oper}."
+                        logger.error(msg)
+                        return HttpResponseBadRequest(make_error(msg=msg))
+                    
+                    search_params.append([where_key, f".{where_oper}", where_value])
+                logger.info(f"Search params: {search_params}")
+                table_data.update_rows_with_where(table.table_name, data, req_tenant, db_instance, search_params)
             else:
                 table_data.update_rows_with_where(table.table_name, data, req_tenant, db_instance)
         except Exception as e:
@@ -1216,6 +1288,7 @@ class ViewManagement(RoleSessionMixin, APIView):
                 msg = f"User may only specify raw_sql or select_query, got both."
                 logger.error(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
+            
             if where_query:
                 msg = f"When using a raw_sql query, where_query is not allowed, got both."
                 logger.error(msg)
@@ -1226,14 +1299,20 @@ class ViewManagement(RoleSessionMixin, APIView):
             msg = f"The view_name must be of type string. Got type: {type(view_name)}"
             logger.error(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
+        
         if not FORBIDDEN_CHARS.match(view_name):
             msg = f"The view_name inputted is not url safe. Value must be alphanumeric with _ and - optional. Value inputted: {view_name}"
             logger.error(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
-        # Check for existence of view_name in tenant.
+        # Check for existence of view_name/table_name in tenant, can collide.
         if ManageViews.objects.filter(view_name=view_name, tenant_id=req_tenant).exists():
             msg = f"View with name \'{view_name}\' and tenant_id \'{req_tenant}\' already exists in ManageViews table."
+            logger.warning(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+        
+        if ManageTables.objects.filter(table_name=view_name, tenant_id=req_tenant).exists():
+            msg = f"Table with name '{view_name}' and tenant_id '{req_tenant}' already exists in ManageTables table. View and Table names can collide"
             logger.warning(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
@@ -1452,7 +1531,8 @@ class ViewsResource(RoleSessionMixin, APIView):
         user_roles = get_user_sk_roles(req_tenant, req_username)
         try:
             if not set(view.permission_rules).issubset(set(user_roles)):
-                msg = f"User {req_username} in tenant {req_tenant} does not have permission to access view {view.view_name} in tenant {req_tenant}."
+                msg = (f"User {req_username} in tenant {req_tenant} does not have permission to access view {view.view_name}"
+                       f" in tenant {req_tenant}. User roles: {user_roles}. Required roles: {view.permission_rules}")
                 logger.debug(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
         except Exception as e:
@@ -1466,6 +1546,27 @@ class ViewsResource(RoleSessionMixin, APIView):
             return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
+            # Parse params, if the key contains a search operation, throw it into search_params
+            # search_params list is [[key, oper, value], ...]
+            search_params = []
+            opers = ['.neq', '.eq', '.lte', '.lt', '.gte', '.gt', '.nin', '.in',
+                     '.null', '.between', '.nbetween', '.like', '.nlike']
+            for full_key, value in params.items():
+                # Check that value is not list, if it is that means the user had two query parameters that were
+                # exactly the same and the request object consolidated the inputs, we don't want/need this.
+                if isinstance(value, list):
+                    msg = f"You may only specify a query value once, ex. ?col1.eq=2&col1.eq=2 is NOT allowed."
+                    logger.critical(msg + f" e: {e}")
+                    return HttpResponseBadRequest(make_error(msg=msg))
+
+                # If param ends with the operation, we remove the operation and use it later. That
+                # should leave only the key value that we can check later against the view's columns
+                for oper in opers:
+                    if full_key.endswith(oper):
+                        key = full_key.replace(oper, "")
+                        search_params.append([key, oper, value])
+                        break
+            logger.info(f"Search params: {search_params}")
             if limit == -1:
                 limit = None
             elif limit is None:
@@ -1474,7 +1575,7 @@ class ViewsResource(RoleSessionMixin, APIView):
                 offset = 0
             if order is not None:
                 result = view_data.get_rows_from_view(view.view_name,
-                                                      params,
+                                                      search_params,
                                                       req_tenant,
                                                       limit,
                                                       offset,
@@ -1482,7 +1583,7 @@ class ViewsResource(RoleSessionMixin, APIView):
                                                       view.manage_view_id,
                                                       order=order)
             else:
-                result = view_data.get_rows_from_view(view.view_name, params, req_tenant, limit, offset, db_instance,
+                result = view_data.get_rows_from_view(view.view_name, search_params, req_tenant, limit, offset, db_instance,
                                                       view.manage_view_id)
         except Exception as e:
             msg = f"Failed to retrieve rows from view {view.view_name} on tenant {req_tenant}. {e}"
