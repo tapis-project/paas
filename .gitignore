@@ -78,3 +78,5 @@ pgrest/pycommon/__pycache__/
 pgrest/db_transactions/__pycache__/
 pgrest/migrations/__pycache__/
 *.pyc
+*.mypy_cache
+*mypy.ini
