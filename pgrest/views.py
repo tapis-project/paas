@@ -2,6 +2,7 @@ import datetime
 import json
 import re
 import timeit
+import copy
 
 import requests
 from cerberus import Validator
@@ -10,6 +11,7 @@ from django.db import transaction
 from django.http import (HttpResponse, HttpResponseBadRequest,
                          HttpResponseForbidden, HttpResponseNotFound,
                          HttpResponseServerError)
+from pgrest.db_transactions.data_utils import do_transaction
 from rest_framework.views import APIView
 
 from pgrest.db_transactions import (bulk_data, manage_tables, table_data,
@@ -520,13 +522,35 @@ class TableManagementById(RoleSessionMixin, APIView):
         We use these to ensure row puts are in the proper formatting and that we call the correct
         tables inside of a tenant.
         
-        This means that we'll need to 
+        This means that we'll need to get all column defs and also update column defs depending on
+        the inputted data. For example, we'll have to change the table name in managetables if a 
+        user passes in {"table_name": newNameHere}.
+        
+        Also important to remember that we might need to rollback these changes. The changes to
+        the Django ManageTables table along with changes to the Postgres data that we're modifying.
+        Psycopg2 support cursor.rollback() to rollback to the start of any "pending transactions".
+        Django also has rollbacks, when Django errors it'll rollback by itself, this however excludes
+        model data changes. Meaning we'll have to save whatever Django model data we have as a "init
+        state" and revert back to that if there's a problem down the line.
 
         Args:
-            request ([type]): [description]
+            request: request_object
+            kwargs: dict of the following
+                "root_url": new_root_url,
+                "table_name": new_name,
+                "comments": new_comments,
+                "endpoints": [new_endpoints_list]},
+                "column_type": "column_name, type"
+                "column_drop_column": column_name,
 
+                ***WIP***
+                "column_set_default": "column_name, new_default"
+                "column_drop_default": column_name,
+                "column_add_column": {"column_name": Traditional table column definition dict}    #### This seems difficult?
+        
         Returns:
-            [type]: [description]
+            200: "Table put succesfully"
+            400: "Error completing table put: e"
         """
         logger.debug("top of put /manage/tables/<table_id>")
         req_tenant = request.session['tenant_id']
@@ -542,133 +566,252 @@ class TableManagementById(RoleSessionMixin, APIView):
 
         try:
             table = ManageTables.objects.get(pk=table_id)
-            transition_table = ManageTablesTransition.objects.get(manage_table=table)
         except ManageTables.DoesNotExist:
             msg = f"Table with ID {table_id} does not exist in ManageTables table."
             logger.warning(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
-        except ManageTablesTransition.DoesNotExist:
-            msg = f"Transition table for table with ID {table_id} does not exist."
-            logger.warning(msg)
-            return HttpResponseServerError(make_error(msg=msg))
 
         # Parse out possible update fields.
         root_url = request.data.get('root_url', None)
         table_name = request.data.get('table_name', None)
-        update_cols = request.data.get('columns', None)
         comments = request.data.get('comments', None)
-        list_all = request.data.get('list_all', ("GET_ALL" in table.endpoints))
-        list_one = request.data.get('list_one', ("GET_ONE" in table.endpoints))
-        create = request.data.get('create', ("CREATE" in table.endpoints))
-        update = request.data.get('update', ("UPDATE" in table.endpoints))
-        delete = request.data.get('delete', ("DELETE" in table.endpoints))
-        endpoints = request.data.get('endpoints', True)
+        endpoints = request.data.get('endpoints', None) # GET_ALL, GET_ONE, CREATE, UPDATE, DELETE, ALL
+        column_type = request.data.get('column_type', None)
+        drop_column = request.data.get('drop_column', None)
 
-        if root_url is not None:
-            table.root_url = root_url
-            table.save()
+        
+        #ONLY ONE CHANGE PER REQUEST
+        # We change Django first and then Postgres and Postgres is harder to revert using do_transaction
+        updates_to_do = 0
+        for update_field in [root_url, table_name, comments, endpoints, column_type, drop_column]:
+            if update_field:
+                updates_to_do += 1
+        if updates_to_do == 0:
+            msg = f"No updates requested"
+            logger.warning(msg)
+            return HttpResponse(make_success(msg="No updates to table requested. Success."), content_type='application/json')
+        if updates_to_do >= 2:
+            msg = f"Only one update to table may be done at a time."
+            logger.warning(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        # Backup table - To revert to if there's a problem
+        backup_table = copy.copy(table)
+        
+        
+        # root_url operation
+        if root_url:
+            if not isinstance(root_url, str):
+                msg = f"Error changing root_url for table {backup_table.table_name}. 'root_url' must be a str. Received type {type(root_url)}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            try:
+                table.root_url = root_url
+                table.save()
+            except Exception as e:
+                # Revert Django
+                backup_table.save()
+                msg = f"Changes reverted. Error changing root_url for table {backup_table.table_name} from {backup_table.root_url}to {root_url}. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+
+        # table_name operation
+        if table_name is not None:
+            if not isinstance(table_name, str):
+                msg = f"Error renaming table {backup_table.table_name}. 'table_name' must be a str. Received type {type(table_name)}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg)) 
+                     
+            try:
+                table.table_name = table_name
+                table.save()
+                command = f"ALTER TABLE {req_tenant}.{backup_table.table_name} RENAME TO {table_name}"
+                do_transaction(command, db_instance_name)
+            except Exception as e:
+                # Revert Django
+                backup_table.save()
+                msg = f"Changes reverted. Error changing table name from {backup_table.table_name} to {table_name}. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+
+        # comment operation
         if comments is not None:
-            table.comments = comments
-            table.save()
-        if not endpoints:
-            table.endpoints = list()
-            table.save()
-        else:
-            set_endpoints = set(table.endpoints)
-            if list_all:
-                set_endpoints.add("GET_ALL")
-            else:
-                if "GET_ALL" in set_endpoints:
-                    set_endpoints.remove("GET_ALL")
+            if not isinstance(comments, str):
+                msg = f"Error adding comments to table {backup_table.table_name}. 'comments' must be a str. Received type {type(comments)}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
 
-            if list_one:
-                set_endpoints.add("GET_ONE")
-            else:
-                if "GET_ONE" in set_endpoints:
-                    set_endpoints.remove("GET_ONE")
+            try:
+                table.comments = comments
+                table.save()
+            except Exception as e:
+                # Revert Django
+                backup_table.save()
+                msg = f"Changes reverted. Error adding comments to table {backup_table.table_name}. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+            
 
-            if create:
-                set_endpoints.add("CREATE")
-            else:
-                if "CREATE" in set_endpoints:
-                    set_endpoints.remove("CREATE")
+        # endpoints operation
+        if endpoints is not None:
+            valid_endpoints = ["GET_ALL", "GET_ONE", "CREATE", "UPDATE", "DELETE", "ALL"]
+            if not isinstance(endpoints, list):
+                msg = f"Error with put to table with ID {backup_table.table_name}. 'endpoints' must be a list. Received type {type(endpoints)}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
 
-            if update:
-                set_endpoints.add("UPDATE")
-            else:
-                if "UPDATE" in set_endpoints:
-                    set_endpoints.remove("UPDATE")
-
-            if delete:
-                set_endpoints.add("DELETE")
-            else:
-                if "DELETE" in set_endpoints:
-                    set_endpoints.remove("DELETE")
-
-            table.endpoints = list(set_endpoints)
-            table.save()
-
-            if table_name is not None:
-                transition_table.table_name_tn = table_name
-                transition_table.save()
-
-            if update_cols is not None:
-                current_cols = transition_table.column_definition_tn
-                for col_name, col_info in current_cols.items():
-                    if "action" not in col_info:
-                        msg = f"Action field is required to update column {col_name}"
+            try:
+                endpoints = set(endpoints)
+                for endpoint in endpoints:
+                    if endpoint not in valid_endpoints:
+                        msg = f"Error with put to table with ID {backup_table.table_name}. Endpoints list can only contain str values from: {valid_endpoints}"
                         logger.warning(msg)
                         return HttpResponseBadRequest(make_error(msg=msg))
+                    if endpoint == "ALL":
+                        endpoints = endpoints.union(set(valid_endpoints))
+                        # All isn't an actual thing we want to save.
+                        endpoints.remove("ALL")
+                table.endpoints = endpoints
+                table.save()
+            except Exception as e:
+                # Revert Django
+                backup_table.save()
+                msg = f"Changes reverted. Error changing endpoints for table {backup_table.table_name}. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
 
-                    if col_info["action"] == 'DROP':
-                        current_cols.pop(col_name, None)
-                    elif col_info["action"] == "ADD":
-                        current_cols[col_name] = col_info
-                    elif col_info["action"] == "ALTER":
-                        current_cols.pop(col_name, None)
-                        current_cols[col_name] = col_info
-                    else:
-                        msg = f"Invalid action for column {col_name} received: {col_info['action']}"
-                        logger.warning(msg)
-                        return HttpResponseBadRequest(make_error(msg=msg))
 
-                    transition_table.save()
+        # We grab enums to do run 'create_validate_schema' in column_type and drop_column operations
+        if column_type or drop_column:
+            existing_enums = manage_tables.get_enums(db_instance_name)
+            if existing_enums.get(req_tenant):
+                existing_enums_names = list(existing_enums.get(req_tenant).keys())
+            else:
+                existing_enums_names = []
+            logger.info(f"Got list of existing enum_names: {existing_enums_names}")
 
-                # We grab enums to do some checks
-                existing_enums = manage_tables.get_enums(db_instance_name)
-                if existing_enums.get(req_tenant):
-                    existing_enums_names = list(existing_enums.get(req_tenant).keys())
-                else:
-                    existing_enums_names = []
-                logger.info(f"Got list of existing enum_names: {existing_enums_names}")
 
-                try:
-                    validate_json_create_tn, validate_json_update_tn = create_validate_schema(
-                        current_cols, req_tenant, existing_enums)
-                    transition_table.validate_json_create_tn = validate_json_create_tn
-                    transition_table.validate_json_update_tn = validate_json_update_tn
-                    transition_table.save()
-                except Exception as e:
-                    msg = f"Unable to create json validation schema for updating table {table_name}: {e}" \
-                          f"\nFailed to update transition table for {table_name}. "
-                    logger.warning(msg)
-                    return HttpResponseBadRequest(make_error(msg=msg))
+        # column_type operation
+        if column_type:
+            valid_types = ["varchar", "boolean", "integer", "text", "timestamp", "serial", "datetime"]
+            if not isinstance(column_type, str):
+                msg = f"Error changing column type for table. 'column_type' must be a str. Received type {type(column_type)}. Format should be 'column_name,new_type'"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+            
+            split_str = column_type.split(',')
+            if not len(split_str) == 2:
+                msg = f"Error changing column type for table. 'column_type' should come in format 'column_name,new_type', got {column_type}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+            
+            if not split_str[0] or not split_str[1]:
+                msg = f"Error changing column type for table. 'column_type' should come in format 'column_name,new_type', got {column_type}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+            
+            column_name, new_type = split_str
+                        
+            # Check that new_type is in valid_types or is in existing_enums
+            if new_type not in valid_types + existing_enums_names:
+                msg = f"Error changing column type for table. '{new_type}' not in {valid_types + existing_enums_names}."
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
 
-                # generate migration script
-                # apply and roll back, error if it does not work
-                # if works, open process that creates a new file and pipes generated migration into it.
+            # Check column_name is legal.
+            valid_column_names = table.column_definition.keys()
+            if not column_name in valid_column_names:
+                msg = f"Error: column_name not in current table. '{column_name}' not in {list(valid_column_names)}."
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
 
-    # def create_update_table_migration(swlf, table_name, tenant, update_dict):
-    #     logger.info(f"Generating script to update table {tenant}.{table_name}...")
-    #
-    #     command = "ALTER TABLE %s" % table_name
-    #     if "table_name" in update_dict:
-    #         command = command + " RENAME TO %s"
-    #
-    #     if "columns" in update_dict:
-    #         for col_name, col_info in update_dict["columns"].items():
-    #             if col["action"] == "DROP":
-    #                 command = command + " DROP %s IF EXISTS column %s" % col_name, col_info["on_delete"]
+            new_column_definition = copy.copy(table.column_definition)
+            
+            # Make the type change to the column_definition.
+            try:
+                old_column = new_column_definition[column_name]
+                new_column_definition[column_name]['data_type'] = new_type
+                if old_column['data_type'] == 'varchar' and new_type != 'varchar':
+                    del new_column_definition[column_name]['char_len']
+                if new_type == 'varchar' and not new_column_definition[column_name].get('char_len'):
+                    new_column_definition[column_name]['char_len'] = '255'
+            except Exception as e:
+                msg = f"Error changing column type in column_definition. New def: {new_column_definition}. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            # Create a validation schema
+            try:
+                validate_json_create, validate_json_update = create_validate_schema(new_column_definition, req_tenant, existing_enums_names)
+            except Exception as e:
+                msg = f"Unable to create json validation schema after changing table column type. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            try:
+                table.column_definition = new_column_definition
+                table.validate_json_create = validate_json_create
+                table.validate_json_update = validate_json_update
+                table.save()
+                command = f"ALTER TABLE {req_tenant}.{backup_table.table_name} ALTER COLUMN {column_name} TYPE {new_type}"
+                do_transaction(command, db_instance_name)
+            except Exception as e:
+                # Revert Django
+                backup_table.save()
+                msg = f"Changes reverted. Error changing column_name '{column_name}' to type '{new_type}' in table '{backup_table.table_name}'. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+
+        # drop_column operation
+        if drop_column:
+            column_name = drop_column
+            if not isinstance(column_name, str):
+                msg = f"Error dropping column in table. 'column_name' must be a str. Received type {type(column_name)}. Format should be 'column_name'"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            # Check column_name is legal.
+            valid_column_names = table.column_definition.keys()
+            if not column_name in valid_column_names:
+                msg = f"Error: column_name not in current table. '{column_name}' not in {list(valid_column_names)}."
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            new_column_definition = copy.copy(table.column_definition)
+            
+            # Make the type change to the column_definition.
+            try:
+                del new_column_definition[column_name]
+            except Exception as e:
+                msg = f"Error dropping column in table. New def: {new_column_definition}. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            # Create a validation schema
+            try:
+                validate_json_create, validate_json_update = create_validate_schema(new_column_definition, req_tenant, existing_enums_names)
+            except Exception as e:
+                msg = f"Unable to create json validation schema after changing table column type. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            try:
+                table.column_definition = new_column_definition
+                table.validate_json_create = validate_json_create
+                table.validate_json_update = validate_json_update
+                table.save()
+                command = f"ALTER TABLE {req_tenant}.{backup_table.table_name} DROP COLUMN {column_name}"
+                do_transaction(command, db_instance_name)
+            except Exception as e:
+                # Revert Django
+                backup_table.save()
+                msg = f"Changes reverted. Error dropping column_name '{column_name}' in table '{backup_table.table_name}'. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
 
         return HttpResponse(make_success(msg="Table put successfully."), content_type='application/json')
 
