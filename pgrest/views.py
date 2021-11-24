@@ -541,12 +541,12 @@ class TableManagementById(RoleSessionMixin, APIView):
                 "comments": new_comments,
                 "endpoints": [new_endpoints_list]},
                 "column_type": "column_name, type"
-                "column_drop_column": column_name,
+                "drop_column": column_name,
+                "drop_default": column_name,
+                "set_default": "column_name, new_default"
 
                 ***WIP***
-                "column_set_default": "column_name, new_default"
-                "column_drop_default": column_name,
-                "column_add_column": {"column_name": Traditional table column definition dict}    #### This seems difficult?
+                "add_column": {"column_name": Traditional table column definition dict}    #### This seems difficult?
         
         Returns:
             200: "Table put succesfully"
@@ -578,12 +578,15 @@ class TableManagementById(RoleSessionMixin, APIView):
         endpoints = request.data.get('endpoints', None) # GET_ALL, GET_ONE, CREATE, UPDATE, DELETE, ALL
         column_type = request.data.get('column_type', None)
         drop_column = request.data.get('drop_column', None)
+        drop_default = request.data.get('drop_default', None)
+        set_default = request.data.get('set_default', None)
+
 
         
         #ONLY ONE CHANGE PER REQUEST
         # We change Django first and then Postgres and Postgres is harder to revert using do_transaction
         updates_to_do = 0
-        for update_field in [root_url, table_name, comments, endpoints, column_type, drop_column]:
+        for update_field in [root_url, table_name, comments, endpoints, column_type, drop_column, drop_default]:
             if update_field:
                 updates_to_do += 1
         if updates_to_do == 0:
@@ -783,11 +786,11 @@ class TableManagementById(RoleSessionMixin, APIView):
 
             new_column_definition = copy.copy(table.column_definition)
             
-            # Make the type change to the column_definition.
+            # Delete column from column_def
             try:
                 del new_column_definition[column_name]
             except Exception as e:
-                msg = f"Error dropping column in table. New def: {new_column_definition}. e: {e}"
+                msg = f"Error dropping column in column_definition. New def: {new_column_definition}. e: {e}"
                 logger.warning(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
 
@@ -812,6 +815,115 @@ class TableManagementById(RoleSessionMixin, APIView):
                 msg = f"Changes reverted. Error dropping column_name '{column_name}' in table '{backup_table.table_name}'. e: {e}"
                 logger.warning(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
+
+        # drop_default operation
+        if drop_default:
+            column_name = drop_default
+            if not isinstance(column_name, str):
+                msg = f"Error dropping column default in table. 'column_name' must be a str. Received type {type(column_name)}. Format should be 'column_name'"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            # Check column_name is legal.
+            valid_column_names = table.column_definition.keys()
+            if not column_name in valid_column_names:
+                msg = f"Error: column_name not in current table. '{column_name}' not in {list(valid_column_names)}."
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            new_column_definition = copy.copy(table.column_definition)
+            
+            # Delete default from column_def
+            try:
+                del new_column_definition[column_name]['default']
+            except Exception as e:
+                msg = f"Error dropping column default in column_definition. New def: {new_column_definition}. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            # Create a validation schema
+            try:
+                validate_json_create, validate_json_update = create_validate_schema(new_column_definition, req_tenant, existing_enums_names)
+            except Exception as e:
+                msg = f"Unable to create json validation schema after changing table column type. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            try:
+                table.column_definition = new_column_definition
+                table.validate_json_create = validate_json_create
+                table.validate_json_update = validate_json_update
+                table.save()
+                command = f"ALTER TABLE {req_tenant}.{backup_table.table_name} ALTER COLUMN {column_name} DROP DEFAULT"
+                do_transaction(command, db_instance_name)
+            except Exception as e:
+                # Revert Django
+                backup_table.save()
+                msg = f"Changes reverted. Error dropping default from column_name '{column_name}' in table '{backup_table.table_name}'. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+
+        # set_default operation
+        if set_default:
+            if not isinstance(set_default, str):
+                msg = f"Error setting default for column in table. 'set_default' must be a str. Received type {type(set_default)}. Format should be 'column_name,new_default'"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+            
+            split_str = set_default.split(',')
+            if not len(split_str) == 2:
+                msg = f"Error setting default for column in table. 'set_default' should come in format 'column_name,new_default', got {column_type}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+            
+            if not split_str[0] or not split_str[1]:
+                msg = f"Error setting default for column in table. 'set_default' should come in format 'column_name,new_default', got {column_type}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+            
+            column_name, new_default = set_default
+
+            # Check column_name is legal.
+            valid_column_names = table.column_definition.keys()
+            if not column_name in valid_column_names:
+                msg = f"Error: column_name not in current table. '{column_name}' not in {list(valid_column_names)}."
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            new_column_definition = copy.copy(table.column_definition)
+            
+            # Add new column defintion to column_definition.
+            try:
+                new_column_definition[column_name]["default"] = new_default
+            except Exception as e:
+                msg = f"Error setting default for column in table. New def: {new_column_definition}. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            # Create a validation schema
+            try:
+                validate_json_create, validate_json_update = create_validate_schema(new_column_definition, req_tenant, existing_enums_names)
+            except Exception as e:
+                msg = f"Unable to create json validation schema after changing table column default. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            try:
+                table.column_definition = new_column_definition
+                table.validate_json_create = validate_json_create
+                table.validate_json_update = validate_json_update
+                table.save()
+                command = f"ALTER TABLE {req_tenant}.{backup_table.table_name} ALTER COLUMN {column_name} SET DEFAULT {new_default}"
+                do_transaction(command, db_instance_name)
+            except Exception as e:
+                # Revert Django
+                backup_table.save()
+                msg = f"Changes reverted. Error changing default for column_name '{column_name}' to '{new_default}' in table '{backup_table.table_name}'. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+
 
         return HttpResponse(make_success(msg="Table put successfully."), content_type='application/json')
 
