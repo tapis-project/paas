@@ -613,9 +613,11 @@ class TableManagementById(RoleSessionMixin, APIView):
             except Exception as e:
                 # Revert Django
                 backup_table.save()
-                msg = f"Changes reverted. Error changing root_url for table {backup_table.table_name} from {backup_table.root_url}to {root_url}. e: {e}"
+                msg = f"Changes reverted. Error changing root_url for table '{backup_table.table_name}' from '{backup_table.root_url}' to '{root_url}'. e: {e}"
                 logger.warning(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
+            
+            return HttpResponse(make_success(msg=f"Successfully changed table root_url to '{root_url}' for table '{backup_table.table_name}'."), content_type='application/json')
 
 
         # table_name operation
@@ -637,11 +639,13 @@ class TableManagementById(RoleSessionMixin, APIView):
                 logger.warning(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
 
+            return HttpResponse(make_success(msg=f"Successfully changed table_name to '{table_name}' from '{backup_table.table_name}'."), content_type='application/json')
+        
 
         # comment operation
         if comments is not None:
             if not isinstance(comments, str):
-                msg = f"Error adding comments to table {backup_table.table_name}. 'comments' must be a str. Received type {type(comments)}"
+                msg = f"Error adding comments to table '{backup_table.table_name}'. 'comments' must be a str. Received type {type(comments)}"
                 logger.warning(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
 
@@ -654,6 +658,8 @@ class TableManagementById(RoleSessionMixin, APIView):
                 msg = f"Changes reverted. Error adding comments to table {backup_table.table_name}. e: {e}"
                 logger.warning(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
+
+            return HttpResponse(make_success(msg=f"Successfully added comments to table, '{backup_table.table_name}'."), content_type='application/json')
             
 
         # endpoints operation
@@ -697,6 +703,8 @@ class TableManagementById(RoleSessionMixin, APIView):
                 logger.warning(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
 
+            return HttpResponse(make_success(msg=f"Successfully changed table, '{backup_table.table_name}', to have the following endpoints: {endpoints}"), content_type='application/json')
+
 
         # We grab enums to do run 'create_validate_schema' in column_type and drop_column operations
         if column_type or drop_column:
@@ -711,22 +719,24 @@ class TableManagementById(RoleSessionMixin, APIView):
         # column_type operation
         if column_type:
             if not isinstance(column_type, str):
-                msg = f"Error changing column type for table. 'column_type' must be a str. Received type {type(column_type)}. Format should be 'column_name,new_type'"
+                msg = f"Error changing column type for table. 'column_type' must be a str. Received type {type(column_type)}. Format should be 'column_name, new_type'"
                 logger.warning(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
             
             split_str = column_type.split(',')
             if not len(split_str) == 2:
-                msg = f"Error changing column type for table. 'column_type' should come in format 'column_name,new_type', got {column_type}"
+                msg = f"Error changing column type for table. 'column_type' should come in format 'column_name, new_type', got {column_type}"
                 logger.warning(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
             
             if not split_str[0] or not split_str[1]:
-                msg = f"Error changing column type for table. 'column_type' should come in format 'column_name,new_type', got {column_type}"
+                msg = f"Error changing column type for table. 'column_type' should come in format 'column_name, new_type', got {column_type}"
                 logger.warning(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
             
             column_name, new_type = split_str
+            column_name = column_name.strip()
+            new_type = new_type.strip()
                         
             # Check that new_type is in valid_types or is in existing_enums
             valid_types = ["varchar", "boolean", "integer", "text", "timestamp", "datetime"]
@@ -779,6 +789,8 @@ class TableManagementById(RoleSessionMixin, APIView):
                 logger.warning(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
 
+            return HttpResponse(make_success(msg=f"Successfully changed column_name '{column_name}' to type '{new_type}' in table '{backup_table.table_name}'."), content_type='application/json')
+
 
         # drop_column operation
         if drop_column:
@@ -827,6 +839,9 @@ class TableManagementById(RoleSessionMixin, APIView):
                 logger.warning(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
 
+            return HttpResponse(make_success(msg=f"Successfully dropped column, '{column_name}', from table '{backup_table.table_name}'"), content_type='application/json')
+
+
         # drop_default operation
         if drop_default:
             column_name = drop_default
@@ -874,26 +889,30 @@ class TableManagementById(RoleSessionMixin, APIView):
                 logger.warning(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
 
+            return HttpResponse(make_success(msg=f"Successfully dropped default from column, '{column_name}', from table '{backup_table.table_name}'"), content_type='application/json')
+
 
         # set_default operation
         if set_default:
             if not isinstance(set_default, str):
-                msg = f"Error setting default for column in table. 'set_default' must be a str. Received type {type(set_default)}. Format should be 'column_name,new_default'"
+                msg = f"Error setting default for column in table. 'set_default' must be a str. Received type {type(set_default)}. Format should be 'column_name, new_default'"
                 logger.warning(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
             
             split_str = set_default.split(',')
             if not len(split_str) == 2:
-                msg = f"Error setting default for column in table. 'set_default' should come in format 'column_name,new_default', got {column_type}"
+                msg = f"Error setting default for column in table. 'set_default' should come in format 'column_name, new_default', got {column_type}"
                 logger.warning(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
             
             if not split_str[0] or not split_str[1]:
-                msg = f"Error setting default for column in table. 'set_default' should come in format 'column_name,new_default', got {column_type}"
+                msg = f"Error setting default for column in table. 'set_default' should come in format 'column_name, new_default', got {column_type}"
                 logger.warning(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
             
             column_name, new_default = set_default
+            column_name = column_name.strip()
+            new_default = new_default.strip()
 
             # Check column_name is legal.
             valid_column_names = table.column_definition.keys()
@@ -904,7 +923,7 @@ class TableManagementById(RoleSessionMixin, APIView):
 
             new_column_definition = copy.copy(table.column_definition)
             
-            # Add new column defintion to column_definition.
+            # Add new column definition to column_definition.
             try:
                 new_column_definition[column_name]["default"] = new_default
             except Exception as e:
@@ -934,9 +953,9 @@ class TableManagementById(RoleSessionMixin, APIView):
                 logger.warning(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
 
+            return HttpResponse(make_success(msg=f"Successfully set column default for column, '{column_name}', on table '{backup_table.table_name}'"), content_type='application/json')
 
 
-        return HttpResponse(make_success(msg="Table put successfully."), content_type='application/json')
 
     @is_admin
     def delete(self, request, *args, **kwargs):
