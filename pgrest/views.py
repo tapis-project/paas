@@ -658,7 +658,7 @@ class TableManagementById(RoleSessionMixin, APIView):
 
         # endpoints operation
         if endpoints is not None:
-            valid_endpoints = ["GET_ALL", "GET_ONE", "CREATE", "UPDATE", "DELETE", "ALL"]
+            valid_endpoints = ["GET_ALL", "GET_ONE", "CREATE", "UPDATE", "DELETE", "ALL", "NONE"]
             if not isinstance(endpoints, list):
                 msg = f"Error with put to table with ID {backup_table.table_name}. 'endpoints' must be a list. Received type {type(endpoints)}"
                 logger.warning(msg)
@@ -666,15 +666,28 @@ class TableManagementById(RoleSessionMixin, APIView):
 
             try:
                 endpoints = set(endpoints)
+                endpoints = list(endpoints)
+                if "NONE" in endpoints and len(endpoints) > 1:
+                    msg = f"Error, when specifying NONE in endpoints you cannot specify anything else. endpoints: {endpoints}"
+                    logger.warning(msg)
+                    return HttpResponseBadRequest(make_error(msg=msg))
+                if "ALL" in endpoints and len(endpoints) > 1:
+                    msg = f"Error, when specifying ALL in endpoints you cannot specify anything else. endpoints: {endpoints}"
+                    logger.warning(msg)
+                    return HttpResponseBadRequest(make_error(msg=msg))
                 for endpoint in endpoints:
                     if endpoint not in valid_endpoints:
                         msg = f"Error with put to table with ID {backup_table.table_name}. Endpoints list can only contain str values from: {valid_endpoints}"
                         logger.warning(msg)
                         return HttpResponseBadRequest(make_error(msg=msg))
                     if endpoint == "ALL":
-                        endpoints = endpoints.union(set(valid_endpoints))
-                        # All isn't an actual thing we want to save.
+                        endpoints = valid_endpoints
+                        # All/None isn't an actual thing we want to save.
                         endpoints.remove("ALL")
+                        endpoints.remove("NONE")
+                    if endpoint == "NONE":
+                        endpoints = []
+
                 table.endpoints = endpoints
                 table.save()
             except Exception as e:
