@@ -580,13 +580,11 @@ class TableManagementById(RoleSessionMixin, APIView):
         drop_column = request.data.get('drop_column', None)
         drop_default = request.data.get('drop_default', None)
         set_default = request.data.get('set_default', None)
-
-
         
         #ONLY ONE CHANGE PER REQUEST
         # We change Django first and then Postgres and Postgres is harder to revert using do_transaction
         updates_to_do = 0
-        for update_field in [root_url, table_name, comments, endpoints, column_type, drop_column, drop_default]:
+        for update_field in [root_url, table_name, comments, endpoints, column_type, drop_column, drop_default, set_default]:
             if update_field:
                 updates_to_do += 1
         if updates_to_do == 0:
@@ -699,7 +697,6 @@ class TableManagementById(RoleSessionMixin, APIView):
 
         # column_type operation
         if column_type:
-            valid_types = ["varchar", "boolean", "integer", "text", "timestamp", "serial", "datetime"]
             if not isinstance(column_type, str):
                 msg = f"Error changing column type for table. 'column_type' must be a str. Received type {type(column_type)}. Format should be 'column_name,new_type'"
                 logger.warning(msg)
@@ -719,8 +716,9 @@ class TableManagementById(RoleSessionMixin, APIView):
             column_name, new_type = split_str
                         
             # Check that new_type is in valid_types or is in existing_enums
+            valid_types = ["varchar", "boolean", "integer", "text", "timestamp", "datetime"]
             if new_type not in valid_types + existing_enums_names:
-                msg = f"Error changing column type for table. '{new_type}' not in {valid_types + existing_enums_names}."
+                msg = f"Error changing column type for table. '{new_type}' not in {valid_types + existing_enums_names}. Note: Cannot update to a serial data type."
                 logger.warning(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
 
@@ -1508,15 +1506,15 @@ class ViewManagement(RoleSessionMixin, APIView):
         # Parse out required fields.
         try:
             view_name = request.data['view_name']
-            from_table = request.data['from_table']
         except KeyError as e:
-            msg = f"\'{e.args}\' is required when creating a new table."
+            msg = f"\'{e.args}\' is required when creating a new view."
             logger.warning(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
         # Parse out optional fields.
         root_url = request.data.get('root_url', view_name)
         raw_sql = request.data.get('raw_sql', None)
+        from_table = request.data.get('from_table', None)
         select_query = request.data.get('select_query', None)
         where_query = request.data.get('where_query', None)
         permission_rules = request.data.get('permission_rules', [])
@@ -1529,7 +1527,37 @@ class ViewManagement(RoleSessionMixin, APIView):
         comments = request.data.get('comments', "")
 
         # Check required selection parameters.
-        # If raw_sql being used, select_query and where_query are disallowed.
+        # Check view_name is acceptable
+        if not isinstance(view_name, str):
+            msg = f"The view_name must be of type string. Got type: {type(view_name)}"
+            logger.error(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+        
+        if not FORBIDDEN_CHARS.match(view_name):
+            msg = f"The view_name inputted is not url safe. Value must be alphanumeric with _ and - optional. Value inputted: {view_name}"
+            logger.error(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        # Check for existence of view_name in tenant.
+        if ManageViews.objects.filter(view_name=view_name, tenant_id=req_tenant).exists():
+            msg = f"View with name \'{view_name}\' and tenant_id \'{req_tenant}\' already exists in ManageViews table."
+            logger.warning(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        # Check for view_name in table names (they collide when dealing with sql (e.g. dev.my_item_name))
+        if ManageTables.objects.filter(table_name=view_name, tenant_id=req_tenant).exists():
+            msg = f"Table with name '{view_name}' and tenant_id '{req_tenant}' already exists in ManageTables table. View and Table names are not allowed to collide."
+            logger.warning(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        # Check for existence of root_url in tenant.
+        if ManageViews.objects.filter(root_url=root_url).exists():
+            msg = f"View with root url \'{root_url}\' and tenant_id {req_tenant} already exists in ManageViews table. " \
+                  f"View name: {view_name}"
+            logger.warning(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        # If raw_sql being used, select_query, where_query, from_table are disallowed.
         if raw_sql:
             # Permission check, ensure user has PGREST_ADMIN role.
             # Get all user roles from sk and check if user has role.
@@ -1549,40 +1577,21 @@ class ViewManagement(RoleSessionMixin, APIView):
                 logger.error(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
 
-        # Check view_name is acceptable
-        if not isinstance(view_name, str):
-            msg = f"The view_name must be of type string. Got type: {type(view_name)}"
-            logger.error(msg)
-            return HttpResponseBadRequest(make_error(msg=msg))
-        
-        if not FORBIDDEN_CHARS.match(view_name):
-            msg = f"The view_name inputted is not url safe. Value must be alphanumeric with _ and - optional. Value inputted: {view_name}"
-            logger.error(msg)
-            return HttpResponseBadRequest(make_error(msg=msg))
-
-        # Check for existence of view_name/table_name in tenant, can collide.
-        if ManageViews.objects.filter(view_name=view_name, tenant_id=req_tenant).exists():
-            msg = f"View with name \'{view_name}\' and tenant_id \'{req_tenant}\' already exists in ManageViews table."
-            logger.warning(msg)
-            return HttpResponseBadRequest(make_error(msg=msg))
-        
-        if ManageTables.objects.filter(table_name=view_name, tenant_id=req_tenant).exists():
-            msg = f"Table with name '{view_name}' and tenant_id '{req_tenant}' already exists in ManageTables table. View and Table names can collide"
-            logger.warning(msg)
-            return HttpResponseBadRequest(make_error(msg=msg))
-
-        # Check for existence of root_url in tenant.
-        if ManageViews.objects.filter(root_url=root_url).exists():
-            msg = f"View with root url \'{root_url}\' and tenant_id {req_tenant} already exists in ManageViews table. " \
-                  f"View name: {view_name}"
-            logger.warning(msg)
-            return HttpResponseBadRequest(make_error(msg=msg))
-
-        # Check for existence of from_table in tenant.
-        if not ManageTables.objects.filter(table_name=from_table, tenant_id=req_tenant).exists():
-            msg = f"Table with name \'{from_table}\' and tenant_id \'{req_tenant}\' does not exist in ManageTables table."
-            logger.warning(msg)
-            return HttpResponseBadRequest(make_error(msg=msg))
+            if from_table:
+                msg = f"When using a raw_sql query, table_name is not allowed, got both."
+                logger.error(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+        else:
+            if not from_table:
+                msg = "'from_table' is required when creating a new view."
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+                        
+            # Check for existence of from_table in tenant.
+            if not ManageTables.objects.filter(table_name=from_table, tenant_id=req_tenant).exists():
+                msg = f"Table with name \'{from_table}\' and tenant_id \'{req_tenant}\' does not exist in ManageTables table."
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
 
         # Get endpoint rules
         if endpoints:
