@@ -338,10 +338,10 @@ class TableManagement(RoleSessionMixin, APIView):
         try:
             existing_enums = manage_tables.get_enums(db_instance_name)
             if existing_enums.get(req_tenant):
-                existing_enums_names = list(existing_enums.get(req_tenant).keys())
+                existing_enum_names = list(existing_enums.get(req_tenant).keys())
             else:
-                existing_enums_names = []
-            logger.info(f"Got list of existing enum_names: {existing_enums_names}")
+                existing_enum_names = []
+            logger.info(f"Got list of existing enum_names: {existing_enum_names}")
         except Exception as e:
             msg = f"Failed to get enums for table {table_name}. e:{e}"
             logger.warning(msg)
@@ -385,7 +385,7 @@ class TableManagement(RoleSessionMixin, APIView):
         # Create a validation schema
         try:
             validate_json_create, validate_json_update = create_validate_schema(columns, req_tenant,
-                                                                                existing_enums_names)
+                                                                                existing_enum_names)
         except Exception as e:
             msg = f"Unable to create json validation schema for table {table_name}: {e}" \
                   f"\nFailed to create table {table_name}. "
@@ -395,7 +395,7 @@ class TableManagement(RoleSessionMixin, APIView):
         # Create table
         try:
             result = self.post_transaction(table_name, root_url, primary_key, columns, validate_json_create,
-                                           validate_json_update, endpoints, existing_enums_names, special_rules,
+                                           validate_json_update, endpoints, existing_enum_names, special_rules,
                                            comments, constraints, req_tenant, db_instance_name)
         except Exception as e:
             msg = f"Failed to create table {table_name}. {e}"
@@ -544,13 +544,13 @@ class TableManagementById(RoleSessionMixin, APIView):
                 "drop_column": column_name,
                 "drop_default": column_name,
                 "set_default": "column_name, new_default"
-
-                ***WIP***
-                "add_column": {"column_name": Traditional table column definition dict}    #### This seems difficult?
+                "add_column": {"name": {"data_type": "integer",
+                                        "unique": true,
+                                        "null": false}}
         
         Returns:
-            200: "Table put succesfully"
-            400: "Error completing table put: e"
+            200: Description of successful operation.
+            400: Description of operation error.
         """
         logger.debug("top of put /manage/tables/<table_id>")
         req_tenant = request.session['tenant_id']
@@ -580,11 +580,12 @@ class TableManagementById(RoleSessionMixin, APIView):
         drop_column = request.data.get('drop_column', None)
         drop_default = request.data.get('drop_default', None)
         set_default = request.data.get('set_default', None)
+        add_column = request.data.get('add_column', None)
         
         #ONLY ONE CHANGE PER REQUEST
         # We change Django first and then Postgres and Postgres is harder to revert using do_transaction
         updates_to_do = 0
-        for update_field in [root_url, table_name, comments, endpoints, column_type, drop_column, drop_default, set_default]:
+        for update_field in [root_url, table_name, comments, endpoints, column_type, drop_column, drop_default, set_default, add_column]:
             if update_field:
                 updates_to_do += 1
         if updates_to_do == 0:
@@ -705,16 +706,14 @@ class TableManagementById(RoleSessionMixin, APIView):
 
             return HttpResponse(make_success(msg=f"Successfully changed table, '{backup_table.table_name}', to have the following endpoints: {endpoints}"), content_type='application/json')
 
-
         # We grab enums to do run 'create_validate_schema' in column_type and drop_column operations
-        if column_type or drop_column:
+        if column_type or drop_column or add_column:
             existing_enums = manage_tables.get_enums(db_instance_name)
             if existing_enums.get(req_tenant):
-                existing_enums_names = list(existing_enums.get(req_tenant).keys())
+                existing_enum_names = list(existing_enums.get(req_tenant).keys())
             else:
-                existing_enums_names = []
-            logger.info(f"Got list of existing enum_names: {existing_enums_names}")
-
+                existing_enum_names = []
+            logger.info(f"Got list of existing enum_names: {existing_enum_names}")
 
         # column_type operation
         if column_type:
@@ -740,8 +739,8 @@ class TableManagementById(RoleSessionMixin, APIView):
                         
             # Check that new_type is in valid_types or is in existing_enums
             valid_types = ["varchar", "boolean", "integer", "text", "timestamp", "datetime"]
-            if new_type not in valid_types + existing_enums_names:
-                msg = f"Error changing column type for table. '{new_type}' not in {valid_types + existing_enums_names}. Note: Cannot update to a serial data type."
+            if new_type not in valid_types + existing_enum_names:
+                msg = f"Error changing column type for table. '{new_type}' not in {valid_types + existing_enum_names}. Note: Cannot update to a serial data type."
                 logger.warning(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
 
@@ -769,7 +768,7 @@ class TableManagementById(RoleSessionMixin, APIView):
 
             # Create a validation schema
             try:
-                validate_json_create, validate_json_update = create_validate_schema(new_column_definition, req_tenant, existing_enums_names)
+                validate_json_create, validate_json_update = create_validate_schema(new_column_definition, req_tenant, existing_enum_names)
             except Exception as e:
                 msg = f"Unable to create json validation schema after changing table column type. e: {e}"
                 logger.warning(msg)
@@ -790,6 +789,188 @@ class TableManagementById(RoleSessionMixin, APIView):
                 return HttpResponseBadRequest(make_error(msg=msg))
 
             return HttpResponse(make_success(msg=f"Successfully changed column_name '{column_name}' to type '{new_type}' in table '{backup_table.table_name}'."), content_type='application/json')
+
+        # add_column operation
+        if add_column:
+            if not isinstance(add_column, dict):
+                msg = f"Error with put to table with ID {backup_table.table_name}. 'add_column' must be a dict. Received type {type(add_column)}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            if len(add_column) > 1:
+                msg = "add_column dict received is too large. Should be len of '1', in format {'col_name': {'data_type': 'integer', ...}\}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            (column_name, column_args), = add_column.items()
+            
+            if not isinstance(column_args, dict):
+                msg = f"Error with put to table with ID {backup_table.table_name}. 'add_column' must be dict with value of type dict. In format {'col_name': {'data_type': 'integer', ...}\}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+
+            ### We now validate the column_definition just to make sure all keys and values are expected and accounted for. Used later to update Django.
+            new_column_definition = copy.copy(table.column_definition)
+            
+            # Append the added column to column definition
+            try:
+                new_column_definition.update(add_column)
+            except Exception as e:
+                msg = f"Error adding column to table definition. New def: {new_column_definition}. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            # Create a validation schema
+            try:
+                validate_json_create, validate_json_update = create_validate_schema(new_column_definition, req_tenant, existing_enum_names)
+            except Exception as e:
+                msg = f"Unable to create json validation schema after adding column to table definition. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+
+            ### Validation complete, now we create the Postgres command we have to run.
+            # We need to grab the column type first as it used to decide how to handle the other variables.
+            try:
+                column_type = column_args["data_type"].upper()
+            except KeyError:
+                msg = f"Data type not specified for new column. Column args are as follows: {column_args}"
+                raise Exception(msg)
+            if column_type in {"VARCHAR", "CHAR"}:
+                try:
+                    char_len = column_args["char_len"]
+                    column_type = f"{column_type}({char_len})"
+                except KeyError:
+                    msg = f"Character max size not received for column {column_name}. Cannot create table {table_name}."
+                    logger.warning(msg)
+                    raise Exception(msg)
+
+            # Attempt to handle enum data_types
+            # This is only a small subsect of postgres data_types, listing them
+            # all would be trouble though, so just checking the common ones.
+            # Here we are fixing enum data_types given without tenant, i.e., data_type: "animals"
+            # Should be "dev.animals", we fix that here if we can.
+            if not column_type in ["BOOLEAN", "VARCHAR", "CHAR", "TEXT", "INTEGER", "SERIAL", "FLOAT", "DATE", "TIMESTAMP"]:
+                if column_type.lower() in existing_enum_names:
+                    column_type = f"{req_tenant}.{column_type}"
+
+            # Changing serial data types to an identity type that allows for user inputted increment and start.
+            if column_type == "SERIAL":
+                try:
+                    serial_start = int(column_args.get("serial_start", 1))
+                    serial_increment = int(column_args.get("serial_increment", 1))
+                    column_type = f"INTEGER GENERATED BY DEFAULT AS IDENTITY (START WITH {serial_start} INCREMENT BY {serial_increment})"
+                except Exception as e:
+                    msg = f"Error setting serial data_type for column {key}. e: {e}"
+                    logger.warning(msg)
+                    raise Exception(msg)
+
+            # Handle foreign keys.
+            if "foreign_key" in column_args and column_args["foreign_key"]:
+                try:
+                    # On_event means either on_delete or on_update for foreign keys. During that event
+                    # postgres will complete the event_action specified by the user.
+                    # check we have we need
+                    ref_table = column_args["reference_table"]
+                    ref_column = column_args["reference_column"]
+                    on_event = column_args["on_event"]
+                    event_action = column_args["event_action"]
+                except KeyError as e:
+                    msg = f"Required key {e.args[0]} for foreign key not received for column {column_name}. " \
+                        f"Cannot create table {table_name}."
+                    logger.warning(msg)
+                    raise Exception(msg)
+
+                try:
+                    on_event = on_event.upper()
+                    event_action = event_action.upper()
+                except:
+                    msg = f"on_event and event_action must both be strings, got {type(on_event)} and {type(event_action)}"
+                    logger.warning(msg)
+                    raise Exception(msg)
+
+                # Check that on_event is either DELETE or UPDATE
+                events = ["ON DELETE", "ON UPDATE"]
+                if on_event not in events:
+                    msg = f"Invalid on event supplied: {on_event}. Valid event actions: {events}."
+                    logger.warning(msg)
+                    raise Exception(msg)
+                # Do some input checking on event action.
+                event_options = ["SET NULL", "SET DEFAULT", "RESTRICT", "NO ACTION", "CASCADE"]
+                if event_action not in event_options:
+                    msg = f"Invalid event action supplied: {event_action}. Valid event actions: {event_options}."
+                    logger.warning(msg)
+                    raise Exception(msg)
+                # Cannot set on event action to SET NULL if the column does not allow nulls.
+                if event_action == "SET NULL" and "null" in column_args and not column_args["null"]:
+                    msg = f"Cannot set event action on column {column_name} " \
+                            f"as it does not allow nulls in column definition."
+                    logger.warning(msg)
+                    raise Exception(msg)
+
+                column_type = f"{column_type} REFERENCES {req_tenant}.{ref_table}({ref_column}) {on_event} {event_action}"
+
+            col_str_list = list()
+            col_string = f"{column_name} {column_type}"
+            col_str_list.append(col_string)
+
+            # Find optional values and assign to variable.
+            for key, val in column_args.items():
+                if key == "null":
+                    if not val:
+                        col_str_list.append("NOT NULL")
+                elif key == "unique":
+                    col_str_list.append("UNIQUE")
+                elif key == "default":
+                    # Check if default value should be encased in quotes. (str v. int)
+                    if type(val) == 'int' or type(val) == 'float':
+                        col_str_list.append(f"DEFAULT {val}")
+                    else:
+                        col_str_list.append(f"DEFAULT '{val}'")
+                elif key == "primary_key" and val == True:
+                    if not column_args['data_type'].lower() in ['integer', 'varchar', 'serial']:
+                        msg = f"primary_key field can only be set on fields of data_type 'integer', 'serial', or 'varchar'." \
+                            f" {column_args['data_type']} is not. Cannot create table: {table_name}"
+                        logger.warning(msg)
+                        raise Exception(msg)
+                    if column_args.get('null'):
+                        msg = f"primary_key field cannot have 'null' set to True. Field must have unique value." \
+                            f" Cannot create table: {table_name}"
+                        logger.warning(msg)
+                        raise Exception(msg)
+                    if column_args.get('default'):
+                        msg = f"primary_key field cannot have a 'default' set. Field must have unique value." \
+                            f" Cannot create table: {table_name}"
+                        logger.warning(msg)
+                        raise Exception(msg)
+                    primary_key_flag = True
+                    col_str_list.append("PRIMARY KEY")
+                elif key == "comments":
+                    continue
+                elif key not in ["data_type", "char_len", "foreign_key", "reference_table", "reference_column", "on_event", "event_action", "serial_start", "serial_increment"]:
+                    msg = f"{key} is an invalid argument for column {column_name}. Cannot create table {table_name}"
+                    logger.warning(msg)
+                    raise Exception(msg)
+    
+            col_def_command = " ".join(col_str_list)
+
+            # We now have the command to run, but we still need to change things in Django to correspond.
+            try:
+                table.column_definition = new_column_definition
+                table.validate_json_create = validate_json_create
+                table.validate_json_update = validate_json_update
+                table.save()
+                command = f"ALTER TABLE {req_tenant}.{backup_table.table_name} ADD {col_def_command};"
+                do_transaction(command, db_instance_name)
+            except Exception as e:
+                # Revert Django
+                backup_table.save()
+                msg = f"Changes reverted. Error adding column_name '{column_name}' to table '{backup_table.table_name}'. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            return HttpResponse(make_success(msg=f"Successfully added column, '{column_name}', to table '{backup_table.table_name}'"), content_type='application/json')
 
 
         # drop_column operation
@@ -819,7 +1000,7 @@ class TableManagementById(RoleSessionMixin, APIView):
 
             # Create a validation schema
             try:
-                validate_json_create, validate_json_update = create_validate_schema(new_column_definition, req_tenant, existing_enums_names)
+                validate_json_create, validate_json_update = create_validate_schema(new_column_definition, req_tenant, existing_enum_names)
             except Exception as e:
                 msg = f"Unable to create json validation schema after changing table column type. e: {e}"
                 logger.warning(msg)
@@ -869,7 +1050,7 @@ class TableManagementById(RoleSessionMixin, APIView):
 
             # Create a validation schema
             try:
-                validate_json_create, validate_json_update = create_validate_schema(new_column_definition, req_tenant, existing_enums_names)
+                validate_json_create, validate_json_update = create_validate_schema(new_column_definition, req_tenant, existing_enum_names)
             except Exception as e:
                 msg = f"Unable to create json validation schema after changing table column type. e: {e}"
                 logger.warning(msg)
@@ -933,7 +1114,7 @@ class TableManagementById(RoleSessionMixin, APIView):
 
             # Create a validation schema
             try:
-                validate_json_create, validate_json_update = create_validate_schema(new_column_definition, req_tenant, existing_enums_names)
+                validate_json_create, validate_json_update = create_validate_schema(new_column_definition, req_tenant, existing_enum_names)
             except Exception as e:
                 msg = f"Unable to create json validation schema after changing table column default. e: {e}"
                 logger.warning(msg)
