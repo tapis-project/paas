@@ -51,8 +51,10 @@ def get_rows_from_view(view_name, search_params, tenant, limit, offset, db_insta
             order_command = order_parse(order, tenant, view_name, db_instance)
             command += order_command
 
-        command = command + f" LIMIT {int(limit)} "
-        command = command + f" OFFSET {int(offset)};"
+        if limit:
+            command += f" LIMIT {int(limit)} "
+        if offset:
+            command += f" OFFSET {int(offset)};"
     except Exception as e:
         msg = f"Unable to add order, limit, and offset for view {tenant}.{view_name}: {e}"
         logger.warning(msg)

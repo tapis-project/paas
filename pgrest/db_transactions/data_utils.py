@@ -72,7 +72,7 @@ def do_transaction(command, db_instance, parameterized_values=None):
     except Exception as e:
         if conn:
             conn.close()
-        msg = f"Error executing command: {command}"
+        msg = f"Error executing command: {command}; e: {e}"
         logger.error(msg)
         raise Exception(msg)
     

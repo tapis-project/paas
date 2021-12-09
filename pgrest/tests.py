@@ -353,10 +353,11 @@ class ResponseTestCase(TenantTestCase):
                 {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
                 {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": True, "col_five": "hehe"},
                 {"col_one": "bye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}]
-        for dt in data:
-            response = self.client.post(f'/v3/pgrest/data/{root_url}', data=json.dumps({"data": dt}),
-                                        content_type='application/json', **auth_headers)
-            self.assertEqual(response.status_code, 200)
+        response = self.client.post(f'/v3/pgrest/data/{root_url}',
+                                    data=json.dumps({"data": data}),
+                                    content_type='application/json',
+                                    **auth_headers)
+        self.assertEqual(response.status_code, 200)
 
         response = self.client.get(f'/v3/pgrest/data/{root_url}?col_one.eq=hi', **auth_headers)
         self.assertEqual(len(response.json()["result"]), 1)
@@ -370,10 +371,11 @@ class ResponseTestCase(TenantTestCase):
                 {"col_one": "goodbye", "col_two": 100, "col_three": 95, "col_four": False, "col_five": "hehe"},
                 {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": True, "col_five": "hehe"},
                 {"col_one": "bye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}]
-        for dt in data:
-            response = self.client.post(f'/v3/pgrest/data/{root_url}', data=json.dumps({"data": dt}),
-                                        content_type='application/json', **auth_headers)
-            self.assertEqual(response.status_code, 200)
+        response = self.client.post(f'/v3/pgrest/data/{root_url}',
+                                    data=json.dumps({"data": data}),
+                                    content_type='application/json',
+                                    **auth_headers)
+        self.assertEqual(response.status_code, 200)
 
         response = self.client.get(f'/v3/pgrest/data/{root_url}?col_one.eq=goodbye&col_three.eq=95',
                                    **auth_headers)
@@ -388,12 +390,14 @@ class ResponseTestCase(TenantTestCase):
                 {"col_one": "goodbye", "col_two": 100, "col_three": 95, "col_four": False, "col_five": "hehe"},
                 {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": True, "col_five": "hehe"},
                 {"col_one": "bye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}]
-        for dt in data:
-            response = self.client.post(f'/v3/pgrest/data/{root_url}', data=json.dumps({"data": dt}),
-                                        content_type='application/json', **auth_headers)
-            self.assertEqual(response.status_code, 200)
+        response = self.client.post(f'/v3/pgrest/data/{root_url}',
+                                    data=json.dumps({"data": data}),
+                                    content_type='application/json',
+                                    **auth_headers)
+        self.assertEqual(response.status_code, 200)
 
-        response = self.client.get(f'/v3/pgrest/data/{root_url}', **auth_headers)
+        response = self.client.get(f'/v3/pgrest/data/{root_url}',
+                                   **auth_headers)
         self.assertEqual(len(response.json()["result"]), 5)
         response = self.client.get(f'/v3/pgrest/data/{root_url}?col_one.eq=goodbye&col_four.eq=True',
                                    **auth_headers)
@@ -408,10 +412,11 @@ class ResponseTestCase(TenantTestCase):
                 {"col_one": "goodbye", "col_two": 100, "col_three": 95, "col_four": False, "col_five": "hehe"},
                 {"col_one": "goodbye", "col_two": 100, "col_three": 94, "col_four": True, "col_five": "hehe"},
                 {"col_one": "bye", "col_two": 100, "col_three": 60, "col_four": False, "col_five": "hehe"}]
-        for dt in data:
-            response = self.client.post(f'/v3/pgrest/data/{root_url}', data=json.dumps({"data": dt}),
-                                        content_type='application/json', **auth_headers)
-            self.assertEqual(response.status_code, 200)
+        response = self.client.post(f'/v3/pgrest/data/{root_url}',
+                                    data=json.dumps({"data": data}),
+                                    content_type='application/json',
+                                    **auth_headers)
+        self.assertEqual(response.status_code, 200)
 
         response = self.client.get(f'/v3/pgrest/data/{root_url}', **auth_headers)
         self.assertEqual(response.json()["result"][0]["col_three"], 80)
@@ -437,10 +442,11 @@ class ResponseTestCase(TenantTestCase):
                 {"col_one": "goodbye", "col_two": 100, "col_three": 95, "col_four": False, "col_five": "hehe"},
                 {"col_one": "goodbye", "col_two": 100, "col_three": 94, "col_four": True, "col_five": "hehe"},
                 {"col_one": "bye", "col_two": 100, "col_three": 60, "col_four": False, "col_five": "hehe"}]
-        for dt in data:
-            response = self.client.post(f'/v3/pgrest/data/{root_url}', data=json.dumps({"data": dt}),
-                                        content_type='application/json', **auth_headers)
-            self.assertEqual(response.status_code, 200)
+        response = self.client.post(f'/v3/pgrest/data/{root_url}',
+                                    data=json.dumps({"data": data}),
+                                    content_type='application/json',
+                                    **auth_headers)
+        self.assertEqual(response.status_code, 200)
 
         response = self.client.get(f'/v3/pgrest/data/{root_url}?col_one.eq=goodbye', **auth_headers)
         self.assertEqual(response.json()["result"][0]["col_three"], 95)
@@ -460,10 +466,11 @@ class ResponseTestCase(TenantTestCase):
                 {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
                 {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": True, "col_five": "hehe"},
                 {"col_one": "bye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}]
-        for dt in data:
-            response = self.client.post(f'/v3/pgrest/data/{root_url}', data=json.dumps({"data": dt}),
-                                        content_type='application/json', **auth_headers)
-            self.assertEqual(response.status_code, 200)
+        response = self.client.post(f'/v3/pgrest/data/{root_url}',
+                                    data=json.dumps({"data": data}),
+                                    content_type='application/json',
+                                    **auth_headers)
+        self.assertEqual(response.status_code, 200)
 
         # now, update
         data = {"col_five": "omg"}
@@ -482,10 +489,11 @@ class ResponseTestCase(TenantTestCase):
                 {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
                 {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": True, "col_five": "hehe"},
                 {"col_one": "bye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}]
-        for dt in data:
-            response = self.client.post(f'/v3/pgrest/data/{root_url}', data=json.dumps({"data": dt}),
-                                        content_type='application/json', **auth_headers)
-            self.assertEqual(response.status_code, 200)
+        response = self.client.post(f'/v3/pgrest/data/{root_url}',
+                                    data=json.dumps({"data": data}),
+                                    content_type='application/json',
+                                    **auth_headers)
+        self.assertEqual(response.status_code, 200)
 
         # now, update
         data = {"col_where": "omg"}
@@ -501,10 +509,11 @@ class ResponseTestCase(TenantTestCase):
                 {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
                 {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": True, "col_five": "hehe"},
                 {"col_one": "bye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}]
-        for dt in data:
-            response = self.client.post(f'/v3/pgrest/data/{root_url}', data=json.dumps({"data": dt}),
-                                        content_type='application/json', **auth_headers)
-            self.assertEqual(response.status_code, 200)
+        response = self.client.post(f'/v3/pgrest/data/{root_url}',
+                                    data=json.dumps({"data": data}),
+                                    content_type='application/json',
+                                    **auth_headers)
+        self.assertEqual(response.status_code, 200)
 
         # now, update
         data = {"col_five": 40}
@@ -523,10 +532,11 @@ class ResponseTestCase(TenantTestCase):
                 {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"},
                 {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": True, "col_five": "hehe"},
                 {"col_one": "bye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "haha"}]
-        for dt in data:
-            response = self.client.post(f'/v3/pgrest/data/{root_url}', data=json.dumps({"data": dt}),
-                                        content_type='application/json', **auth_headers)
-            self.assertEqual(response.status_code, 200)
+        response = self.client.post(f'/v3/pgrest/data/{root_url}',
+                                    data=json.dumps({"data": data}),
+                                    content_type='application/json',
+                                    **auth_headers)
+        self.assertEqual(response.status_code, 200)
 
         # now, update
         where_clause = {"col_five": {
@@ -552,10 +562,11 @@ class ResponseTestCase(TenantTestCase):
                 {"col_one": "goodbye", "col_two": 100, "col_three": 96, "col_four": False, "col_five": "hehe"},
                 {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": True, "col_five": "hehe"},
                 {"col_one": "bye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "haha"}]
-        for dt in data:
-            response = self.client.post(f'/v3/pgrest/data/{root_url}', data=json.dumps({"data": dt}),
-                                        content_type='application/json', **auth_headers)
-            self.assertEqual(response.status_code, 200)
+        response = self.client.post(f'/v3/pgrest/data/{root_url}',
+                                    data=json.dumps({"data": data}),
+                                    content_type='application/json',
+                                    **auth_headers)
+        self.assertEqual(response.status_code, 200)
 
         where_clause = {"col_three": {
             "operator": "gte",
@@ -580,10 +591,11 @@ class ResponseTestCase(TenantTestCase):
                 {"col_one": "goodbye", "col_two": 100, "col_three": 96, "col_four": False, "col_five": "hehe"},
                 {"col_one": "goodbye", "col_two": 100, "col_three": 90, "col_four": True, "col_five": "hehe"},
                 {"col_one": "bye", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "haha"}]
-        for dt in data:
-            response = self.client.post(f'/v3/pgrest/data/{root_url}', data=json.dumps({"data": dt}),
-                                        content_type='application/json', **auth_headers)
-            self.assertEqual(response.status_code, 200)
+        response = self.client.post(f'/v3/pgrest/data/{root_url}',
+                                    data=json.dumps({"data": data}),
+                                    content_type='application/json',
+                                    **auth_headers)
+        self.assertEqual(response.status_code, 200)
 
         where_clause = {"col_three": {
             "operator": "gte",
@@ -608,8 +620,10 @@ class ResponseTestCase(TenantTestCase):
         # Note this also tests comments and unique constraints.
         root_url = self.init_resp_2["result"]["root_url"]
         data = {"col_one": "hello", "col_two": "cat", "col_three": 90, "col_four": False, "col_five": "hehe"}
-        response = self.client.post(f'/v3/pgrest/data/{root_url}', **auth_headers,
-                                    data=json.dumps({"data": data}), content_type='application/json')
+        response = self.client.post(f'/v3/pgrest/data/{root_url}',
+                                    **auth_headers,
+                                    data=json.dumps({"data": data}),
+                                    content_type='application/json')
         self.assertEqual(response.status_code, 200)
         response = self.client.get(f'/v3/pgrest/data/{root_url}', **auth_headers)
         self.assertEqual(len(response.json()["result"]), 1)
@@ -618,8 +632,10 @@ class ResponseTestCase(TenantTestCase):
         # We should get a 400 from this as enum's won't match up.
         root_url = self.init_resp_2["result"]["root_url"]
         data = {"col_one": "hello", "col_two": "NotInEnum", "col_three": 90, "col_four": False, "col_five": "hehe"}
-        response = self.client.post(f'/v3/pgrest/data/{root_url}', **auth_headers,
-                                    data=json.dumps({"data": data}), content_type='application/json')
+        response = self.client.post(f'/v3/pgrest/data/{root_url}',
+                                    **auth_headers,
+                                    data=json.dumps({"data": data}),
+                                    content_type='application/json')
         self.assertEqual(response.status_code, 400)
 
 

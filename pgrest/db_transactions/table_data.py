@@ -1,5 +1,6 @@
 import re
 import psycopg2
+from cerberus import Validator
 from . import config
 from .data_utils import do_transaction, parse_object_data, search_parse, order_parse, expose_primary_key
 from pgrest.pycommon.logs import get_logger
@@ -56,8 +57,10 @@ def get_rows_from_table(table_name, search_params, tenant, limit, offset, db_ins
             order_command = order_parse(order, tenant, table_name, db_instance)
             command += order_command
 
-        command = command + f" LIMIT {int(limit)} "
-        command = command + f" OFFSET {int(offset)};"
+        if limit:
+            command += f" LIMIT {int(limit)} "
+        if offset:
+            command += f" OFFSET {int(offset)};"
     except Exception as e:
         msg = f"Unable to add order, limit, and offset for table {tenant}.{table_name}: {e}"
         logger.warning(msg)
@@ -110,6 +113,106 @@ def create_row(table_name, data, tenant, primary_key, db_instance=None):
         logger.error(msg)
         raise Exception(msg)
     return result_id
+
+
+def row_creator(table_name, data, tenant, primary_key, validate_json_create, db_instance=None):
+    """
+    Creates new rows in a given table. Does it all in one transaction. Command will be the following.
+    Returns the rows that are inserted. Note, this means we need column_names and value_lists to match
+    throughout. Meaning we need to get all table columns, check column values, and list new data properly.
+    
+    Command:
+        INSERT INTO table_name (column_list)
+        VALUES
+            (value_list_1),
+            (value_list_2),
+            (value_list_3)
+        RETURNING *
+    """
+    logger.info(f"In row_creator for {tenant}.{table_name}...")
+    
+    # Check data is a dict or list (lists create multiple rows at once).
+    if not type(data) in [dict, list]:
+        msg = f"Data for row creation should be of type dict or list (which contains dicts). Received '{type(data)}'"
+        logger.debug(msg)
+        raise Exception(msg)
+
+    # We put dicts in lists so we can use list parsing functions throughout no matter amount of rows being created.
+    if isinstance(data, dict):
+        data = [data]
+
+    # Validate data is list of dicts, and validate the row definitions to make sure they have proper column_names and all.
+    for row_def in data:
+        if not isinstance(row_def, dict):
+            msg = f"Data lists during row creation should contain dicts of row_information. List contained type '{type(data)}'. Item: {row_def}"
+            logger.debug(msg)
+            raise Exception(msg)
+
+        # Validate each row against the table's json schema.
+        try:
+            v = Validator(validate_json_create)
+            if not v.validate(row_def):
+                msg = f"Row definition determined invalid from validation schema; errors: {v.errors}; row def: {row_def}"
+                logger.warning(msg)
+                raise Exception(msg)
+        except Exception as e:
+            msg = f"Error occurred when validating the data from the validation schema; Details: {e}"
+            logger.error(msg)
+            raise Exception(msg)
+
+    # We get all column names from validate_json_create (table def on ManageTables)
+    # we have INSERT reference all column_values. For each row, we either put in correct
+    # column value or DEFAULT to use whatever the DEFAULT value is if nothing is specified
+    # by the user.
+    # e.g. INSERT INTO dev.table1(col_1, col_2, col_3)
+    #      VALUES
+    #          (col_1_val, DEFAULT, col_3_val), etc.
+    logger.info(f"Creating row(s) in {tenant}.{table_name}...")
+    logger.info(f"Data received for new row endpoint: {data}")
+
+    columns = set(validate_json_create.keys()) # These are all column names
+    logger.info(f"Current table columns: {columns}")
+    command = f"INSERT INTO {tenant}.{table_name}({', '.join(columns)}) VALUES " # INSERT INTO dev.table(col_one, col_two, col_three) VALUES
+
+    # We have to create command and get data for command at the same time because if a column value
+    # is not provided we have to use "DEFAULT", but that doesn't work through parameterized
+    # values, only through raw SQL. So we do it this way, using parameterized values (%s) in the 
+    # command and providing parameters in do_transaction()
+    
+    parameterized_values = []
+    for row_data in data:
+        row_insert_command = "("
+        for column_key in columns:
+            try:
+                column_val = row_data[column_key]
+            except KeyError:
+                # add default if user didn't specify column value.
+                row_insert_command += "DEFAULT, "
+                continue
+            if column_key == primary_key and isinstance(column_val, str):
+                if not FORBIDDEN_CHARS.match(column_val):
+                    msg = f"The primary_key value must be url safe. Value inputted for pk '{primary_key}' was '{column_val}'"
+                    logger.error(msg)
+                    raise Exception(msg)
+            parameterized_values.append(column_val)
+            row_insert_command += "%s, "
+        row_insert_command = f"{row_insert_command[:-2]}), " # "(col_one, -> (col_one) "
+        command += row_insert_command
+
+    command = command[:-2]
+    command += "RETURNING *"
+
+    # Run command
+    logger.info("Created command and got parameterized values. Running command")
+    try:
+        obj_description, obj_unparsed_data, _ = do_transaction(command, db_instance, parameterized_values)
+        row_creator_result = parse_object_data(obj_description, obj_unparsed_data)
+        logger.info(f"Rows successfully added to table {tenant}.{table_name}.")
+    except Exception as e:
+        msg = f"Error adding rows to table {tenant}.{table_name}: {e}"
+        logger.error(msg)
+        raise Exception(msg)
+    return row_creator_result
 
 
 def delete_row(table_name, pk_id, tenant, primary_key, db_instance=None):
@@ -185,7 +288,7 @@ def update_rows_with_where(table_name, data, tenant, db_instance, search_params=
     if search_params:
         search_command, parameterized_values = search_parse(search_params, tenant, table_name, db_instance)
         command += search_command
-    command = command + ';'
+    command += ';'
     
     # Run command
     try:

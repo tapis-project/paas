@@ -1286,12 +1286,26 @@ class DynamicView(RoleSessionMixin, APIView):
                         search_params.append([key, oper, value])
                         break
             logger.info(f"Search params: {search_params}")
-            if limit == -1:
-                limit = None
-            elif limit is None:
-                limit = 10
-            if offset is None:
-                offset = 0
+            
+            # limit and offset checking
+            try:
+                if limit:
+                    limit = int(limit)
+                else:
+                    limit = None
+                    
+                if limit == -1:
+                    limit = None
+                
+                if offset:
+                    offset = int(offset)
+                else:
+                    offset = None
+            except Exception as e:
+                msg = f"Limit and offset query parameters must be ints. Got limit: {type(limit)} and offset: {type(offset)}"
+                logger.error(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
             if order is not None:
                 result = table_data.get_rows_from_table(table.table_name,
                                                         search_params,
@@ -1371,40 +1385,19 @@ class DynamicView(RoleSessionMixin, APIView):
             logger.debug(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
-        # Validate against the table's json schema.
         try:
-            v = Validator(table.validate_json_create)
-            if not v.validate(data):
-                msg = f"Data determined invalid from validation schema; errors: {v.errors}"
-                logger.warning(msg)
-                return HttpResponseBadRequest(make_error(msg=msg))
-        except Exception as e:
-            msg = f"Error occurred when validating the data from the validation schema; Details: {e}"
-            logger.error(msg)
-            return HttpResponseBadRequest(make_error(msg=msg))
-
-        try:
-            result_id = table_data.create_row(table.table_name,
+            new_rows = table_data.row_creator(table.table_name,
                                               data,
                                               req_tenant,
                                               table.primary_key,
+                                              table.validate_json_create,
                                               db_instance=db_instance)
         except Exception as e:
-            msg = f"Failed to retrieve rows from table {table.table_name} on tenant {req_tenant}. {e}"
-            logger.error(msg)
-            return HttpResponseBadRequest(make_error(msg=msg))
-        try:
-            result = table_data.get_row_from_table(table.table_name,
-                                                   result_id,
-                                                   req_tenant,
-                                                   table.primary_key,
-                                                   db_instance=db_instance)
-        except Exception as e:
-            msg = f"Failed to retrieve rows from table {table.table_name} on tenant {req_tenant}. {e}"
+            msg = f"Failed to add rows to table {table.table_name} on tenant {req_tenant}. {e}"
             logger.error(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
-        return HttpResponse(make_success(result=result), content_type='application/json')
+        return HttpResponse(make_success(result=new_rows), content_type='application/json')
 
     @can_write
     def put(self, request, *args, **kwargs):
@@ -2044,12 +2037,26 @@ class ViewsResource(RoleSessionMixin, APIView):
                         search_params.append([key, oper, value])
                         break
             logger.info(f"Search params: {search_params}")
-            if limit == -1:
-                limit = None
-            elif limit is None:
-                limit = 10
-            if offset is None:
-                offset = 0
+            
+            # limit and offset checking
+            try:
+                if limit:
+                    limit = int(limit)
+                else:
+                    limit = None
+                    
+                if limit == -1:
+                    limit = None
+                
+                if offset:
+                    offset = int(offset)
+                else:
+                    offset = None
+            except Exception as e:
+                msg = f"Limit and offset query parameters must be ints. Got limit: {type(limit)} and offset: {type(offset)}"
+                logger.error(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
             if order is not None:
                 result = view_data.get_rows_from_view(view.view_name,
                                                       search_params,
