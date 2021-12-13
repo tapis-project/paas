@@ -67,6 +67,12 @@ def do_transaction(command, db_instance, parameterized_values=None):
         if conn:
             conn.close()
         msg = f"Error accessing database: {e}"
+        # Check to see if this is actually a unique constraint collision.
+        try:
+            if "relation" in e.args[0] and "already exists" in e.args[0]:
+                msg = f"Constraints names must be unique. {e}" 
+        except:
+            pass
         logger.error(msg)
         raise Exception(msg)
     except Exception as e:
