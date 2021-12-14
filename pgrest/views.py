@@ -707,7 +707,7 @@ class TableManagementById(RoleSessionMixin, APIView):
             return HttpResponse(make_success(msg=f"Successfully changed table, '{backup_table.table_name}', to have the following endpoints: {endpoints}"), content_type='application/json')
 
         # We grab enums to do run 'create_validate_schema' in column_type and drop_column operations
-        if column_type or drop_column or add_column:
+        if column_type or drop_column or add_column or set_default or drop_default:
             existing_enums = manage_tables.get_enums(db_instance_name)
             if existing_enums.get(req_tenant):
                 existing_enum_names = list(existing_enums.get(req_tenant).keys())
@@ -1091,7 +1091,7 @@ class TableManagementById(RoleSessionMixin, APIView):
                 logger.warning(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
             
-            column_name, new_default = set_default
+            column_name, new_default = split_str
             column_name = column_name.strip()
             new_default = new_default.strip()
 
