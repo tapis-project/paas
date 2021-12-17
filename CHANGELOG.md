@@ -3,6 +3,40 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.0.3 - 2021-12-17 - (1.1.0 pre-release)
+
+### Breaking Changes:
+
+- Where parameters for tables and views are changed to match search spec.
+    - No longer `where_col_one=val` format. Now `col_one.eq=val`.
+- Changed how serial data type works. Users can now specify `serial_start` and `serial_increment` in table definition to modify the type.
+- Changed how puts to `manage/table/table_id` work. Old methods are gone.
+- Views and tables now default to having no return limit (previously row limit of 10).
+
+### New features:
+
+- Added support for `raw_sql` input when creating table views. This allows admins only to have greater view customization.
+- Added support for bulk row posts to `data/table_url`. Keeps single dictionary inputs, but also allows lists of dictionaries (rows) as input.
+- Where parameters for tables and views are changed to match search spec.
+    - No longer `where_col_one=val` format. Now `col_one.eq=val`.
+    - Added support for `.eq`, `.neq`, `.like`, `.nlike`, `.gt`, `.gte`, `.lt`, `.lte`, `.between`, `.nbetween`, `.in`, and `.nin`.
+- Changed how serial data type works. Users can now specify `serial_start` and `serial_increment` in table definition to modify the type.
+    - `serial_start` and `serial_increment` both default to 1.
+    - Now using a Postgres 10+ identity data type to make the sequence possible.
+- Added lots of operations to puts `manage/table/table_id` work. Meaning updates to tables are possible.
+    - Check docs, new operations are `root_url`, `table_name`, `comments`, `endpoints`, `column_type`, `add_column`, `drop_column`, `drop_default`, and `set_default`.
+    - Meaning no more having to delete and recreate tables.
+- `data_utils` are now more universal. `do_transaction` and the like are functionalized for ease-of-use/updates.
+- Rearranged dockerfile for faster compilations. (Code after package initialization)
+- Service now grants all neccessary roles in enviroment, across tenants, at startup.
+- Updated PgREST spec with newest features.
+- New tests for all features.
+
+### Bug fixes:
+
+- Added better error messages for unique constraint names that collide during table creation.
+- Fixed view names and table names colliding in a tenant.
+
 
 ## 1.0.2 - 2021-09-24
 
