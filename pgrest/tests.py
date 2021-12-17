@@ -16,16 +16,6 @@ from pgrest.pycommon.config import conf
 # V2
 auth_headers = {'HTTP_TAPIS_V2_TOKEN': conf.test_token}
 
-# TESTS TO WRITE
-#
-# TO DO
-# - Raw SQL endpoint
-# DONE
-# - Alter tables tests
-# - Bulk row done by other tests.
-# - Serial data type
-# - Where support (table and view)
-
 
 class ResponseTestCase(TenantTestCase):
 
