@@ -111,6 +111,48 @@ paths:
                 properties:
                   result:
                     $ref: '#/components/schemas/Table'
+    put:
+      tags:
+        - Manage Tables
+      summary: update_table
+      description: Update a table definition with specific table operations.
+      operationId: update_table
+      x-swagger-router-controller: connexContr
+      parameters:
+      - name: table_id
+        in: path
+        description: The id of the table.
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTable'
+            examples:
+              table_name:
+                summary: An example of updating a table's name.
+                value: {"table_name": "new_table_name"}
+              root_url:
+                summary: An example of updating a table's root_url.
+                value: {"root_url": "new_root_url"}
+              add_column:
+                summary: An example of adding a column to a table.
+                value: {"add_column": {"new_col_name": {"data_type": "varchar", "char_len": 255}}}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BasicResponse'
+                properties:
+                  result:
+                    $ref: '#/components/schemas/Table'
+
     delete:
       tags:
         - Manage Tables
@@ -710,9 +752,48 @@ components:
           type: string
           description: Only if foreign_key, sets which event action to call when on_event event occurs.
           enum: [CASCADE, SET NULL, SET DEFAULT, RESTRICT, NO ACTION]
+        serial_start:
+          type: integer
+          description: Only if data_type is serial. Delegates what number the data_type will start at.
+        serial_increment:
+          type: integer
+          description: Only if data_type is serial. Delegates what the serial increment between rows will be.
       additionalProperties:
         type: object
       required: [data_type]
+
+    UpdateTable:
+      type: object
+      properties:
+        table_name:
+          type: string
+          description: Operation to change the table_name currently associated with the table.
+        root_url:
+          type: string
+          description: Operation to change the root_url currently associated with the table.
+        comments:
+          type: string
+          description: Operation to change the comments currently associated with the table (Overwrites existing).
+        endpoints:
+          type: array
+          items:
+            type: string
+          description: Operation to change the endpoints a table currently has available.
+        column_type:
+          type: string
+          description: Operation to change the column_type of a particular column in table ("col_name, new_type" format).
+        add_column:
+          $ref: '#/components/schemas/TableColumns'
+          description: Operation to add a column to a table.
+        drop_column:
+          type: string
+          description: Operation to drop a column in a table (Not reversible).
+        set_default:
+          type: string
+          description: Operation to set a new default on a column in a table ("col_name, new_default" format).
+        drop_default:
+          type: string
+          description: Operation to drop a default currently set on a column in a table.
 
 
     #=== TABLE ROWS ===#
@@ -808,7 +889,10 @@ components:
           items:
             type: string
           description: Roles users who access this view must have in security kernel to have permission to see this view.
-      required: [view_name, select_query, from_table]
+        raw_sql:
+          type: string
+          description: Admin only. Full support of SQL when creating complex views.
+      required: [view_name]
 
 
     #=== ROLES ===#
