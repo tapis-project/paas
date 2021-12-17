@@ -195,8 +195,6 @@ class RoleSessionMixin:
             return HttpResponseBadRequest(make_error(msg=msg))
         logger.debug(f"got roles: {role_list}")
         
-        tenant_id = tenant_id.replace('-', '_')
-
         try:
             db_instance_name = Tenants.objects.get(tenant_name=tenant_id).db_instance_name
         except Exception as e:

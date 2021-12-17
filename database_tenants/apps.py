@@ -30,7 +30,7 @@ class GetTenantsFromRequest(TenantMainMiddleware):
             # Try and get tenant_id from request url and tapipy
             try:
                 request_url = request.scheme + "://" + request.get_host()
-                tenant_id = get_tenant_id_from_base_url(request_url, t.tenant_cache).replace('-', '_')
+                tenant_id = get_tenant_id_from_base_url(request_url, t.tenant_cache)
                 logger.debug(f"Got tenant information, tenant_id = {tenant_id}, request_url = {request_url}, hostname = {hostname}")
             except Exception as e:
                 msg = f"Error getting tenant_id from request_url = {request_url}."
