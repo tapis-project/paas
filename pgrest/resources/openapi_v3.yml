@@ -230,7 +230,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/NewTableRow'
+              oneOf:
+                - $ref: '#/components/schemas/NewTableRow'
+                - $ref: '#/components/schemas/NewTableRows'
       responses:
         '201':
           description: Created
@@ -269,6 +271,41 @@ paths:
               schema:
                 allOf:
                   - $ref: '#/components/schemas/BasicResponse'
+
+
+  /v3/pgrest/data//{root_url}:
+    post:
+      tags:
+        - Tables
+      summary: add_table_rows
+      description: Create new objects in the table with specified root_url {root_url}.
+      operationId: add_table_rows
+      parameters:
+      - name: root_url
+        in: path
+        description: The root_url parameter of the table.
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/NewTableRow'
+                - $ref: '#/components/schemas/NewTableRows'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BasicResponse'
+                properties:
+                  result:
+                    $ref: '#/components/schemas/TableRows'
 
 
   /v3/pgrest/data/{root_url}/{item}:
@@ -811,6 +848,11 @@ components:
         data:
           type: object
           description: The values of the row to add.
+
+    NewTableRows:
+      type: array
+      items:
+        $ref: '#/components/schemas/NewTablerow'
 
     UpdateTableRow:
       type: object
