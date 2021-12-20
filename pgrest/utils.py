@@ -6,7 +6,9 @@ from django.core.serializers.json import DjangoJSONEncoder
 
 from pgrest.pycommon import errors as common_errors
 from pgrest.pycommon.auth import t
+from pgrest.pycommon.config import conf
 from pgrest.pycommon.logs import get_logger
+
 logger = get_logger(__name__)
 
 PGREST_ROLES = ['PGREST_ADMIN', 'PGREST_WRITE', 'PGREST_READ', 'PGREST_ROLE_ADMIN']
@@ -29,29 +31,35 @@ def get_version():
     return "dev" # TODO
 
 
-def make_error(msg=None):
+def make_error(msg=None, metadata={}):
     """
     Create an error JSON response in the standard Tapis 4-stanza format.
     """
     if not msg:
         msg = "There was an error."
+    if not isinstance(metadata, dict):
+        raise TypeError("Got exception formatting response. Metadata should be dict.")
     d = {"status": "error",
          "message": msg,
          "version": get_version(),
-         "result": None}
+         "result": None,
+         "metadata": metadata}
     return json.dumps(d)
 
 
-def make_success(result=None, msg=None):
+def make_success(result=None, msg=None, metadata={}):
     """
     Create an error JSON response in the standard Tapis 4-stanza format.
     """
     if not msg:
         msg = "The request was successful."
+    if not isinstance(metadata, dict):
+        raise TypeError("Got exception formatting response. Metadata should be dict.")
     d = {"status": "success",
          "message": msg,
          "version": get_version(),
-         "result": result}    
+         "result": result,
+         "metadata": metadata}
     return json.dumps(d, default=timestampJSONEncoder)
 
 
@@ -228,7 +236,7 @@ def grant_role(tenant, username, role):
     t.sk.grantRole(user=username, tenant=tenant, roleName=role)
 
 
-tenants = ['a2cps', 'cii', 'tacc', 'dev', 'admin']
+tenants = conf.tenants
 
 # make sure roles exist --
 create_roles(tenants)

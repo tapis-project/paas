@@ -5,6 +5,7 @@ from tapipy.tapis import Tapis
 from pgrest.pycommon.config import conf
 from pgrest.pycommon import errors
 from pgrest.pycommon.logs import get_logger
+
 logger = get_logger(__name__)
 
 
@@ -168,7 +169,7 @@ class Tenants(object):
         # might be running on different 500x ports locally, e.g., 5000, 5001, 5002, etc..
         if url and 'http://localhost:500' in url:
             logger.debug("http://localhost:500 in url; resolving tenant id to dev.")
-            tenant_id = 'dev'
+            tenant_id = 'tacc'
         if tenant_id:
             logger.debug(f"looking for tenant with tenant_id: {tenant_id}")
             t = find_tenant_from_id()
@@ -216,8 +217,9 @@ class Tenants(object):
             # if the site_id for the service is the same as the site_id for the request, use the tenant URL:
             if conf.service_site_id == tenant_config.site_id:
                 base_url = tenant_config.base_url
-                logger.debug(f"service {service} was SK or tokens and tenant's site was the same as the configured site; "
-                             f"returning tenant's base_url: {base_url}")
+                logger.debug(
+                    f"service {service} was SK or tokens and tenant's site was the same as the configured site; "
+                    f"returning tenant's base_url: {base_url}")
                 return base_url
             else:
                 # otherwise, we use the primary site (NOTE: if we are here, the configured site_id is different from the
@@ -243,9 +245,8 @@ class Tenants(object):
         try:
             base_url_template = self.primary_site.tenant_base_url_template
         except AttributeError:
-            raise errors.BaseTapisError(
-                f"Could not compute the base_url for tenant {tenant_id} at the primary site."
-                f"The primary site was missing the tenant_base_url_template attribute.")
+            raise errors.BaseTapisError(f"Could not compute the base_url for tenant {tenant_id} at the primary site."
+                                        f"The primary site was missing the tenant_base_url_template attribute.")
         return base_url_template.replace('${tenant_id}', tenant_id)
 
     def get_site_admin_tenants_for_service(self):
@@ -286,13 +287,14 @@ class Tenants(object):
         `service` should be the service being requested (e.g., apps, files, sk, tenants, etc.)
 
         """
-        logger.debug(f"top of get_site_and_base_url_for_service_request() for tenant_id: {tenant_id} and service: {service}")
+        logger.debug(
+            f"top of get_site_and_base_url_for_service_request() for tenant_id: {tenant_id} and service: {service}")
         site_id_for_request = None
         base_url = None
         # requests to the tenants service should always go to the primary site
         if service == 'tenants':
             site_id_for_request = self.primary_site.site_id
-            base_url =self.get_base_url_admin_tenant_primary_site()
+            base_url = self.get_base_url_admin_tenant_primary_site()
             logger.debug(f"call to tenants API, returning site_id: {site_id_for_request}; base url: {base_url}")
             return site_id_for_request, base_url
 
@@ -356,8 +358,9 @@ class Tenants(object):
         try:
             token_tenant_id = data['tapis/tenant_id']
         except KeyError:
-            raise errors.AuthenticationError("Unable to process Tapis token; could not parse the tenant_id. It is possible "
-                                             "the token is in a format no longer supported by the platform.")
+            raise errors.AuthenticationError(
+                "Unable to process Tapis token; could not parse the tenant_id. It is possible "
+                "the token is in a format no longer supported by the platform.")
         try:
             token_tenant = self.get_tenant_config(tenant_id=token_tenant_id)
             public_key_str = token_tenant.public_key
@@ -368,7 +371,8 @@ class Tenants(object):
             raise errors.AuthenticationError("Unable to process Tapis token; no public key associated with the "
                                              "tenant_id.")
         if not public_key_str:
-            raise errors.AuthenticationError("Could not find the public key for the tenant_id associated with the tenant.")
+            raise errors.AuthenticationError(
+                "Could not find the public key for the tenant_id associated with the tenant.")
         # check signature and decode
         tries = 0
         while tries < 2:
@@ -379,8 +383,8 @@ class Tenants(object):
                 # if we get an exception decoding it could be that the tenant's public key has changed (i.e., that
                 # the public key in out tenant_cache is stale. if we haven't updated the tenant_cache in the last
                 # update_tenant_cache_timedelta then go ahead and update and try the decode again.
-                if ( (datetime.datetime.now() > tenants.last_tenants_cache_update + tenants.update_tenant_cache_timedelta)
-                        and tries == 1):
+                if ((datetime.datetime.now() >
+                     tenants.last_tenants_cache_update + tenants.update_tenant_cache_timedelta) and tries == 1):
                     tenants.get_tenants()
                     continue
                 # otherwise, we were using a recent public key, so just fail out.
@@ -388,7 +392,6 @@ class Tenants(object):
                 raise errors.AuthenticationError("Invalid Tapis token.")
         # if the token is a service token (i.e., this is a service to service request), do additional checks:
         return claims
-
 
 
 # singleton object with all the tenant data and automatic reload functionality.

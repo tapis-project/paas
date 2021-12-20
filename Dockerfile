@@ -10,6 +10,13 @@ ENV TAPIS_API pgrest-api
 
 ## FILE INITIALIZATION
 COPY ./requirements.txt /home/tapis/requirements.txt
+
+
+# Installs
+RUN pip install -r /home/tapis/requirements.txt
+
+
+## CODE
 COPY configschema.json /home/tapis/configschema.json
 COPY ./manage.py /home/tapis/manage.py
 COPY pgrest /home/tapis/service/pgrest
@@ -21,8 +28,6 @@ COPY paas /home/tapis/paas
 RUN mkdir /home/tapis/databases
 RUN touch /home/tapis/pgrest.log
 
-
-RUN pip install -r /home/tapis/requirements.txt
 
 WORKDIR /home/tapis/
 

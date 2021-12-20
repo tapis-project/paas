@@ -7,7 +7,7 @@ The PgREST service provides an friendly HTTP-based API to a managed Postgres dat
 
 Once you understand PgREST, put it all to work by looking at our quick-start Jupyter notebook. This notebook contains all the code neccessary to work with PgREST, modify it to your wishes or copy and paste code snippets into whatever scripts you have.
 
-**Quick-Start Jupyter Notebook:** https://github.com/tapis-project/paas/blob/dev/quick-start-notebook.ipynb
+**Quick-Start Jupyter Notebook:** https://github.com/tapis-project/paas/blob/dev/notebook-quick-start.ipynb
 
 
 Local Development

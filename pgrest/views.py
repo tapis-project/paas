@@ -2,6 +2,7 @@ import datetime
 import json
 import re
 import timeit
+import copy
 
 import requests
 from cerberus import Validator
@@ -10,6 +11,7 @@ from django.db import transaction
 from django.http import (HttpResponse, HttpResponseBadRequest,
                          HttpResponseForbidden, HttpResponseNotFound,
                          HttpResponseServerError)
+from pgrest.db_transactions.data_utils import do_transaction
 from rest_framework.views import APIView
 
 from pgrest.db_transactions import (bulk_data, manage_tables, table_data,
@@ -112,7 +114,7 @@ def get_username_for_request(request, tenant_id):
         username = response.json()['result']['username']
     except KeyError:
         msg = "Unable to validate v2 token; either the token is invalid, " \
-              "expired, or does not reoresnt a valid user in the v2 TACC tenant."
+              "expired, or does not represent a valid user in the v2 TACC tenant."
         logger.error(msg)
         return None, HttpResponseForbidden(make_error(msg=msg))
     logger.debug(f"got username: {username}")
@@ -192,7 +194,7 @@ class RoleSessionMixin:
             logger.error(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
         logger.debug(f"got roles: {role_list}")
-
+        
         try:
             db_instance_name = Tenants.objects.get(tenant_name=tenant_id).db_instance_name
         except Exception as e:
@@ -210,6 +212,7 @@ class RoleSessionMixin:
         return super().dispatch(request, *args, **kwargs)
 
 
+### Manage Tables
 class TableManagement(RoleSessionMixin, APIView):
     """
     GET: Returns information about all of the tables.
@@ -243,6 +246,7 @@ class TableManagement(RoleSessionMixin, APIView):
                     "update_schema": table.validate_json_update,
                     "create_schema": table.validate_json_create,
                     "tenant_id": table.tenant_id,
+                    "constraints": table.constraints,
                     "comments": table.comments
                 })
         else:
@@ -255,6 +259,7 @@ class TableManagement(RoleSessionMixin, APIView):
                     "endpoints": table.endpoints,
                     "tenant_id": table.tenant_id,
                     "primary_key": table.primary_key,
+                    "constraints": table.constraints,
                     "comments": table.comments
                 })
 
@@ -289,6 +294,11 @@ class TableManagement(RoleSessionMixin, APIView):
 
         if ManageTables.objects.filter(table_name=table_name, tenant_id=req_tenant).exists():
             msg = f"Table with name '{table_name}' and tenant_id '{req_tenant}' already exists in ManageTables table."
+            logger.warning(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+        
+        if ManageViews.objects.filter(view_name=table_name, tenant_id=req_tenant).exists():
+            msg = f"View with name '{table_name}' and tenant_id '{req_tenant}' already exists in ManageViews table. View and Table names can collide."
             logger.warning(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
@@ -326,10 +336,10 @@ class TableManagement(RoleSessionMixin, APIView):
         try:
             existing_enums = manage_tables.get_enums(db_instance_name)
             if existing_enums.get(req_tenant):
-                existing_enums_names = list(existing_enums.get(req_tenant).keys())
+                existing_enum_names = list(existing_enums.get(req_tenant).keys())
             else:
-                existing_enums_names = []
-            logger.info(f"Got list of existing enum_names: {existing_enums_names}")
+                existing_enum_names = []
+            logger.info(f"Got list of existing enum_names: {existing_enum_names}")
         except Exception as e:
             msg = f"Failed to get enums for table {table_name}. e:{e}"
             logger.warning(msg)
@@ -373,7 +383,7 @@ class TableManagement(RoleSessionMixin, APIView):
         # Create a validation schema
         try:
             validate_json_create, validate_json_update = create_validate_schema(columns, req_tenant,
-                                                                                existing_enums_names)
+                                                                                existing_enum_names)
         except Exception as e:
             msg = f"Unable to create json validation schema for table {table_name}: {e}" \
                   f"\nFailed to create table {table_name}. "
@@ -383,7 +393,7 @@ class TableManagement(RoleSessionMixin, APIView):
         # Create table
         try:
             result = self.post_transaction(table_name, root_url, primary_key, columns, validate_json_create,
-                                           validate_json_update, endpoints, existing_enums_names, special_rules,
+                                           validate_json_update, endpoints, existing_enum_names, special_rules,
                                            comments, constraints, req_tenant, db_instance_name)
         except Exception as e:
             msg = f"Failed to create table {table_name}. {e}"
@@ -421,6 +431,7 @@ class TableManagement(RoleSessionMixin, APIView):
             "table_id": new_table.pk,
             "root_url": new_table.root_url,
             "endpoints": new_table.endpoints,
+            "constraints": new_table.constraints,
             "comments": new_table.comments
         }
 
@@ -485,6 +496,7 @@ class TableManagementById(RoleSessionMixin, APIView):
                 "update schema": table.validate_json_update,
                 "create schema": table.validate_json_create,
                 "primary_key": table.primary_key,
+                "constraints": table.constraints,
                 "comments": table.comments
             }
         else:
@@ -495,6 +507,7 @@ class TableManagementById(RoleSessionMixin, APIView):
                 "endpoints": table.endpoints,
                 "tenant_id": table.tenant_id,
                 "primary_key": table.primary_key,
+                "constraints": table.constraints,
                 "comments": table.comments
             }
 
@@ -502,7 +515,42 @@ class TableManagementById(RoleSessionMixin, APIView):
 
     @is_admin
     def put(self, request, *args, **kwargs):
-        logger.debug("top of put /manage/tables/<id>")
+        """Alter tables using Postgres Alter table commands. This is complicated because
+        each table has it's column_definition saved in managetables along with table name.
+        We use these to ensure row puts are in the proper formatting and that we call the correct
+        tables inside of a tenant.
+        
+        This means that we'll need to get all column defs and also update column defs depending on
+        the inputted data. For example, we'll have to change the table name in managetables if a 
+        user passes in {"table_name": newNameHere}.
+        
+        Also important to remember that we might need to rollback these changes. The changes to
+        the Django ManageTables table along with changes to the Postgres data that we're modifying.
+        Psycopg2 support cursor.rollback() to rollback to the start of any "pending transactions".
+        Django also has rollbacks, when Django errors it'll rollback by itself, this however excludes
+        model data changes. Meaning we'll have to save whatever Django model data we have as a "init
+        state" and revert back to that if there's a problem down the line.
+
+        Args:
+            request: request_object
+            kwargs: dict of the following
+                "root_url": new_root_url,
+                "table_name": new_name,
+                "comments": new_comments,
+                "endpoints": [new_endpoints_list]},
+                "column_type": "column_name, type"
+                "drop_column": column_name,
+                "drop_default": column_name,
+                "set_default": "column_name, new_default"
+                "add_column": {"name": {"data_type": "integer",
+                                        "unique": true,
+                                        "null": false}}
+        
+        Returns:
+            200: Description of successful operation.
+            400: Description of operation error.
+        """
+        logger.debug("top of put /manage/tables/<table_id>")
         req_tenant = request.session['tenant_id']
         db_instance_name = request.session['db_instance_name']
 
@@ -516,135 +564,577 @@ class TableManagementById(RoleSessionMixin, APIView):
 
         try:
             table = ManageTables.objects.get(pk=table_id)
-            transition_table = ManageTablesTransition.objects.get(manage_table=table)
         except ManageTables.DoesNotExist:
             msg = f"Table with ID {table_id} does not exist in ManageTables table."
             logger.warning(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
-        except ManageTablesTransition.DoesNotExist:
-            msg = f"Transition table for table with ID {table_id} does not exist."
-            logger.warning(msg)
-            return HttpResponseServerError(make_error(msg=msg))
 
         # Parse out possible update fields.
         root_url = request.data.get('root_url', None)
         table_name = request.data.get('table_name', None)
-        update_cols = request.data.get('columns', None)
         comments = request.data.get('comments', None)
-        list_all = request.data.get('list_all', ("GET_ALL" in table.endpoints))
-        list_one = request.data.get('list_one', ("GET_ONE" in table.endpoints))
-        create = request.data.get('create', ("CREATE" in table.endpoints))
-        update = request.data.get('update', ("UPDATE" in table.endpoints))
-        delete = request.data.get('delete', ("DELETE" in table.endpoints))
-        endpoints = request.data.get('endpoints', True)
+        endpoints = request.data.get('endpoints', None) # GET_ALL, GET_ONE, CREATE, UPDATE, DELETE, ALL
+        column_type = request.data.get('column_type', None)
+        drop_column = request.data.get('drop_column', None)
+        drop_default = request.data.get('drop_default', None)
+        set_default = request.data.get('set_default', None)
+        add_column = request.data.get('add_column', None)
+        
+        #ONLY ONE CHANGE PER REQUEST
+        # We change Django first and then Postgres and Postgres is harder to revert using do_transaction
+        updates_to_do = 0
+        for update_field in [root_url, table_name, comments, endpoints, column_type, drop_column, drop_default, set_default, add_column]:
+            if update_field:
+                updates_to_do += 1
+        if updates_to_do == 0:
+            msg = f"No updates requested"
+            logger.warning(msg)
+            return HttpResponse(make_success(msg="No updates to table requested. Success."), content_type='application/json')
+        if updates_to_do >= 2:
+            msg = f"Only one update to table may be done at a time."
+            logger.warning(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
 
-        if root_url is not None:
-            table.root_url = root_url
-            table.save()
+        # Backup table - To revert to if there's a problem
+        backup_table = copy.copy(table)
+        
+        
+        # root_url operation
+        if root_url:
+            if not isinstance(root_url, str):
+                msg = f"Error changing root_url for table {backup_table.table_name}. 'root_url' must be a str. Received type {type(root_url)}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            try:
+                table.root_url = root_url
+                table.save()
+            except Exception as e:
+                # Revert Django
+                backup_table.save()
+                msg = f"Changes reverted. Error changing root_url for table '{backup_table.table_name}' from '{backup_table.root_url}' to '{root_url}'. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+            
+            return HttpResponse(make_success(msg=f"Successfully changed table root_url to '{root_url}' for table '{backup_table.table_name}'."), content_type='application/json')
+
+
+        # table_name operation
+        if table_name is not None:
+            if not isinstance(table_name, str):
+                msg = f"Error renaming table {backup_table.table_name}. 'table_name' must be a str. Received type {type(table_name)}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg)) 
+                     
+            try:
+                table.table_name = table_name
+                table.save()
+                command = f"ALTER TABLE {req_tenant}.{backup_table.table_name} RENAME TO {table_name}"
+                do_transaction(command, db_instance_name)
+            except Exception as e:
+                # Revert Django
+                backup_table.save()
+                msg = f"Changes reverted. Error changing table name from {backup_table.table_name} to {table_name}. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            return HttpResponse(make_success(msg=f"Successfully changed table_name to '{table_name}' from '{backup_table.table_name}'."), content_type='application/json')
+        
+
+        # comment operation
         if comments is not None:
-            table.comments = comments
-            table.save()
-        if not endpoints:
-            table.endpoints = list()
-            table.save()
-        else:
-            set_endpoints = set(table.endpoints)
-            if list_all:
-                set_endpoints.add("GET_ALL")
-            else:
-                if "GET_ALL" in set_endpoints:
-                    set_endpoints.remove("GET_ALL")
+            if not isinstance(comments, str):
+                msg = f"Error adding comments to table '{backup_table.table_name}'. 'comments' must be a str. Received type {type(comments)}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
 
-            if list_one:
-                set_endpoints.add("GET_ONE")
-            else:
-                if "GET_ONE" in set_endpoints:
-                    set_endpoints.remove("GET_ONE")
+            try:
+                table.comments = comments
+                table.save()
+            except Exception as e:
+                # Revert Django
+                backup_table.save()
+                msg = f"Changes reverted. Error adding comments to table {backup_table.table_name}. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
 
-            if create:
-                set_endpoints.add("CREATE")
-            else:
-                if "CREATE" in set_endpoints:
-                    set_endpoints.remove("CREATE")
+            return HttpResponse(make_success(msg=f"Successfully added comments to table, '{backup_table.table_name}'."), content_type='application/json')
+            
 
-            if update:
-                set_endpoints.add("UPDATE")
-            else:
-                if "UPDATE" in set_endpoints:
-                    set_endpoints.remove("UPDATE")
+        # endpoints operation
+        if endpoints is not None:
+            valid_endpoints = ["GET_ALL", "GET_ONE", "CREATE", "UPDATE", "DELETE", "ALL", "NONE"]
+            if not isinstance(endpoints, list):
+                msg = f"Error with put to table with ID {backup_table.table_name}. 'endpoints' must be a list. Received type {type(endpoints)}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
 
-            if delete:
-                set_endpoints.add("DELETE")
-            else:
-                if "DELETE" in set_endpoints:
-                    set_endpoints.remove("DELETE")
-
-            table.endpoints = list(set_endpoints)
-            table.save()
-
-            if table_name is not None:
-                transition_table.table_name_tn = table_name
-                transition_table.save()
-
-            if update_cols is not None:
-                current_cols = transition_table.column_definition_tn
-                for col_name, col_info in current_cols.items():
-                    if "action" not in col_info:
-                        msg = f"Action field is required to update column {col_name}"
-                        logger.warning(msg)
-                        return HttpResponseBadRequest(make_error(msg=msg))
-
-                    if col_info["action"] == 'DROP':
-                        current_cols.pop(col_name, None)
-                    elif col_info["action"] == "ADD":
-                        current_cols[col_name] = col_info
-                    elif col_info["action"] == "ALTER":
-                        current_cols.pop(col_name, None)
-                        current_cols[col_name] = col_info
-                    else:
-                        msg = f"Invalid action for column {col_name} received: {col_info['action']}"
-                        logger.warning(msg)
-                        return HttpResponseBadRequest(make_error(msg=msg))
-
-                    transition_table.save()
-
-                # We grab enums to do some checks
-                existing_enums = manage_tables.get_enums(db_instance_name)
-                if existing_enums.get(req_tenant):
-                    existing_enums_names = list(existing_enums.get(req_tenant).keys())
-                else:
-                    existing_enums_names = []
-                logger.info(f"Got list of existing enum_names: {existing_enums_names}")
-
-                try:
-                    validate_json_create_tn, validate_json_update_tn = create_validate_schema(
-                        current_cols, req_tenant, existing_enums)
-                    transition_table.validate_json_create_tn = validate_json_create_tn
-                    transition_table.validate_json_update_tn = validate_json_update_tn
-                    transition_table.save()
-                except Exception as e:
-                    msg = f"Unable to create json validation schema for updating table {table_name}: {e}" \
-                          f"\nFailed to update transition table for {table_name}. "
+            try:
+                endpoints = set(endpoints)
+                endpoints = list(endpoints)
+                if "NONE" in endpoints and len(endpoints) > 1:
+                    msg = f"Error, when specifying NONE in endpoints you cannot specify anything else. endpoints: {endpoints}"
                     logger.warning(msg)
                     return HttpResponseBadRequest(make_error(msg=msg))
+                if "ALL" in endpoints and len(endpoints) > 1:
+                    msg = f"Error, when specifying ALL in endpoints you cannot specify anything else. endpoints: {endpoints}"
+                    logger.warning(msg)
+                    return HttpResponseBadRequest(make_error(msg=msg))
+                for endpoint in endpoints:
+                    if endpoint not in valid_endpoints:
+                        msg = f"Error with put to table with ID {backup_table.table_name}. Endpoints list can only contain str values from: {valid_endpoints}"
+                        logger.warning(msg)
+                        return HttpResponseBadRequest(make_error(msg=msg))
+                    if endpoint == "ALL":
+                        endpoints = valid_endpoints
+                        # All/None isn't an actual thing we want to save.
+                        endpoints.remove("ALL")
+                        endpoints.remove("NONE")
+                    if endpoint == "NONE":
+                        endpoints = []
 
-                # generate migration script
-                # apply and roll back, error if it does not work
-                # if works, open process that creates a new file and pipes generated migration into it.
+                table.endpoints = endpoints
+                table.save()
+            except Exception as e:
+                # Revert Django
+                backup_table.save()
+                msg = f"Changes reverted. Error changing endpoints for table {backup_table.table_name}. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
 
-    # def create_update_table_migration(swlf, table_name, tenant, update_dict):
-    #     logger.info(f"Generating script to update table {tenant}.{table_name}...")
-    #
-    #     command = "ALTER TABLE %s" % table_name
-    #     if "table_name" in update_dict:
-    #         command = command + " RENAME TO %s"
-    #
-    #     if "columns" in update_dict:
-    #         for col_name, col_info in update_dict["columns"].items():
-    #             if col["action"] == "DROP":
-    #                 command = command + " DROP %s IF EXISTS column %s" % col_name, col_info["on_delete"]
+            return HttpResponse(make_success(msg=f"Successfully changed table, '{backup_table.table_name}', to have the following endpoints: {endpoints}"), content_type='application/json')
 
-        return HttpResponse(make_success(msg="Table put successfully."), content_type='application/json')
+        # We grab enums to do run 'create_validate_schema' in column_type and drop_column operations
+        if column_type or drop_column or add_column or set_default or drop_default:
+            existing_enums = manage_tables.get_enums(db_instance_name)
+            if existing_enums.get(req_tenant):
+                existing_enum_names = list(existing_enums.get(req_tenant).keys())
+            else:
+                existing_enum_names = []
+            logger.info(f"Got list of existing enum_names: {existing_enum_names}")
+
+        # column_type operation
+        if column_type:
+            if not isinstance(column_type, str):
+                msg = f"Error changing column type for table. 'column_type' must be a str. Received type {type(column_type)}. Format should be 'column_name, new_type'"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+            
+            split_str = column_type.split(',')
+            if not len(split_str) == 2:
+                msg = f"Error changing column type for table. 'column_type' should come in format 'column_name, new_type', got {column_type}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+            
+            if not split_str[0] or not split_str[1]:
+                msg = f"Error changing column type for table. 'column_type' should come in format 'column_name, new_type', got {column_type}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+            
+            column_name, new_type = split_str
+            column_name = column_name.strip()
+            new_type = new_type.strip()
+                        
+            # Check that new_type is in valid_types or is in existing_enums
+            valid_types = ["varchar", "boolean", "integer", "text", "timestamp", "datetime"]
+            if new_type not in valid_types + existing_enum_names:
+                msg = f"Error changing column type for table. '{new_type}' not in {valid_types + existing_enum_names}. Note: Cannot update to a serial data type."
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            # Check column_name is legal.
+            valid_column_names = table.column_definition.keys()
+            if not column_name in valid_column_names:
+                msg = f"Error: column_name not in current table. '{column_name}' not in {list(valid_column_names)}."
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            new_column_definition = copy.copy(table.column_definition)
+            
+            # Make the type change to the column_definition.
+            try:
+                old_column = new_column_definition[column_name]
+                new_column_definition[column_name]['data_type'] = new_type
+                if old_column['data_type'] == 'varchar' and new_type != 'varchar':
+                    del new_column_definition[column_name]['char_len']
+                if new_type == 'varchar' and not new_column_definition[column_name].get('char_len'):
+                    new_column_definition[column_name]['char_len'] = '255'
+            except Exception as e:
+                msg = f"Error changing column type in column_definition. New def: {new_column_definition}. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            # Create a validation schema
+            try:
+                validate_json_create, validate_json_update = create_validate_schema(new_column_definition, req_tenant, existing_enum_names)
+            except Exception as e:
+                msg = f"Unable to create json validation schema after changing table column type. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            try:
+                table.column_definition = new_column_definition
+                table.validate_json_create = validate_json_create
+                table.validate_json_update = validate_json_update
+                table.save()
+                command = f"ALTER TABLE {req_tenant}.{backup_table.table_name} ALTER COLUMN {column_name} TYPE {new_type}"
+                do_transaction(command, db_instance_name)
+            except Exception as e:
+                # Revert Django
+                backup_table.save()
+                msg = f"Changes reverted. Error changing column_name '{column_name}' to type '{new_type}' in table '{backup_table.table_name}'. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            return HttpResponse(make_success(msg=f"Successfully changed column_name '{column_name}' to type '{new_type}' in table '{backup_table.table_name}'."), content_type='application/json')
+
+        # add_column operation
+        if add_column:
+            if not isinstance(add_column, dict):
+                msg = f"Error with put to table with ID {backup_table.table_name}. 'add_column' must be a dict. Received type {type(add_column)}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            if len(add_column) > 1:
+                msg = "add_column dict received is too large. Should be len of '1', in format {'col_name': {'data_type': 'integer', ...}\}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            (column_name, column_args), = add_column.items()
+            
+            if not isinstance(column_args, dict):
+                msg = f"Error with put to table with ID {backup_table.table_name}. 'add_column' must be dict with value of type dict. In format {'col_name': {'data_type': 'integer', ...}\}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+
+            ### We now validate the column_definition just to make sure all keys and values are expected and accounted for. Used later to update Django.
+            new_column_definition = copy.copy(table.column_definition)
+            
+            # Append the added column to column definition
+            try:
+                new_column_definition.update(add_column)
+            except Exception as e:
+                msg = f"Error adding column to table definition. New def: {new_column_definition}. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            # Create a validation schema
+            try:
+                validate_json_create, validate_json_update = create_validate_schema(new_column_definition, req_tenant, existing_enum_names)
+            except Exception as e:
+                msg = f"Unable to create json validation schema after adding column to table definition. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+
+            ### Validation complete, now we create the Postgres command we have to run.
+            # We need to grab the column type first as it used to decide how to handle the other variables.
+            try:
+                column_type = column_args["data_type"].upper()
+            except KeyError:
+                msg = f"Data type not specified for new column. Column args are as follows: {column_args}"
+                raise Exception(msg)
+            if column_type in {"VARCHAR", "CHAR"}:
+                try:
+                    char_len = column_args["char_len"]
+                    column_type = f"{column_type}({char_len})"
+                except KeyError:
+                    msg = f"Character max size not received for column {column_name}. Cannot create table {table_name}."
+                    logger.warning(msg)
+                    raise Exception(msg)
+
+            # Attempt to handle enum data_types
+            # This is only a small subsect of postgres data_types, listing them
+            # all would be trouble though, so just checking the common ones.
+            # Here we are fixing enum data_types given without tenant, i.e., data_type: "animals"
+            # Should be "dev.animals", we fix that here if we can.
+            if not column_type in ["BOOLEAN", "VARCHAR", "CHAR", "TEXT", "INTEGER", "SERIAL", "FLOAT", "DATE", "TIMESTAMP"]:
+                if column_type.lower() in existing_enum_names:
+                    column_type = f"{req_tenant}.{column_type}"
+
+            # Changing serial data types to an identity type that allows for user inputted increment and start.
+            if column_type == "SERIAL":
+                try:
+                    serial_start = int(column_args.get("serial_start", 1))
+                    serial_increment = int(column_args.get("serial_increment", 1))
+                    column_type = f"INTEGER GENERATED BY DEFAULT AS IDENTITY (START WITH {serial_start} INCREMENT BY {serial_increment})"
+                except Exception as e:
+                    msg = f"Error setting serial data_type for column {key}. e: {e}"
+                    logger.warning(msg)
+                    raise Exception(msg)
+
+            # Handle foreign keys.
+            if "foreign_key" in column_args and column_args["foreign_key"]:
+                try:
+                    # On_event means either on_delete or on_update for foreign keys. During that event
+                    # postgres will complete the event_action specified by the user.
+                    # check we have we need
+                    ref_table = column_args["reference_table"]
+                    ref_column = column_args["reference_column"]
+                    on_event = column_args["on_event"]
+                    event_action = column_args["event_action"]
+                except KeyError as e:
+                    msg = f"Required key {e.args[0]} for foreign key not received for column {column_name}. " \
+                        f"Cannot create table {table_name}."
+                    logger.warning(msg)
+                    raise Exception(msg)
+
+                try:
+                    on_event = on_event.upper()
+                    event_action = event_action.upper()
+                except:
+                    msg = f"on_event and event_action must both be strings, got {type(on_event)} and {type(event_action)}"
+                    logger.warning(msg)
+                    raise Exception(msg)
+
+                # Check that on_event is either DELETE or UPDATE
+                events = ["ON DELETE", "ON UPDATE"]
+                if on_event not in events:
+                    msg = f"Invalid on event supplied: {on_event}. Valid event actions: {events}."
+                    logger.warning(msg)
+                    raise Exception(msg)
+                # Do some input checking on event action.
+                event_options = ["SET NULL", "SET DEFAULT", "RESTRICT", "NO ACTION", "CASCADE"]
+                if event_action not in event_options:
+                    msg = f"Invalid event action supplied: {event_action}. Valid event actions: {event_options}."
+                    logger.warning(msg)
+                    raise Exception(msg)
+                # Cannot set on event action to SET NULL if the column does not allow nulls.
+                if event_action == "SET NULL" and "null" in column_args and not column_args["null"]:
+                    msg = f"Cannot set event action on column {column_name} " \
+                            f"as it does not allow nulls in column definition."
+                    logger.warning(msg)
+                    raise Exception(msg)
+
+                column_type = f"{column_type} REFERENCES {req_tenant}.{ref_table}({ref_column}) {on_event} {event_action}"
+
+            col_str_list = list()
+            col_string = f"{column_name} {column_type}"
+            col_str_list.append(col_string)
+
+            # Find optional values and assign to variable.
+            for key, val in column_args.items():
+                if key == "null":
+                    if not val:
+                        col_str_list.append("NOT NULL")
+                elif key == "unique":
+                    col_str_list.append("UNIQUE")
+                elif key == "default":
+                    # Check if default value should be encased in quotes. (str v. int)
+                    if type(val) == 'int' or type(val) == 'float':
+                        col_str_list.append(f"DEFAULT {val}")
+                    else:
+                        col_str_list.append(f"DEFAULT '{val}'")
+                elif key == "primary_key" and val == True:
+                    if not column_args['data_type'].lower() in ['integer', 'varchar', 'serial']:
+                        msg = f"primary_key field can only be set on fields of data_type 'integer', 'serial', or 'varchar'." \
+                            f" {column_args['data_type']} is not. Cannot create table: {table_name}"
+                        logger.warning(msg)
+                        raise Exception(msg)
+                    if column_args.get('null'):
+                        msg = f"primary_key field cannot have 'null' set to True. Field must have unique value." \
+                            f" Cannot create table: {table_name}"
+                        logger.warning(msg)
+                        raise Exception(msg)
+                    if column_args.get('default'):
+                        msg = f"primary_key field cannot have a 'default' set. Field must have unique value." \
+                            f" Cannot create table: {table_name}"
+                        logger.warning(msg)
+                        raise Exception(msg)
+                    primary_key_flag = True
+                    col_str_list.append("PRIMARY KEY")
+                elif key == "comments":
+                    continue
+                elif key not in ["data_type", "char_len", "foreign_key", "reference_table", "reference_column", "on_event", "event_action", "serial_start", "serial_increment"]:
+                    msg = f"{key} is an invalid argument for column {column_name}. Cannot create table {table_name}"
+                    logger.warning(msg)
+                    raise Exception(msg)
+    
+            col_def_command = " ".join(col_str_list)
+
+            # We now have the command to run, but we still need to change things in Django to correspond.
+            try:
+                table.column_definition = new_column_definition
+                table.validate_json_create = validate_json_create
+                table.validate_json_update = validate_json_update
+                table.save()
+                command = f"ALTER TABLE {req_tenant}.{backup_table.table_name} ADD {col_def_command};"
+                do_transaction(command, db_instance_name)
+            except Exception as e:
+                # Revert Django
+                backup_table.save()
+                msg = f"Changes reverted. Error adding column_name '{column_name}' to table '{backup_table.table_name}'. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            return HttpResponse(make_success(msg=f"Successfully added column, '{column_name}', to table '{backup_table.table_name}'"), content_type='application/json')
+
+
+        # drop_column operation
+        if drop_column:
+            column_name = drop_column
+            if not isinstance(column_name, str):
+                msg = f"Error dropping column in table. 'column_name' must be a str. Received type {type(column_name)}. Format should be 'column_name'"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            # Check column_name is legal.
+            valid_column_names = table.column_definition.keys()
+            if not column_name in valid_column_names:
+                msg = f"Error: column_name not in current table. '{column_name}' not in {list(valid_column_names)}."
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            new_column_definition = copy.copy(table.column_definition)
+            
+            # Delete column from column_def
+            try:
+                del new_column_definition[column_name]
+            except Exception as e:
+                msg = f"Error dropping column in column_definition. New def: {new_column_definition}. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            # Create a validation schema
+            try:
+                validate_json_create, validate_json_update = create_validate_schema(new_column_definition, req_tenant, existing_enum_names)
+            except Exception as e:
+                msg = f"Unable to create json validation schema after changing table column type. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            try:
+                table.column_definition = new_column_definition
+                table.validate_json_create = validate_json_create
+                table.validate_json_update = validate_json_update
+                table.save()
+                command = f"ALTER TABLE {req_tenant}.{backup_table.table_name} DROP COLUMN {column_name}"
+                do_transaction(command, db_instance_name)
+            except Exception as e:
+                # Revert Django
+                backup_table.save()
+                msg = f"Changes reverted. Error dropping column_name '{column_name}' in table '{backup_table.table_name}'. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            return HttpResponse(make_success(msg=f"Successfully dropped column, '{column_name}', from table '{backup_table.table_name}'"), content_type='application/json')
+
+
+        # drop_default operation
+        if drop_default:
+            column_name = drop_default
+            if not isinstance(column_name, str):
+                msg = f"Error dropping column default in table. 'column_name' must be a str. Received type {type(column_name)}. Format should be 'column_name'"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            # Check column_name is legal.
+            valid_column_names = table.column_definition.keys()
+            if not column_name in valid_column_names:
+                msg = f"Error: column_name not in current table. '{column_name}' not in {list(valid_column_names)}."
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            new_column_definition = copy.copy(table.column_definition)
+            
+            # Delete default from column_def
+            try:
+                del new_column_definition[column_name]['default']
+            except Exception as e:
+                msg = f"Error dropping column default in column_definition. New def: {new_column_definition}. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            # Create a validation schema
+            try:
+                validate_json_create, validate_json_update = create_validate_schema(new_column_definition, req_tenant, existing_enum_names)
+            except Exception as e:
+                msg = f"Unable to create json validation schema after changing table column type. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            try:
+                table.column_definition = new_column_definition
+                table.validate_json_create = validate_json_create
+                table.validate_json_update = validate_json_update
+                table.save()
+                command = f"ALTER TABLE {req_tenant}.{backup_table.table_name} ALTER COLUMN {column_name} DROP DEFAULT"
+                do_transaction(command, db_instance_name)
+            except Exception as e:
+                # Revert Django
+                backup_table.save()
+                msg = f"Changes reverted. Error dropping default from column_name '{column_name}' in table '{backup_table.table_name}'. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            return HttpResponse(make_success(msg=f"Successfully dropped default from column, '{column_name}', from table '{backup_table.table_name}'"), content_type='application/json')
+
+
+        # set_default operation
+        if set_default:
+            if not isinstance(set_default, str):
+                msg = f"Error setting default for column in table. 'set_default' must be a str. Received type {type(set_default)}. Format should be 'column_name, new_default'"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+            
+            split_str = set_default.split(',')
+            if not len(split_str) == 2:
+                msg = f"Error setting default for column in table. 'set_default' should come in format 'column_name, new_default', got {column_type}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+            
+            if not split_str[0] or not split_str[1]:
+                msg = f"Error setting default for column in table. 'set_default' should come in format 'column_name, new_default', got {column_type}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+            
+            column_name, new_default = split_str
+            column_name = column_name.strip()
+            new_default = new_default.strip()
+
+            # Check column_name is legal.
+            valid_column_names = table.column_definition.keys()
+            if not column_name in valid_column_names:
+                msg = f"Error: column_name not in current table. '{column_name}' not in {list(valid_column_names)}."
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            new_column_definition = copy.copy(table.column_definition)
+            
+            # Add new column definition to column_definition.
+            try:
+                new_column_definition[column_name]["default"] = new_default
+            except Exception as e:
+                msg = f"Error setting default for column in table. New def: {new_column_definition}. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            # Create a validation schema
+            try:
+                validate_json_create, validate_json_update = create_validate_schema(new_column_definition, req_tenant, existing_enum_names)
+            except Exception as e:
+                msg = f"Unable to create json validation schema after changing table column default. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            try:
+                table.column_definition = new_column_definition
+                table.validate_json_create = validate_json_create
+                table.validate_json_update = validate_json_update
+                table.save()
+                command = f"ALTER TABLE {req_tenant}.{backup_table.table_name} ALTER COLUMN {column_name} SET DEFAULT {new_default}"
+                do_transaction(command, db_instance_name)
+            except Exception as e:
+                # Revert Django
+                backup_table.save()
+                msg = f"Changes reverted. Error changing default for column_name '{column_name}' to '{new_default}' in table '{backup_table.table_name}'. e: {e}"
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            return HttpResponse(make_success(msg=f"Successfully set column default for column, '{column_name}', on table '{backup_table.table_name}'"), content_type='application/json')
+
+
 
     @is_admin
     def delete(self, request, *args, **kwargs):
@@ -732,6 +1222,7 @@ class TableManagementLoad(RoleSessionMixin, APIView):
 # based on the url to get here. We then will formulate a SQL statement to do the need actions.
 
 
+### Table Rows
 # Once we figure out the table and row, these are just simple SQL crud operations.
 class DynamicView(RoleSessionMixin, APIView):
     """
@@ -742,7 +1233,7 @@ class DynamicView(RoleSessionMixin, APIView):
     """
     @can_read
     def get(self, request, *args, **kwargs):
-        logger.debug("top of get /data/<data_root_url>")
+        logger.debug("top of get /data/<root_url>")
         req_tenant = request.session['tenant_id']
         db_instance = request.session['db_instance_name']
 
@@ -771,25 +1262,51 @@ class DynamicView(RoleSessionMixin, APIView):
             logger.warning(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
-        query_dict = dict()
-        for param in params:
-            if param.lower().startswith('where'):
-                table_columns = table.column_definition.keys()
-                if param[6:] in table_columns or param[6:] == 'pk':
-                    query_dict.update({param[6:]: params[param]})
-                else:
-                    msg = f"Invalid query parameter: {param[6:]}"
-                    logger.warning(msg)
+        try:
+            # Parse params, if the key contains a search operation, throw it into search_params
+            # search_params list is [[key, oper, value], ...]
+            search_params = []
+            opers = ['.neq', '.eq', '.lte', '.lt', '.gte', '.gt', '.nin', '.in',
+                     '.null', '.between', '.nbetween', '.like', '.nlike']
+            for full_key, value in params.items():
+                # Check that value is not list, if it is that means the user had two query parameters that were
+                # exactly the same and the request object consolidated the inputs, we don't want/need this.
+                if isinstance(value, list):
+                    msg = f"You may only specify a query value once, ex. ?col1.eq=2&col1.eq=2 is NOT allowed."
+                    logger.critical(msg + f" e: {e}")
                     return HttpResponseBadRequest(make_error(msg=msg))
 
-        try:
-            if limit is None:
-                limit = 10
-            if offset is None:
-                offset = 0
+                # If param ends with the operation, we remove the operation and use it later. That
+                # should leave only the key value that we can check later against the view's columns
+                for oper in opers:
+                    if full_key.endswith(oper):
+                        key = full_key.replace(oper, "")
+                        search_params.append([key, oper, value])
+                        break
+            logger.info(f"Search params: {search_params}")
+            
+            # limit and offset checking
+            try:
+                if limit:
+                    limit = int(limit)
+                else:
+                    limit = None
+                    
+                if limit == -1:
+                    limit = None
+                
+                if offset:
+                    offset = int(offset)
+                else:
+                    offset = None
+            except Exception as e:
+                msg = f"Limit and offset query parameters must be ints. Got limit: {type(limit)} and offset: {type(offset)}"
+                logger.error(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
             if order is not None:
                 result = table_data.get_rows_from_table(table.table_name,
-                                                        query_dict,
+                                                        search_params,
                                                         req_tenant,
                                                         limit,
                                                         offset,
@@ -797,7 +1314,7 @@ class DynamicView(RoleSessionMixin, APIView):
                                                         table.primary_key,
                                                         order=order)
             else:
-                result = table_data.get_rows_from_table(table.table_name, query_dict, req_tenant, limit, offset,
+                result = table_data.get_rows_from_table(table.table_name, search_params, req_tenant, limit, offset,
                                                         db_instance, table.primary_key)
         except Exception as e:
             msg = f"Failed to retrieve rows from table {table.table_name} on tenant {req_tenant}. {e}"
@@ -808,7 +1325,7 @@ class DynamicView(RoleSessionMixin, APIView):
 
     @can_write
     def post(self, request, *args, **kwargs):
-        logger.debug("top of post /data/<data_root_url>")
+        logger.debug("top of post /data/<root_url>")
         try:
             req_tenant = request.session['tenant_id']
             db_instance = request.session['db_instance_name']
@@ -866,44 +1383,23 @@ class DynamicView(RoleSessionMixin, APIView):
             logger.debug(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
-        # Validate against the table's json schema.
         try:
-            v = Validator(table.validate_json_create)
-            if not v.validate(data):
-                msg = f"Data determined invalid from validation schema; errors: {v.errors}"
-                logger.warning(msg)
-                return HttpResponseBadRequest(make_error(msg=msg))
-        except Exception as e:
-            msg = f"Error occurred when validating the data from the validation schema; Details: {e}"
-            logger.error(msg)
-            return HttpResponseBadRequest(make_error(msg=msg))
-
-        try:
-            result_id = table_data.create_row(table.table_name,
+            new_rows = table_data.row_creator(table.table_name,
                                               data,
                                               req_tenant,
                                               table.primary_key,
+                                              table.validate_json_create,
                                               db_instance=db_instance)
         except Exception as e:
-            msg = f"Failed to retrieve rows from table {table.table_name} on tenant {req_tenant}. {e}"
-            logger.error(msg)
-            return HttpResponseBadRequest(make_error(msg=msg))
-        try:
-            result = table_data.get_row_from_table(table.table_name,
-                                                   result_id,
-                                                   req_tenant,
-                                                   table.primary_key,
-                                                   db_instance=db_instance)
-        except Exception as e:
-            msg = f"Failed to retrieve rows from table {table.table_name} on tenant {req_tenant}. {e}"
+            msg = f"Failed to add rows to table {table.table_name} on tenant {req_tenant}. {e}"
             logger.error(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
-        return HttpResponse(make_success(result=result), content_type='application/json')
+        return HttpResponse(make_success(result=new_rows), content_type='application/json')
 
     @can_write
     def put(self, request, *args, **kwargs):
-        logger.debug("top of put /data/<data_root_url>")
+        logger.debug("top of put /data/<root_url>")
         req_tenant = request.session['tenant_id']
         db_instance = request.session['db_instance_name']
 
@@ -955,7 +1451,44 @@ class DynamicView(RoleSessionMixin, APIView):
 
         try:
             if where_clause:
-                table_data.update_rows_with_where(table.table_name, data, req_tenant, db_instance, where_clause)
+                # where_clause comes in as {variable: {"operator": oper, "value": value}, ...}
+                # Need to parse dict to search_param format. [[key, oper, value], ...]
+                logger.info(f"Parsing where_clause: {where_clause}")
+                search_params = []
+                if not isinstance(where_clause, dict):
+                    msg = f"Error, where clause should come as a dict, got {type(where_clause)}"
+                    logger.error(msg)
+                    return HttpResponseBadRequest(make_error(msg=msg))
+                for where_key, where_dict in where_clause.items():
+                    if not isinstance(where_dict, dict):
+                        msg = f"Error in where_clause. Got key, but value should be of type dict, got {where_dict}"
+                        logger.error(msg)
+                        return HttpResponseBadRequest(make_error(msg=msg))
+                    where_oper = where_dict.get("operator")
+                    where_value = where_dict.get("value")
+                    if not where_oper:
+                        msg = f"'operator' must be a key in where_clause dict. where_clause dict: {where_dict}"
+                        logger.error(msg)
+                        return HttpResponseBadRequest(make_error(msg=msg))
+                    if not where_value:
+                        msg = f"'value' must be a key in where_clause dict. where_clause dict: {where_dict}"
+                        logger.error(msg)
+                        return HttpResponseBadRequest(make_error(msg=msg))
+                    if not isinstance(where_oper, str):
+                        msg = f"'operator' must be a string, got: {where_oper}, type: {type(where_oper)}"
+                        logger.error(msg)
+                        return HttpResponseBadRequest(make_error(msg=msg))
+                    
+                    logger.info('HERE WHERE_CLAUSE')
+                    opers = ['neq', 'eq', 'lte', 'lt', 'gte', 'gt', 'nin', 'in', 'nlike', 'like', 'between', 'nbetween', 'null']
+                    if where_oper not in opers:
+                        msg = f"where_oper must be in {opers}, got {where_oper}."
+                        logger.error(msg)
+                        return HttpResponseBadRequest(make_error(msg=msg))
+                    
+                    search_params.append([where_key, f".{where_oper}", where_value])
+                logger.info(f"Search params: {search_params}")
+                table_data.update_rows_with_where(table.table_name, data, req_tenant, db_instance, search_params)
             else:
                 table_data.update_rows_with_where(table.table_name, data, req_tenant, db_instance)
         except Exception as e:
@@ -1172,19 +1705,21 @@ class ViewManagement(RoleSessionMixin, APIView):
         logger.debug("top of post /manage/views")
         req_tenant = request.session['tenant_id']
         db_instance_name = request.session['db_instance_name']
+        req_username = request.session['username']
 
         # Parse out required fields.
         try:
             view_name = request.data['view_name']
-            select_query = request.data['select_query']
-            from_table = request.data['from_table']
         except KeyError as e:
-            msg = f"\'{e.args}\' is required when creating a new table."
+            msg = f"\'{e.args}\' is required when creating a new view."
             logger.warning(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
         # Parse out optional fields.
         root_url = request.data.get('root_url', view_name)
+        raw_sql = request.data.get('raw_sql', None)
+        from_table = request.data.get('from_table', None)
+        select_query = request.data.get('select_query', None)
         where_query = request.data.get('where_query', None)
         permission_rules = request.data.get('permission_rules', [])
         list_all = request.data.get('list_all', True)
@@ -1195,32 +1730,72 @@ class ViewManagement(RoleSessionMixin, APIView):
         endpoints = request.data.get('endpoints', True)
         comments = request.data.get('comments', "")
 
-        # view_name checks
+        # Check required selection parameters.
+        # Check view_name is acceptable
         if not isinstance(view_name, str):
             msg = f"The view_name must be of type string. Got type: {type(view_name)}"
             logger.error(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
+        
         if not FORBIDDEN_CHARS.match(view_name):
             msg = f"The view_name inputted is not url safe. Value must be alphanumeric with _ and - optional. Value inputted: {view_name}"
             logger.error(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
-        # Check for existence of view_name, table_name, and root_url
+        # Check for existence of view_name in tenant.
         if ManageViews.objects.filter(view_name=view_name, tenant_id=req_tenant).exists():
             msg = f"View with name \'{view_name}\' and tenant_id \'{req_tenant}\' already exists in ManageViews table."
             logger.warning(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
+        # Check for view_name in table names (they collide when dealing with sql (e.g. dev.my_item_name))
+        if ManageTables.objects.filter(table_name=view_name, tenant_id=req_tenant).exists():
+            msg = f"Table with name '{view_name}' and tenant_id '{req_tenant}' already exists in ManageTables table. View and Table names are not allowed to collide."
+            logger.warning(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        # Check for existence of root_url in tenant.
         if ManageViews.objects.filter(root_url=root_url).exists():
             msg = f"View with root url \'{root_url}\' and tenant_id {req_tenant} already exists in ManageViews table. " \
                   f"View name: {view_name}"
             logger.warning(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
-        if not ManageTables.objects.filter(table_name=from_table, tenant_id=req_tenant).exists():
-            msg = f"Table with name \'{from_table}\' and tenant_id \'{req_tenant}\' does not exist in ManageTables table."
-            logger.warning(msg)
-            return HttpResponseBadRequest(make_error(msg=msg))
+        # If raw_sql being used, select_query, where_query, from_table are disallowed.
+        if raw_sql:
+            # Permission check, ensure user has PGREST_ADMIN role.
+            # Get all user roles from sk and check if user has role.
+            user_roles = get_user_sk_roles(req_tenant, req_username)
+            if not "PGREST_ADMIN" in user_roles:
+                msg = f"User {req_username} in tenant {req_tenant} requires PGREST_ADMIN role for raw_sql view creation."
+                logger.debug(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            if select_query:
+                msg = f"User may only specify raw_sql or select_query, got both."
+                logger.error(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+            
+            if where_query:
+                msg = f"When using a raw_sql query, where_query is not allowed, got both."
+                logger.error(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
+            if from_table:
+                msg = f"When using a raw_sql query, table_name is not allowed, got both."
+                logger.error(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+        else:
+            if not from_table:
+                msg = "'from_table' is required when creating a new view."
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+                        
+            # Check for existence of from_table in tenant.
+            if not ManageTables.objects.filter(table_name=from_table, tenant_id=req_tenant).exists():
+                msg = f"Table with name \'{from_table}\' and tenant_id \'{req_tenant}\' does not exist in ManageTables table."
+                logger.warning(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
 
         # Get endpoint rules
         if endpoints:
@@ -1239,18 +1814,21 @@ class ViewManagement(RoleSessionMixin, APIView):
             endpoints = []
 
         # Create view_definition
-        view_definition = {"select_query": select_query, "from_table": from_table, "where_query": where_query}
+        view_definition = {"from_table": from_table, "raw_sql": raw_sql, "select_query": select_query, "where_query": where_query}
 
         # Create view
         try:
-            result = self.post_view_transaction(view_name, root_url, view_definition, permission_rules, endpoints,
+            result, metadata = self.post_view_transaction(view_name, root_url, view_definition, permission_rules, endpoints,
                                                 comments, req_tenant, db_instance_name)
-        except Exception as e:
-            msg = f"Failed to create view {view_name}. {e}"
+        except Exception as er:
+            logger.error(er)
+            error = er.args[0]
+            metadata = er.args[1]
+            msg = f"Failed to create view {view_name}. {error}"
             logger.error(msg)
-            return HttpResponseBadRequest(make_error(msg=msg))
+            return HttpResponseBadRequest(make_error(msg=msg, metadata=metadata))
 
-        return HttpResponse(make_success(result=result), content_type='application/json')
+        return HttpResponse(make_success(result=result, metadata=metadata), content_type='application/json')
 
     @transaction.atomic
     def post_view_transaction(self, view_name, root_url, view_definition, permission_rules, endpoints, comments,
@@ -1264,7 +1842,7 @@ class ViewManagement(RoleSessionMixin, APIView):
                                               comments=comments,
                                               tenant_id=tenant_id)
 
-        view_data.create_view(view_name, view_definition, tenant_id, db_instance=db_instance_name)
+        metadata = view_data.create_view(view_name, view_definition, tenant_id, db_instance=db_instance_name)
 
         result = {
             "view_name": new_view.view_name,
@@ -1274,7 +1852,7 @@ class ViewManagement(RoleSessionMixin, APIView):
             "comments": new_view.comments
         }
 
-        return result
+        return result, metadata
 
 
 class ViewManagementById(RoleSessionMixin, APIView):
@@ -1421,7 +1999,8 @@ class ViewsResource(RoleSessionMixin, APIView):
         user_roles = get_user_sk_roles(req_tenant, req_username)
         try:
             if not set(view.permission_rules).issubset(set(user_roles)):
-                msg = f"User {req_username} in tenant {req_tenant} does not have permission to access view {view.view_name} in tenant {req_tenant}."
+                msg = (f"User {req_username} in tenant {req_tenant} does not have permission to access view {view.view_name}"
+                       f" in tenant {req_tenant}. User roles: {user_roles}. Required roles: {view.permission_rules}")
                 logger.debug(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
         except Exception as e:
@@ -1435,13 +2014,50 @@ class ViewsResource(RoleSessionMixin, APIView):
             return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
-            if limit is None:
-                limit = 10
-            if offset is None:
-                offset = 0
+            # Parse params, if the key contains a search operation, throw it into search_params
+            # search_params list is [[key, oper, value], ...]
+            search_params = []
+            opers = ['.neq', '.eq', '.lte', '.lt', '.gte', '.gt', '.nin', '.in',
+                     '.null', '.between', '.nbetween', '.like', '.nlike']
+            for full_key, value in params.items():
+                # Check that value is not list, if it is that means the user had two query parameters that were
+                # exactly the same and the request object consolidated the inputs, we don't want/need this.
+                if isinstance(value, list):
+                    msg = f"You may only specify a query value once, ex. ?col1.eq=2&col1.eq=2 is NOT allowed."
+                    logger.critical(msg + f" e: {e}")
+                    return HttpResponseBadRequest(make_error(msg=msg))
+
+                # If param ends with the operation, we remove the operation and use it later. That
+                # should leave only the key value that we can check later against the view's columns
+                for oper in opers:
+                    if full_key.endswith(oper):
+                        key = full_key.replace(oper, "")
+                        search_params.append([key, oper, value])
+                        break
+            logger.info(f"Search params: {search_params}")
+            
+            # limit and offset checking
+            try:
+                if limit:
+                    limit = int(limit)
+                else:
+                    limit = None
+                    
+                if limit == -1:
+                    limit = None
+                
+                if offset:
+                    offset = int(offset)
+                else:
+                    offset = None
+            except Exception as e:
+                msg = f"Limit and offset query parameters must be ints. Got limit: {type(limit)} and offset: {type(offset)}"
+                logger.error(msg)
+                return HttpResponseBadRequest(make_error(msg=msg))
+
             if order is not None:
                 result = view_data.get_rows_from_view(view.view_name,
-                                                      params,
+                                                      search_params,
                                                       req_tenant,
                                                       limit,
                                                       offset,
@@ -1449,7 +2065,7 @@ class ViewsResource(RoleSessionMixin, APIView):
                                                       view.manage_view_id,
                                                       order=order)
             else:
-                result = view_data.get_rows_from_view(view.view_name, params, req_tenant, limit, offset, db_instance,
+                result = view_data.get_rows_from_view(view.view_name, search_params, req_tenant, limit, offset, db_instance,
                                                       view.manage_view_id)
         except Exception as e:
             msg = f"Failed to retrieve rows from view {view.view_name} on tenant {req_tenant}. {e}"

@@ -1,44 +1,10 @@
 import re
 import psycopg2
 from . import config
+from .data_utils import do_transaction, parse_object_data, search_parse, order_parse
 from pgrest.pycommon.logs import get_logger
 logger = get_logger(__name__)
 
-
-def do_transaction(command, db_instance):
-    # Read the connection parameters and connect to database.
-    if db_instance:
-        params = config.config(db_instance)
-    else:
-        params = config.config()
-    conn = psycopg2.connect(**params)
-    cur = conn.cursor()
-    cur.execute(command)
-    cur.close()
-    conn.commit()
-
-def dict_fetch_all(cursor):
-    """
-    Return all rows from a cursor as a dict
-    """
-    columns = [col[0] for col in cursor.description]
-    return [
-        dict(zip(columns, row))
-        for row in cursor.fetchall()
-    ]
-
-def expose_primary_key(result_list, primary_key):
-    list_with_id_field = []
-    if result_list:
-        for result_dict in result_list:
-            try:
-                list_entry = result_dict.update({'_pkid': result_dict[primary_key]})
-            except:
-                msg = f"Error finding 'primary_key' field, {primary_key} in result list: {result_list}"
-                logger.error(msg)
-                raise Exception(msg)
-            list_with_id_field.append(list_entry)
-    return list_with_id_field
 
 def get_row_from_view(view_name, pk_id, tenant, primary_key, db_instance=None):
     """
@@ -50,142 +16,68 @@ def get_row_from_view(view_name, pk_id, tenant, primary_key, db_instance=None):
     else:
         command = f"SELECT * FROM {tenant}.{view_name} WHERE {primary_key} = '{pk_id}';"
 
-    logger.info(f"Command: {command}")
+    # Run command
     try:
-        # Read the connection parameters and connect to database.
-        if db_instance:
-            params = config.config(db_instance)
-        else:
-            params = config.config()
-        conn = psycopg2.connect(**params)
-        cur = conn.cursor()
-        cur.execute(command)
-        result = dict_fetch_all(cur)
+        obj_description, obj_unparsed_data, _ = do_transaction(command, db_instance)
+        result = parse_object_data(obj_description, obj_unparsed_data)
         if len(result) == 0:
-            raise Exception
-        cur.close()
-        conn.commit()
-        # Success.
+            msg = f"Error. Received no result when retrieving row with pk \'{pk_id}\' from view {tenant}.{view_name}."
+            logger.error(msg)
+            raise Exception(msg)
         logger.info(f"Row {pk_id} successfully retrieved from view {tenant}.{view_name}.")
-        #expose_primary_key(result, primary_key)
-        return result
-    except psycopg2.DatabaseError as e:
-        msg = f"Error accessing database: {e}"
-        logger.error(msg)
-        raise Exception(msg)
     except Exception as e:
         msg = f"Error retrieving row with pk \'{pk_id}\' from view {tenant}.{view_name}: {e}"
         logger.error(msg)
         raise Exception(msg)
+    return result
 
 
-def get_rows_from_view(view_name, query_params, tenant, limit, offset, db_instance, primary_key, **kwargs):
+def get_rows_from_view(view_name, search_params, tenant, limit, offset, db_instance, primary_key, **kwargs):
     """
     Gets all rows from given table with an optional limit and filter.
     """
     logger.info(f"Getting rows from table {tenant}.{view_name}")
-    
-    query_dict = dict()
-    if query_params:
-        # If we have params we first have to get the view description to check to ensure
-        # parameters entered are indeed values in the query and not something bad.
-        try:
-            command = f"SELECT * FROM {tenant}.{view_name}"
-            if db_instance:
-                params = config.config(db_instance)
-            else:
-                params = config.config()
-            conn = psycopg2.connect(**params)
-            cur = conn.cursor()
-            cur.execute(command)
-            view_description = cur.description
-            cur.close()
-            conn.commit()
-            # Success.
-            logger.info(f"Got column description for view: {tenant}.{view_name}. Description: {view_description}")
-        except psycopg2.DatabaseError as e:
-            msg = f"Error accessing database: {e}"
-            logger.error(msg)
-            raise Exception(msg)
-        except Exception as e:
-            msg = f"Error retrieving description from view {tenant}.{view_name}: {e}"
-            logger.error(msg)
-            raise Exception(msg)
+    command = f"SELECT * FROM {tenant}.{view_name}"
 
-        if view_description:
-            view_columns = []
-            for row in view_description:
-                view_columns.append(row[0])
-
-        for query_param in query_params:
-            if query_param.lower().startswith('where'):
-                if query_param[6:] in view_columns:
-                    query_dict.update({query_param[6:]: query_params[query_param]})
-                else:
-                    msg = f"Invalid query parameter: {query_param[6:]}"
-                    logger.warning(msg)
-                    raise Exception(msg)
-
+    # Add search params, order, limit, and offset to command
     try:
-        command = f"SELECT * FROM {tenant}.{view_name}"
-        if len(query_dict) > 0:
-            first = True
-            for key, value in query_dict.items():
-                if first:
-                    if type(value) == 'int' or type(value) == 'float':
-                        query = f" WHERE \"{key}\" = {value}"
-                    else:
-                        query = f" WHERE \"{key}\" = \'{value}\'"
-                    first = False
-                else:
-                    if type(value) == 'int' or type(value) == 'float':
-                        query = f" AND \"{key}\" = {value}"
-                    else:
-                        query = f" AND \"{key}\" = \'{value}\'"
-                command = command + query
-        if "order" in kwargs:
-            order = kwargs["order"].replace(",", " ").strip()
-            command = f"{command} ORDER BY {order} "
+        parameterized_values = []
+        if search_params:
+            search_command, parameterized_values = search_parse(search_params, tenant, view_name, db_instance)
+            command += search_command
 
-        command = command + f" LIMIT {int(limit)} "
-        command = command + f" OFFSET {int(offset)};"
+        if "order" in kwargs:
+            order = kwargs["order"]
+            order_command = order_parse(order, tenant, view_name, db_instance)
+            command += order_command
+
+        if limit:
+            command += f" LIMIT {int(limit)} "
+        if offset:
+            command += f" OFFSET {int(offset)};"
     except Exception as e:
-        msg = f"Unable to form database query for table {tenant}.{view_name} with query(ies) {query_dict}: {e}"
+        msg = f"Unable to add order, limit, and offset for view {tenant}.{view_name}: {e}"
         logger.warning(msg)
         raise Exception(msg)
 
-    logger.info(f"Command: {command}")
+    # Run command
     try:
-        # Read the connection parameters and connect to database.
-        if db_instance:
-            params = config.config(db_instance)
-        else:
-            params = config.config()
-        conn = psycopg2.connect(**params)
-        cur = conn.cursor()
-        cur.execute(command)
-        result = dict_fetch_all(cur)
-        cur.close()
-        conn.commit()
-        # Success.
-        logger.info(f"Rows successfully retrieved from table {tenant}.{view_name}.")
-        #expose_primary_key(result, primary_key)
-        return result
-    except psycopg2.DatabaseError as e:
-        msg = f"Error accessing database: {e}"
-        logger.error(msg)
-        raise Exception(msg)
+        obj_description, obj_unparsed_data, _ = do_transaction(command, db_instance, parameterized_values)
+        result = parse_object_data(obj_description, obj_unparsed_data)
+        logger.info(f"Rows successfully retrieved from view {tenant}.{view_name}.")
     except Exception as e:
         msg = f"Error retrieving rows from view {tenant}.{view_name}: {e}"
         logger.error(msg)
         raise Exception(msg)
+    return result
 
 
 def create_view(view_name, view_definition, tenant, db_instance=None):
     """Create view in the PostgreSQL database"""
     try:
-        select_query = view_definition['select_query']
         from_table = view_definition['from_table']
+        raw_sql = view_definition['raw_sql']
+        select_query = view_definition['select_query']
         where_query = view_definition['where_query']
     except KeyError:
         msg = f"Error reading view variables from view_definition. v_d: {view_definition}"
@@ -193,29 +85,27 @@ def create_view(view_name, view_definition, tenant, db_instance=None):
         raise Exception(msg)
 
     logger.info(f"Creating view {tenant}.{view_name}...")
-    if where_query:
-        command = f"CREATE OR REPLACE VIEW {tenant}.{view_name} AS SELECT {select_query} FROM {tenant}.{from_table} WHERE {where_query};"
-    else:
-        command = f"CREATE OR REPLACE VIEW {tenant}.{view_name} AS SELECT {select_query} FROM {tenant}.{from_table};"
 
+    if raw_sql:
+        command = f"CREATE OR REPLACE VIEW {tenant}.{view_name} {raw_sql}"
+    else:
+        if where_query:
+            command = f"CREATE OR REPLACE VIEW {tenant}.{view_name} AS SELECT {select_query} FROM {tenant}.{from_table} WHERE {where_query};"
+        else:
+            command = f"CREATE OR REPLACE VIEW {tenant}.{view_name} AS SELECT {select_query} FROM {tenant}.{from_table};"
+
+    metadata = {"command": command}
     logger.debug(f"Create db command for view {tenant}.{view_name}: {command}")
 
-    conn = None
+    # Run command
     try:
         do_transaction(command, db_instance)
         logger.debug(f"View {tenant}.{view_name} successfully created in postgres db.")
-    except psycopg2.DatabaseError as e:
-        if conn:
-            conn.close()
-        msg = f"Error accessing database: {e}"
-        logger.error(msg)
-        raise Exception(msg)
     except Exception as e:
-        if conn:
-            conn.close()
         msg = f"Error creating view {tenant}.{view_name}: {e}"
-        logger.error(msg)
-        raise Exception(msg)
+        logger.error(f"{msg} -- Command: {command}")
+        raise Exception(msg, metadata)
+    return metadata
 
 
 def delete_view(view_name, tenant, db_instance=None):
@@ -223,20 +113,13 @@ def delete_view(view_name, tenant, db_instance=None):
     logger.info(f"Dropping view {tenant}.{view_name}...")
     # Maybe we shouldn't CASCADE?
     command = f"DROP VIEW {tenant}.{view_name} CASCADE;"
-    conn = None
     logger.info(f"Drop view command for {tenant}.{view_name}: {command}")
+    
+    # Run command
     try:
         do_transaction(command, db_instance)
         logger.info(f"View {tenant}.{view_name} successfully dropped from postgres db.")
-    except psycopg2.DatabaseError as e:
-        if conn:
-            conn.close()
-        msg = f"Error accessing database: {e}"
-        logger.error(msg)
-        raise Exception(msg)
     except Exception as e:
-        if conn:
-            conn.close()
         msg = f"Error dropping view {tenant}.{view_name}: {e}"
         logger.error(msg)
         raise Exception(msg)

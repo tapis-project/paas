@@ -21,11 +21,14 @@ services:
 
 
   db:
-    image: postgres:9.6.5
+    image: postgres:13
     volumes:
       - postgres_data:/var/lib/postgresql/data/
     ports:
     - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     container_name: pgrest-postgres
 
 
