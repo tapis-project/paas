@@ -9,7 +9,7 @@ from pgrest.pycommon.logs import get_logger
 logger = get_logger(__name__)
 
 
-# Create your views here.
+# Create tenants here.
 class CreateTenant(APIView):
     def post(self, request, *args, **kwargs):
         logger.debug("top of post /manage/tenants")
