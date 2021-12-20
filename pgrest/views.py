@@ -1337,6 +1337,8 @@ class DynamicView(RoleSessionMixin, APIView):
         # Parse out required fields.
         try:
             root_url = self.kwargs['root_url']
+            # We replace a / in root_url to allow for add_table_rows and add_table_row operations with Tapipy.
+            root_url = root_url.replace('/', '')
         except KeyError as e:
             msg = f"\'{e.args}\' is required to list rows in a table."
             logger.warning(msg)
