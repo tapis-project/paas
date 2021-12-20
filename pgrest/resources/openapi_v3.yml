@@ -278,7 +278,7 @@ paths:
       tags:
         - Tables
       summary: add_table_rows
-      description: Create new objects in the table with specified root_url {root_url}.
+      description: Create new objects in the table with specified root_url {root_url}. ()
       operationId: add_table_rows
       parameters:
       - name: root_url
@@ -852,7 +852,7 @@ components:
     NewTableRows:
       type: array
       items:
-        $ref: '#/components/schemas/NewTablerow'
+        $ref: '#/components/schemas/NewTableRow'
 
     UpdateTableRow:
       type: object
