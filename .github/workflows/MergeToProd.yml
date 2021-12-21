@@ -28,4 +28,4 @@ jobs:
         from_branch: staging
         target_branch: prod
         github_token: ${{ github.token }}
-        message: 'action: Manual merge staging -> prod.'
+        message: 'Manual merge staging -> prod.'
