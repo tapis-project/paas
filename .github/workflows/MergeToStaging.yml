@@ -28,3 +28,4 @@ jobs:
         from_branch: dev
         target_branch: staging
         github_token: ${{ github.token }}
+        message: 'action: Merge dev to staging.'
