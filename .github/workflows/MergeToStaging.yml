@@ -1,6 +1,6 @@
 # This is a basic workflow that is manually triggered
 
-name: Manual merge to stage.
+name: Manual merge dev -> staging.
 
 # Controls when the action will run. Workflow runs when manually triggered using the UI
 # or API.
@@ -21,11 +21,11 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     
-    - name: Merge dev -> staging
+    - name: Manual merge dev -> staging.
       uses: devmasx/merge-branch@master
       with:
         type: now
         from_branch: dev
         target_branch: staging
         github_token: ${{ github.token }}
-        message: 'action: Merge dev to staging.'
+        message: 'action: Manual merge dev -> staging.'
