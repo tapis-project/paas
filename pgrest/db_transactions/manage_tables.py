@@ -2,7 +2,7 @@ import re
 import psycopg2
 from . import config
 from .data_utils import do_transaction
-from pgrest.pycommon.logs import get_logger
+from tapisservice.logs import get_logger
 logger = get_logger(__name__)
 
 # We create a forbidden regex for quick parsing

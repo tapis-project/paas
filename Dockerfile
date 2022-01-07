@@ -1,7 +1,7 @@
 # Core image for PgREST project - Includes files for testing.
 # Image: pgrest-api/core
 
-FROM python:3.6
+FROM tapis/flaskbase-plugins:latest
 
 ENV PYTHONUNBUFFERED 1
 ENV DJANGO_ENV dev
@@ -11,10 +11,8 @@ ENV TAPIS_API pgrest-api
 ## FILE INITIALIZATION
 COPY ./requirements.txt /home/tapis/requirements.txt
 
-
 # Installs
 RUN pip install -r /home/tapis/requirements.txt
-
 
 ## CODE
 COPY configschema.json /home/tapis/configschema.json

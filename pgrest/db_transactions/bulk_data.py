@@ -1,7 +1,7 @@
 import sys
 
 from subprocess import Popen, check_call, call, PIPE
-from pgrest.pycommon.logs import get_logger
+from tapisservice.logs import get_logger
 logger = get_logger(__name__)
 
 
