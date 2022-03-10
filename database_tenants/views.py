@@ -4,7 +4,7 @@ from django.http import HttpResponse, HttpResponseBadRequest
 
 from database_tenants.models import Tenants
 from pgrest.utils import make_error, make_success
-from pgrest.pycommon.logs import get_logger
+from tapisservice.logs import get_logger
 
 logger = get_logger(__name__)
 

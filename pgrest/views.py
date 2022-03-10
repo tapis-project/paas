@@ -17,9 +17,11 @@ from rest_framework.views import APIView
 from pgrest.db_transactions import (bulk_data, manage_tables, table_data,
                                     view_data)
 from pgrest.models import ManageTables, ManageTablesTransition, ManageViews
-from pgrest.pycommon import errors
-from pgrest.pycommon.auth import get_tenant_id_from_base_url, t
-from pgrest.pycommon.logs import get_logger
+from pgrest.__init__ import t
+from pgrest.utils import get_tenant_id_from_base_url
+from tapisservice import errors
+from tapisservice.logs import get_logger
+#from tapisservice.auth import validate_token
 from pgrest.utils import (can_read, can_write, create_validate_schema,
                           is_admin, is_role_admin, is_user, make_error,
                           make_success)
@@ -57,7 +59,7 @@ def resolve_tapis_v3_token(request, tenant_id):
     v3_token = request.META.get('HTTP_X_TAPIS_TOKEN')
     if v3_token:
         try:
-            claims = t.tenant_cache.validate_token(v3_token)
+            claims = t.validate_token(v3_token)
         except errors.NoTokenError as e:
             msg = "No Tapis token found in the request. Be sure to specify the X-Tapis-Token header."
             logger.info(msg)
@@ -125,7 +127,7 @@ def get_user_sk_roles(tenant, username):
     logger.debug(f"Getting SK roles on tenant {tenant} and user {username}")
     start_timer = timeit.default_timer()
     try:
-        roles_obj = t.sk.getUserRoles(tenant=tenant, user=username)
+        roles_obj = t.sk.getUserRoles(tenant=tenant, user=username, _tapis_set_x_headers_from_service=True)
     except Exception as e:
         end_timer = timeit.default_timer()
         total = (end_timer - start_timer) * 1000
@@ -185,7 +187,7 @@ class RoleSessionMixin:
 
         # Grab data about roles from SK.
         try:
-            roles = t.sk.getUserRoles(user=username, tenant=tenant_id)
+            roles = t.sk.getUserRoles(user=username, tenant=tenant_id, _tapis_set_x_headers_from_service=True)
             role_list = list()
             for name in roles.names:
                 role_list.append(name)
@@ -2091,7 +2093,7 @@ class RoleManagement(RoleSessionMixin, APIView):
         req_tenant = request.session['tenant_id']
 
         try:
-            full_tenant_role_list = t.sk.getRoleNames(tenant=req_tenant).names
+            full_tenant_role_list = t.sk.getRoleNames(tenant=req_tenant, _tapis_set_x_headers_from_service=True).names
         except Exception as e:
             msg = f"Error getting roles for tenant '{req_tenant}' from sk."
             logger.critical(msg + f" e: {e}")
@@ -2136,7 +2138,7 @@ class RoleManagement(RoleSessionMixin, APIView):
 
         # Check to see if role already exists
         try:
-            role_info = t.sk.getRoleByName(tenant=req_tenant, roleName=role_name)
+            role_info = t.sk.getRoleByName(tenant=req_tenant, roleName=role_name, _tapis_set_x_headers_from_service=True)
             msg = f"Role with name {role_name} already exists for this tenant"
             logger.critical(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
@@ -2145,7 +2147,7 @@ class RoleManagement(RoleSessionMixin, APIView):
             pass
 
         try:
-            t.sk.createRole(roleTenant=req_tenant, roleName=role_name, description=role_description)
+            t.sk.createRole(roleTenant=req_tenant, roleName=role_name, description=role_description, _tapis_set_x_headers_from_service=True)
         except Exception as e:
             msg = f"Error creating role. e: {e}"
             logger.critical(msg)
@@ -2179,7 +2181,7 @@ class RoleManagementByName(RoleSessionMixin, APIView):
 
         # Get role info
         try:
-            role_info = t.sk.getRoleByName(tenant=req_tenant, roleName=role_name)
+            role_info = t.sk.getRoleByName(tenant=req_tenant, roleName=role_name, _tapis_set_x_headers_from_service=True)
             role_info = role_info.__dict__
         except Exception as e:
             msg = f"Error getting role info. e: {e}"
@@ -2188,7 +2190,7 @@ class RoleManagementByName(RoleSessionMixin, APIView):
 
         # Get users in role
         try:
-            role_user_list = t.sk.getUsersWithRole(tenant=req_tenant, roleName=role_name).names
+            role_user_list = t.sk.getUsersWithRole(tenant=req_tenant, roleName=role_name, _tapis_set_x_headers_from_service=True).names
         except Exception as e:
             msg = f"Error getting users in role. e: {e}"
             logger.critical(msg)
@@ -2256,7 +2258,7 @@ class RoleManagementByName(RoleSessionMixin, APIView):
 
         if method == "grant":
             try:
-                granted_role = t.sk.grantRole(tenant=req_tenant, roleName=role_name, user=username)
+                granted_role = t.sk.grantRole(tenant=req_tenant, roleName=role_name, user=username, _tapis_set_x_headers_from_service=True)
                 # returns 'changes': 1 if a change was made, otherwise 0.
                 if granted_role.changes:
                     return HttpResponse(make_success(result="Role granted to user"), content_type='application/json')
@@ -2269,7 +2271,7 @@ class RoleManagementByName(RoleSessionMixin, APIView):
                 return HttpResponseBadRequest(make_error(msg=msg))
         elif method == "revoke":
             try:
-                revoked_role = t.sk.revokeUserRole(tenant=req_tenant, roleName=role_name, user=username)
+                revoked_role = t.sk.revokeUserRole(tenant=req_tenant, roleName=role_name, user=username, _tapis_set_x_headers_from_service=True)
                 # returns 'changes': 1 if a change was made, otherwise 0.
                 if revoked_role.changes:
                     return HttpResponse(make_success(result="Role revoked from user"), content_type='application/json')

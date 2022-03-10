@@ -3,6 +3,22 @@
 
 All notable changes to this project will be documented in this file.
 
+
+## 1.1.0 - 2022-01-07
+
+### Breaking Changes:
+
+- No Change.
+
+### New features:
+
+- Full 1.1.0 release of what was in 1.0.3.
+- Replaced pycommon with tapisservice and tapipy (w/plugins). Now based off flaskbase-plugins image.
+
+### Bug fixes:
+
+- No Change.
+
 ## 1.0.3 - 2021-12-17 - (1.1.0 pre-release)
 
 ### Breaking Changes:

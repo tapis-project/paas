@@ -4,10 +4,10 @@ import datetime
 from django.http import HttpResponseForbidden
 from django.core.serializers.json import DjangoJSONEncoder
 
-from pgrest.pycommon import errors as common_errors
-from pgrest.pycommon.auth import t
-from pgrest.pycommon.config import conf
-from pgrest.pycommon.logs import get_logger
+from tapisservice import errors as common_errors
+from pgrest.__init__ import t
+from tapisservice.config import conf
+from tapisservice.logs import get_logger
 
 logger = get_logger(__name__)
 
@@ -202,6 +202,20 @@ def is_user(view):
     return wrapper
 
 
+def get_tenant_id_from_base_url(base_url, tenants):
+    """
+    Return the tenant_id associated with the base URL of a request.
+    """
+    if base_url and 'http://testserver' in base_url:
+        logger.debug("http://testserver in url; resolving tenant id to dev for Django testing.")
+        return 'dev'
+    if base_url and 'http://localhost:500' in base_url:
+        logger.debug("http://localhost:500 in url; resolving tenant id to tacc for user testing.")
+        return 'tacc'
+
+    request_tenant = tenants.get_tenant_config(url=base_url)
+    return request_tenant.tenant_id
+
 def create_roles(tenants=[]):
     """
     Creates the basic set of roles required by PgREST in SK for a given set of tenants.
@@ -209,21 +223,25 @@ def create_roles(tenants=[]):
     for tn in tenants:
         t.sk.createRole(roleName='PGREST_READ',
                         roleTenant=tn,
-                        description='Role granting read access to all tables in the PgREST API.')
+                        description='Role granting read access to all tables in the PgREST API.',
+                        _tapis_set_x_headers_from_service=True)
         t.sk.createRole(roleName='PGREST_WRITE',
                         roleTenant=tn,
-                        description='Role granting write access to all tables in the PgREST API.')
+                        description='Role granting write access to all tables in the PgREST API.',
+                        _tapis_set_x_headers_from_service=True)
         t.sk.createRole(roleName='PGREST_ADMIN',
                         roleTenant=tn,
-                        description='Role granting admin rights to all tables in the PgREST API.')
+                        description='Role granting admin rights to all tables in the PgREST API.',
+                        _tapis_set_x_headers_from_service=True)
         t.sk.createRole(roleName='PGREST_ROLE_ADMIN',
                         roleTenant=tn,
-                        description='Role granting ability to use PgREST Role endpoints.')
+                        description='Role granting ability to use PgREST Role endpoints.',
+                        _tapis_set_x_headers_from_service=True)
         # This doesn't really belong, but we need to delete our PGREST_TEST role because the testsuite
         # creates it and uses it, but we need to delete it each run. There's no delete role endpoint
         # though. Also we need to "reserve" the role between running the tests. So we delete it now.
         try:
-            t.sk.deleteRoleByName(roleName='PGREST_TEST', tenant=tn)
+            t.sk.deleteRoleByName(roleName='PGREST_TEST', tenant=tn, _tapis_set_x_headers_from_service=True)
         except:
             pass
 
@@ -233,19 +251,19 @@ def grant_role(tenant, username, role):
     """
     if not role in PGREST_ROLES:
         raise common_errors.BaseTapisError(f"Invalid role {role}; role should be in {PGREST_ROLES}")
-    t.sk.grantRole(user=username, tenant=tenant, roleName=role)
+    t.sk.grantRole(user=username, tenant=tenant, roleName=role, _tapis_set_x_headers_from_service=True)
 
 
-tenants = conf.tenants
+role_tenants = conf.tenants
 
 # make sure roles exist --
-create_roles(tenants)
+create_roles(role_tenants)
 
 # set up project admins --
 admins = ['jstubbs', 'cgarcia']
 
 for a in admins:
-    for tn in tenants:
+    for tn in role_tenants:
         grant_role(tn, a, 'PGREST_ADMIN')
 
 # additional roles by tenant

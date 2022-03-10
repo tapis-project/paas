@@ -2,8 +2,8 @@ import requests
 
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
 
-from pgrest.pycommon.auth import t
-from pgrest.pycommon.logs import get_logger
+from pgrest.__init__ import t
+from tapisservice.logs import get_logger
 logger = get_logger(__name__)
 
 
@@ -39,7 +39,7 @@ class RoleSessionMixin:
                 return HttpResponseForbidden(msg)
 
             # TODO send username to SK, then store username and role in the session
-            # roles = t.sk.getUserRoles(user='jstubbs', tenant='tacc')
+            # roles = t.sk.getUserRoles(user='jstubbs', tenant='tacc', _tapis_set_x_headers_from_service=True)
             # request.session['roles'] = roles
             # request.session['username'] = username
 

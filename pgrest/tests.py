@@ -8,7 +8,7 @@ from django_tenants.test.cases import TenantTestCase
 from django_tenants.test.client import TenantClient
 
 from pgrest import test_data
-from pgrest.pycommon.config import conf
+from tapisservice.config import conf
 
 # SET YOUR HEADERS! Either way, user needs ADMIN role in SK.
 # V3

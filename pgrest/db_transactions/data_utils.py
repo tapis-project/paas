@@ -1,7 +1,7 @@
 from re import split
 import psycopg2
 from . import config
-from pgrest.pycommon.logs import get_logger
+from tapisservice.logs import get_logger
 logger = get_logger(__name__)
 
 
