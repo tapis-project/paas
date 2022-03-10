@@ -4,9 +4,9 @@ from django.http import HttpResponseForbidden
 
 from django_tenants.utils import get_tenant_model
 from django_tenants.middleware.main import TenantMainMiddleware
-from pgrest.utils import make_error
-from pgrest.pycommon.auth import t, get_tenant_id_from_base_url
-from pgrest.pycommon.logs import get_logger
+from pgrest.utils import make_error, get_tenant_id_from_base_url
+from pgrest.__init__ import t
+from tapisservice.logs import get_logger
 
 logger = get_logger(__name__)
 

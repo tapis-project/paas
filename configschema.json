@@ -7,6 +7,11 @@
       "description": "URL to postgres db, including port and database.",
       "default": "postgres:5432/pgrest"
     },
+    "python_framework_type": {
+      "type": "string",
+      "default": "django",
+      "description": "The framework this service will use. e.g. Flask, Django, FastApi, etc."
+    },
     "databases": {
       "type": "object",
       "additionalProperties": false,
