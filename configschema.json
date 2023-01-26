@@ -2,11 +2,6 @@
   "$id": "http://github.com/tapis-project/tenants-api/tenants-api/configschema.json",
   "$schema": "http://json-schema.org/schema#",
   "properties": {
-    "sql_db_url": {
-      "type": "string",
-      "description": "URL to postgres db, including port and database.",
-      "default": "postgres:5432/pgrest"
-    },
     "python_framework_type": {
       "type": "string",
       "default": "django",
