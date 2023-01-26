@@ -267,10 +267,10 @@ for a in admins:
         grant_role(tn, a, 'PGREST_ADMIN')
 
 # additional roles by tenant
-grant_role('a2cps','ctjordan', 'PGREST_ADMIN')
-grant_role('a2cps','pscherer', 'PGREST_ADMIN')
+grant_role('a2cps', 'ctjordan', 'PGREST_ADMIN')
+grant_role('a2cps', 'pscherer', 'PGREST_ADMIN')
 grant_role('a2cps', 'vaughn', 'PGREST_ADMIN')
 
-grant_role('cii','ctjordan', 'PGREST_ADMIN')
-grant_role('cii','pscherer', 'PGREST_ADMIN')
-grant_role('cii','waller', 'PGREST_ADMIN')
+grant_role('cii', 'ctjordan', 'PGREST_ADMIN')
+grant_role('cii', 'pscherer', 'PGREST_ADMIN')
+grant_role('cii', 'waller', 'PGREST_ADMIN')

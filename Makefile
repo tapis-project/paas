@@ -15,11 +15,14 @@ build-core:
 
 
 # Builds core locally and then runs pgrest in daemon mode
+
+
+# @echo "Making migrations"
+# @docker-compose run api python /home/tapis/manage.py makemigrations
+# @echo "Now migrating"
+# @docker-compose run api python /home/tapis/manage.py migrate_schemas --shared
+
 local-deploy: build-core
-	@echo "Making migrations"
-	@docker-compose run api python /home/tapis/manage.py makemigrations
-	@echo "Now migrating"
-	@docker-compose run api python /home/tapis/manage.py migrate_schemas --shared
 	@echo "Running docker-compose up"
 	@docker-compose up -d api
 
