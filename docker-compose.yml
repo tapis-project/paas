@@ -3,7 +3,6 @@ services:
   api:
     build: .
     image: tapis/pgrest-api:dev
-    command: bash -c "uwsgi --http :5000 --module paas.wsgi"
     volumes:
     - .:/code
     - ./config-local.json:/home/tapis/config-local.json
