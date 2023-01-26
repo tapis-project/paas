@@ -4,25 +4,40 @@
 All notable changes to this project will be documented in this file.
 
 
-## 1.1.0 - 2022-01-07
-
+## 1.2.1 - 2023-01-23
 ### Breaking Changes:
-
 - No Change.
 
 ### New features:
+- DB Migrations at startup now start from api container during main exec. No longer a need for init container. Better stdout prints.
 
+### Bug fixes:
+- No Change.
+
+## 1.2.0 - 2022-06-03
+### Breaking Changes:
+- No change.
+
+### New features:
+- Bumping tag for Tapis 1.2.0 release.
+
+### Bug fixes:
+- No Change.
+
+
+## 1.1.0 - 2022-01-07
+### Breaking Changes:
+- No Change.
+
+### New features:
 - Full 1.1.0 release of what was in 1.0.3.
 - Replaced pycommon with tapisservice and tapipy (w/plugins). Now based off flaskbase-plugins image.
 
 ### Bug fixes:
-
 - No Change.
 
 ## 1.0.3 - 2021-12-17 - (1.1.0 pre-release)
-
 ### Breaking Changes:
-
 - Where parameters for tables and views are changed to match search spec.
     - No longer `where_col_one=val` format. Now `col_one.eq=val`.
 - Changed how serial data type works. Users can now specify `serial_start` and `serial_increment` in table definition to modify the type.
@@ -30,7 +45,6 @@ All notable changes to this project will be documented in this file.
 - Views and tables now default to having no return limit (previously row limit of 10).
 
 ### New features:
-
 - Added support for `raw_sql` input when creating table views. This allows admins only to have greater view customization.
 - Added support for bulk row posts to `data/table_url`. Keeps single dictionary inputs, but also allows lists of dictionaries (rows) as input.
 - Where parameters for tables and views are changed to match search spec.
@@ -49,15 +63,12 @@ All notable changes to this project will be documented in this file.
 - New tests for all features.
 
 ### Bug fixes:
-
 - Added better error messages for unique constraint names that collide during table creation.
 - Fixed view names and table names colliding in a tenant.
 
 
 ## 1.0.2 - 2021-09-24
-
 ### Breaking Changes:
-
 - Spec operationIds changed for readability. The following are the changes, "oldID: newID":
     - get_table: get_manage_table
     - list_in_collection: get_table
@@ -69,14 +80,12 @@ All notable changes to this project will be documented in this file.
 - Changed foreign key table definition variables. Now requires `on_event` and `event_action` rather than setting `on_delete` to event action. This allows for `ON UPDATE` event along with `ON DELETE` event.
 
 ### New features:
-
 - Tenants are now completely separated with different postgres schemas.
 - New role creation endpoints for users in `PGREST_ROLE_ADMIN` role.
 - Expanded foreign key usability. Now allow new event type. Also allow new event actions.
 - Added `PGREST_USER` role that can only get views that the user's permissions allow for.
 
 ### Bug fixes:
-
 - Documentation fixed to point towards ReadTheDocs, which is now up to date with all new table, view, and role definitions.
 - Updated Django and DjangoFlaskbase requirements to avoid security issues.
 - Updated dependencies to pass Github Dependabot alerts.
@@ -84,32 +93,24 @@ All notable changes to this project will be documented in this file.
 
 
 ## 1.0.1 - 2021-09-24
-
 ### Breaking Changes:
-
 - ManageViews/ManageTables/ManageTableTransitions are now stored in each tenant, no longer service wide
 - New folder containing tenant migration, `database_tenants`, create tenants func now stored there.
 
 ### New features:
-
 - PgREST tenant seperation. New migrations, now using Django Tenants back-end. Switched Django Tenants to take Tapis v3 tenant_id.
 - Added new role endpoints to allow for `PGREST_ROLE_ADMINS` above to create and manage roles for users.
 
 ### Bug fixes:
-
 - Previously table_ids were serialized service wide, this meant that users could notice that there were more tables than the table view showed. Calling these tables resulted in an error, but with tenant seperation it is no longer an issue.
 
 
 ## 1.0.0 - 2021-09-24
-
 ### Breaking Changes:
-
 - No Change.
 
 ### New features:
-
 - Initial 1.0.0 changelog.
 
 ### Bug fixes:
-
 - No Change.
