@@ -10,6 +10,8 @@ All notable changes to this project will be documented in this file.
 
 ### New features:
 - DB Migrations at startup now start from api container during main exec. No longer a need for init container. Better stdout prints.
+- entry.sh file takes care of migration only happening once per instance of API (even if there are 6 workers)
+    - Added entry.sh, added db_init.py, updated Dockerfile, Makefile, Docker-Compose
 
 ### Bug fixes:
 - No Change.

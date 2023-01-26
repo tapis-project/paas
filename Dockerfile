@@ -23,14 +23,16 @@ COPY database_tenants /home/tapis/service/database_tenants
 COPY database_tenants /home/tapis/database_tenants
 COPY paas /home/tapis/service/paas
 COPY paas /home/tapis/paas
+COPY entry.sh /home/tapis/entry.sh
 RUN mkdir /home/tapis/databases
 RUN touch /home/tapis/pgrest.log
+RUN chmod +x /home/tapis/entry.sh
 
 
 WORKDIR /home/tapis/
 
 #USER tapis
 
-CMD ["/usr/local/bin/uwsgi", "--ini", "paas/uwsgi.ini", ]
+CMD ["/home/tapis/entry.sh"]
 
 EXPOSE 5000
