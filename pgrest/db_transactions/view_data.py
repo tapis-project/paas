@@ -76,6 +76,7 @@ def create_view(view_name, view_definition, tenant, db_instance=None):
     """Create view in the PostgreSQL database"""
     try:
         from_table = view_definition['from_table']
+        materialized_view_raw_sql = view_definition.get('materialized_view_raw_sql', None)
         raw_sql = view_definition['raw_sql']
         select_query = view_definition['select_query']
         where_query = view_definition['where_query']
@@ -88,6 +89,8 @@ def create_view(view_name, view_definition, tenant, db_instance=None):
 
     if raw_sql:
         command = f"CREATE OR REPLACE VIEW {tenant}.{view_name} {raw_sql}"
+    elif materialized_view_raw_sql:
+        command = f"CREATE MATERIALIZED VIEW {tenant}.{view_name} {materialized_view_raw_sql}"
     else:
         if where_query:
             command = f"CREATE OR REPLACE VIEW {tenant}.{view_name} AS SELECT {select_query} FROM {tenant}.{from_table} WHERE {where_query};"
@@ -100,7 +103,10 @@ def create_view(view_name, view_definition, tenant, db_instance=None):
     # Run command
     try:
         do_transaction(command, db_instance)
-        logger.debug(f"View {tenant}.{view_name} successfully created in postgres db.")
+        if materialized_view_raw_sql:
+            logger.debug(f"Materialized view {tenant}.{view_name} successfully created in postgres db.")
+        else:
+            logger.debug(f"View {tenant}.{view_name} successfully created in postgres db.")
     except Exception as e:
         msg = f"Error creating view {tenant}.{view_name}: {e}"
         logger.error(f"{msg} -- Command: {command}")
@@ -108,18 +114,45 @@ def create_view(view_name, view_definition, tenant, db_instance=None):
     return metadata
 
 
-def delete_view(view_name, tenant, db_instance=None):
-    """ Drop view in the PostgreSQL database"""
-    logger.info(f"Dropping view {tenant}.{view_name}...")
+def delete_view(view_name, tenant, materialized_view=False, db_instance=None):
+    """ Drop view (or materialized view) in the PostgreSQL database"""
     # Maybe we shouldn't CASCADE?
-    command = f"DROP VIEW {tenant}.{view_name} CASCADE;"
-    logger.info(f"Drop view command for {tenant}.{view_name}: {command}")
-    
+    if materialized_view:
+        logger.info(f"Dropping materialized view {tenant}.{view_name}...")
+        command = f"DROP MATERIALIZED VIEW IF EXISTS {tenant}.{view_name} CASCADE;"
+        logger.info(f"Drop materialized view command for {tenant}.{view_name}: {command}")
+    else:
+        logger.info(f"Dropping view {tenant}.{view_name}...")
+        command = f"DROP VIEW IF EXISTS {tenant}.{view_name} CASCADE;"
+        logger.info(f"Drop view command for {tenant}.{view_name}: {command}")
+
     # Run command
     try:
         do_transaction(command, db_instance)
-        logger.info(f"View {tenant}.{view_name} successfully dropped from postgres db.")
+        if materialized_view:
+            logger.info(f"Materialized view {tenant}.{view_name} successfully dropped from postgres db.")
+        else:   
+            logger.info(f"View {tenant}.{view_name} successfully dropped from postgres db.")
     except Exception as e:
-        msg = f"Error dropping view {tenant}.{view_name}: {e}"
+        if materialized_view:
+            msg = f"Error dropping materialized view {tenant}.{view_name}: {e}"
+        else:
+            msg = f"Error dropping view {tenant}.{view_name}: {e}"
+        logger.error(msg)
+        raise Exception(msg)
+
+
+def refresh_view(view_name, tenant, db_instance=None):
+    """ Refresh materialized view in the PostgreSQL database"""
+    logger.info(f"Refreshing materialized view {tenant}.{view_name}...")
+    command = f"REFRESH MATERIALIZED VIEW {tenant}.{view_name};"
+    logger.info(f"REFRESH materialized view command for {tenant}.{view_name}: {command}")
+
+    # Run command
+    try:
+        do_transaction(command, db_instance)
+        logger.info(f"Materialized view {tenant}.{view_name} successfully refreshed in postgres db.")
+    except Exception as e:
+        msg = f"Error refreshing materialized view {tenant}.{view_name}: {e}"
         logger.error(msg)
         raise Exception(msg)
