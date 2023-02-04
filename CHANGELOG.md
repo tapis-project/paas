@@ -3,6 +3,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.2.2 - 2023-02-03
+### Breaking Changes:
+- No Change.
+
+### New features:
+- Added materialized views, accessible by using `materialized_view_raw_sql` when creating views with the normal view endpoints.
+- Added refresh materialized views endpoint. `/v3/pgrest/manage/views/<view_id>/refresh`, will complain if the view wasn't created with `materialized_view_raw_sql`.
+- Added healthcheck
+
+### Bug fixes:
+- Previously a row in the manage_views table could not actually have a view in the database so when deleting it was impossible to get rid of the dangling manage_views row entry for the view. That is fixed as the query won't throw an error when view does not exist in database (applies for materialized views as well)
+
 
 ## 1.2.1 - 2023-01-23
 ### Breaking Changes:

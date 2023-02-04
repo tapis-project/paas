@@ -91,6 +91,10 @@ def get_username_for_request(request, tenant_id):
     Determines the username for the request from possible headers. We support Tapis v2 OAuth tokens via the
     Tapis-v2-token header, and the usual Tapis v3 authentication and headers (e.g., X-Tapis-Token)
     """
+    # Healtcheck endpoint does not require authorization at all.
+    if request.path == "/v3/pgrest/healthcheck":
+        return "test", None
+
     # first look for a v2 token -- if they have passed that, we assume that is what they want to use.
     try:
         # Pull token from header `tapis-v2-token`
@@ -1673,33 +1677,33 @@ class ViewManagement(RoleSessionMixin, APIView):
         # Check for details=true. Decide what a brief description and a detailed description is.
         details = self.request.query_params.get('details')
 
-        # Display information for each table based on details variable.
-        tables = ManageViews.objects.filter(tenant_id=req_tenant)
+        # Display information for each view based on details variable.
+        views = ManageViews.objects.filter(tenant_id=req_tenant)
 
         result = list()
-        # If details, form information about the columns and endpoints of the table
+        # If details, form information about the columns and endpoints of the views
         # TODO Fix up this format.
         if details:
-            for table in tables:
+            for view in views:
                 result.append({
-                    "view_name": table.view_name,
-                    "manage_view_id": table.pk,
-                    "root_url": table.root_url,
-                    "view_definition": table.view_definition,
-                    "permission_rules": table.permission_rules,
-                    "endpoints": table.endpoints,
-                    "tenant_id": table.tenant_id,
-                    "comments": table.comments
+                    "view_name": view.view_name,
+                    "manage_view_id": view.pk,
+                    "root_url": view.root_url,
+                    "view_definition": view.view_definition,
+                    "permission_rules": view.permission_rules,
+                    "endpoints": view.endpoints,
+                    "tenant_id": view.tenant_id,
+                    "comments": view.comments
                 })
         else:
-            for table in tables:
+            for view in views:
                 result.append({
-                    "view_name": table.view_name,
-                    "manage_view_id": table.pk,
-                    "root_url": table.root_url,
-                    "endpoints": table.endpoints,
-                    "tenant_id": table.tenant_id,
-                    "comments": table.comments
+                    "view_name": view.view_name,
+                    "manage_view_id": view.pk,
+                    "root_url": view.root_url,
+                    "endpoints": view.endpoints,
+                    "tenant_id": view.tenant_id,
+                    "comments": view.comments
                 })
 
         return HttpResponse(make_success(result=result), content_type='application/json')
@@ -1721,6 +1725,7 @@ class ViewManagement(RoleSessionMixin, APIView):
 
         # Parse out optional fields.
         root_url = request.data.get('root_url', view_name)
+        materialized_view_raw_sql = request.data.get('materialized_view_raw_sql', None)
         raw_sql = request.data.get('raw_sql', None)
         from_table = request.data.get('from_table', None)
         select_query = request.data.get('select_query', None)
@@ -1765,28 +1770,34 @@ class ViewManagement(RoleSessionMixin, APIView):
             logger.warning(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
-        # If raw_sql being used, select_query, where_query, from_table are disallowed.
-        if raw_sql:
+        # Ensure only raw_sql or materialized_view_raw_sql is being used
+        if raw_sql and materialized_view_raw_sql:
+            msg = f"User may only specify raw_sql or materialized_view_raw_sql, got both."
+            logger.error(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        # If raw_sql or materialized_view_raw_sql being used, select_query, where_query, from_table are disallowed.
+        if raw_sql or materialized_view_raw_sql:
             # Permission check, ensure user has PGREST_ADMIN role.
             # Get all user roles from sk and check if user has role.
             user_roles = get_user_sk_roles(req_tenant, req_username)
             if not "PGREST_ADMIN" in user_roles:
-                msg = f"User {req_username} in tenant {req_tenant} requires PGREST_ADMIN role for raw_sql view creation."
+                msg = f"User {req_username} in tenant {req_tenant} requires PGREST_ADMIN role for (materialized_)raw_sql view creation."
                 logger.debug(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
 
             if select_query:
-                msg = f"User may only specify raw_sql or select_query, got both."
+                msg = f"User may only specify (materialized_)raw_sql or select_query, got both."
                 logger.error(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
             
             if where_query:
-                msg = f"When using a raw_sql query, where_query is not allowed, got both."
+                msg = f"When using a (materialized_)raw_sql query, where_query is not allowed, got both."
                 logger.error(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
 
             if from_table:
-                msg = f"When using a raw_sql query, table_name is not allowed, got both."
+                msg = f"When using a (materialized_)raw_sql query, table_name is not allowed, got both."
                 logger.error(msg)
                 return HttpResponseBadRequest(make_error(msg=msg))
         else:
@@ -1818,7 +1829,13 @@ class ViewManagement(RoleSessionMixin, APIView):
             endpoints = []
 
         # Create view_definition
-        view_definition = {"from_table": from_table, "raw_sql": raw_sql, "select_query": select_query, "where_query": where_query}
+        view_definition = {
+            "from_table": from_table,
+            "raw_sql": raw_sql,
+            "materialized_view_raw_sql": materialized_view_raw_sql,
+            "select_query": select_query,
+            "where_query": where_query
+        }
 
         # Create view
         try:
@@ -1877,7 +1894,7 @@ class ViewManagementById(RoleSessionMixin, APIView):
         try:
             view_id = self.kwargs['manage_view_id']
         except KeyError as e:
-            msg = f"\'{e.args}\' is required to list a table."
+            msg = f"\'{e.args}\' is required to list a view."
             logger.warning(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
@@ -1889,7 +1906,7 @@ class ViewManagementById(RoleSessionMixin, APIView):
             return HttpResponseBadRequest(make_error(msg=msg))
 
         try:
-            table = ManageViews.objects.get(pk=view_id)
+            view = ManageViews.objects.get(pk=view_id)
         except ManageViews.DoesNotExist:
             msg = f"View with id {view_id} does not exist in the ManageViews table."
             logger.warning(msg)
@@ -1901,23 +1918,23 @@ class ViewManagementById(RoleSessionMixin, APIView):
 
         if details:
             result = {
-                "view_name": table.view_name,
-                "manage_view_id": table.pk,
-                "root_url": table.root_url,
-                "view_definition": table.view_definition,
-                "permission_rules": table.permission_rules,
-                "endpoints": table.endpoints,
-                "tenant_id": table.tenant_id,
-                "comments": table.comments
+                "view_name": view.view_name,
+                "manage_view_id": view.pk,
+                "root_url": view.root_url,
+                "view_definition": view.view_definition,
+                "permission_rules": view.permission_rules,
+                "endpoints": view.endpoints,
+                "tenant_id": view.tenant_id,
+                "comments": view.comments
             }
         else:
             result = {
-                "view_name": table.view_name,
-                "manage_view_id": table.pk,
-                "root_url": table.root_url,
-                "endpoints": table.endpoints,
-                "tenant_id": table.tenant_id,
-                "comments": table.comments
+                "view_name": view.view_name,
+                "manage_view_id": view.pk,
+                "root_url": view.root_url,
+                "endpoints": view.endpoints,
+                "tenant_id": view.tenant_id,
+                "comments": view.comments
             }
 
         return HttpResponse(make_success(result=result), content_type='application/json')
@@ -1962,7 +1979,70 @@ class ViewManagementById(RoleSessionMixin, APIView):
     @transaction.atomic
     def delete_view_transaction(self, view, tenant_id, db_instance_name):
         ManageViews.objects.get(view_name=view.view_name, tenant_id=tenant_id).delete()
-        view_data.delete_view(view.view_name, tenant_id, db_instance=db_instance_name)
+
+        materialized_view = False
+        if view.view_definition.get('materialized_view_raw_sql'):
+            materialized_view = True
+        view_data.delete_view(view.view_name, tenant_id, materialized_view=materialized_view, db_instance=db_instance_name)
+
+
+
+class ViewsRefreshResource(RoleSessionMixin, APIView):
+    """
+    GET: Refresh the current view if it happens to be a materialized view.
+    """
+    @is_admin
+    def get(self, request, *args, **kwargs):
+        logger.debug("top of get /manage/views/<manage_view_id>/refresh")
+        req_tenant = request.session['tenant_id']
+        db_instance_name = request.session['db_instance_name']
+
+        # Parse out required fields.
+        try:
+            view_id = self.kwargs['manage_view_id']
+        except KeyError as e:
+            msg = f"\'{e.args}\' is required to list a view."
+            logger.warning(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        try:
+            view_id = int(view_id)
+        except:
+            msg = f"Invalid view id; the view id must be an integer. {view_id}"
+            logger.debug(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        try:
+            view = ManageViews.objects.get(pk=view_id)
+        except ManageViews.DoesNotExist:
+            msg = f"View with id {view_id} does not exist in the ManageViews table."
+            logger.warning(msg)
+            return HttpResponseNotFound(make_error(msg=msg))
+        except Exception as e:
+            msg = f"Could not retrieve description of view with id {view_id}. Details: {e}"
+            logger.debug(msg)
+            return HttpResponseNotFound(make_error(msg=msg))
+
+        # We get view, check if it's a materialized view, if it is, refresh the view, if not, error.
+        materialized_view = False
+        if view.view_definition.get('materialized_view_raw_sql'):
+            materialized_view = True
+
+        # Check if the view is a materialized view and can be refreshed
+        if not materialized_view:
+            msg = f"View with id {view_id} is not a materialized view and thus cannot be refreshed."
+            logger.warning(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        # Attempt to refresh
+        try:
+            view_data.refresh_view(view.view_name, req_tenant, db_instance=db_instance_name)
+        except Exception as e:
+            msg = f"Failed to refresh view {view.view_name}: {e}"
+            logger.error(msg)
+            return HttpResponseBadRequest(make_error(msg=msg))
+
+        return HttpResponse(make_success(msg="Materialized view refreshed successfully"), content_type='application/json')
 
 
 class ViewsResource(RoleSessionMixin, APIView):
@@ -2284,3 +2364,22 @@ class RoleManagementByName(RoleSessionMixin, APIView):
                 return HttpResponseBadRequest(make_error(msg=msg))
         else:
             return HttpResponseBadRequest(make_error(msg=f"It should be impossible to get here. {method}, {username}"))
+
+### Healthcheck
+class HealthCheck(RoleSessionMixin, APIView):
+    """
+    GET: Check if API can access DB. No authorization required.
+    """
+    def get(self, request, *args, **kwargs):
+        logger.debug("top of get /healthcheck")
+        req_tenant = request.session['tenant_id']
+
+        try:
+            views = ManageViews.objects.filter(tenant_id=req_tenant)
+            databaseAccess = True
+        except Exception as e:
+            msg = f"Error attempting to perform healthcheck, can't list views in ManageViews table."
+            logger.critical(msg)        
+            databaseAccess = False
+
+        return HttpResponse(make_success(msg={"databaseAccess": databaseAccess}), content_type='application/json')
