@@ -17,9 +17,11 @@ urlpatterns = [
     # Tables: GET ALL, POST, PUT
     url('^v3/pgrest/manage/tables', views.TableManagement.as_view()),
 
-    # Views: GET SINGLE, DELETE
+    # Materialized View Refresh: GET
+    url('^v3/pgrest/manage/views/(?P<manage_view_id>.+)/refresh', views.ViewsRefreshResource.as_view()),
+    # (Materialized) Views: GET SINGLE, DELETE
     url('^v3/pgrest/manage/views/(?P<manage_view_id>.+)', views.ViewManagementById.as_view()),
-    # Views: GET ALL, POST
+    # (Materialized) Views: GET ALL, POST
     url('^v3/pgrest/manage/views', views.ViewManagement.as_view()),
 
     # Roles: GET SINGLE, DELETE
@@ -34,8 +36,11 @@ urlpatterns = [
     # Tables: GET ALL, POST, PUT
     url('^v3/pgrest/data/(?P<root_url>.+)', views.DynamicView.as_view()),
 
-    # Views: GET ALL
+    # (Materialized) Views: GET ALL
     url('^v3/pgrest/views/(?P<root_url>.+)', views.ViewsResource.as_view()),
+
+    # Health Check
+    url('^v3/pgrest/healthcheck', views.HealthCheck.as_view()),
 
 ]
 urlpatterns = format_suffix_patterns(urlpatterns)
