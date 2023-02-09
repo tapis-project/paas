@@ -3,6 +3,19 @@
 
 All notable changes to this project will be documented in this file.
 
+
+## 1.2.3 - 2023-02-09
+### Breaking Changes:
+- No Change.
+
+### New features:
+- No Change.
+
+### Bug fixes:
+- Changed search and order parsing so they raise Exceptions, previously they did not and they would get muffled, errors are now converyed to user verbosely.
+- Fixed syntax error in one test.
+
+
 ## 1.2.2 - 2023-02-03
 ### Breaking Changes:
 - No Change.

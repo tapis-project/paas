@@ -56,7 +56,7 @@ def get_rows_from_view(view_name, search_params, tenant, limit, offset, db_insta
         if offset:
             command += f" OFFSET {int(offset)};"
     except Exception as e:
-        msg = f"Unable to add order, limit, and offset for view {tenant}.{view_name}: {e}"
+        msg = f"Unable to add order, limit, offset, and search for view {tenant}.{view_name}: {e}"
         logger.warning(msg)
         raise Exception(msg)
 
