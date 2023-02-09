@@ -127,7 +127,7 @@ def search_parse(search_params, tenant, obj_name, db_instance):
         else:
             msg = f"Column parameter, {query_key}, not found in the columns of {tenant}.{obj_name}."
             logger.warning(msg)
-            return Exception(msg)
+            raise Exception(msg)
 
         # Add to command query.
         # Types and parameterization should follow this: https://www.psycopg.org/docs/usage.html
@@ -163,7 +163,7 @@ def search_parse(search_params, tenant, obj_name, db_instance):
             else:
                 msg = f".null operator can only receive case-insensitive true or false as inputs. Received {query_val}"
                 logger.warning(msg)
-                return Exception(msg)
+                raise Exception(msg)
 
         # Deal with n/between case, have to make tuple of inputs, and formatting of 'where' is different (There's a forced and)
         if query_oper in ['.between', '.nbetween']:
@@ -172,7 +172,7 @@ def search_parse(search_params, tenant, obj_name, db_instance):
             if not len(query_vals) == 2:
                 msg = f".between/.nbetween operators must have two variables seperated by a comma. Ex. myvar.between=20,40"
                 logger.warning(msg)
-                return Exception(msg)
+                raise Exception(msg)
             command += f" {query_key} {oper_aliases[query_oper]} %s AND %s AND"
             parameterized_values.append(query_vals[0])
             parameterized_values.append(query_vals[1])
@@ -201,14 +201,14 @@ def order_parse(order_string, tenant, obj_name, db_instance):
     if len(split_string) > 2:
         msg = f"Order must be in the format 'columnName,DESC', 'columnName,ASC' or 'columnName'. Got {order_string}"
         logger.warning(msg)
-        return Exception(msg)
+        raise Exception(msg)
 
     if len(split_string) == 2:
         order_dir = split_string[1]
         if not order_dir in ["ASC", "DESC"]:
             msg = f"Order must be in the format 'columnName,DESC', 'columnName,ASC' or 'columnName'. Got {order_string}"
             logger.warning(msg)
-            return Exception(msg)
+            raise Exception(msg)
     else:
         order_dir = None
 
