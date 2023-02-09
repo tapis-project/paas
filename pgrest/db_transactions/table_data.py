@@ -62,7 +62,7 @@ def get_rows_from_table(table_name, search_params, tenant, limit, offset, db_ins
         if offset:
             command += f" OFFSET {int(offset)};"
     except Exception as e:
-        msg = f"Unable to add order, limit, and offset for table {tenant}.{table_name}: {e}"
+        msg = f"Unable to add order, limit, offset, and search for table {tenant}.{table_name}: {e}"
         logger.warning(msg)
         raise Exception(msg)
 

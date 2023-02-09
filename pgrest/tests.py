@@ -1478,7 +1478,7 @@ class ResponseTestCase(TenantTestCase):
 
         # Refresh! Should fail because it's not a materialized view
         response = self.client.get(f'/v3/pgrest/manage/views/{view_id}/refresh', **auth_headers)
-        print(f"refresh resp: {response.text}")
+        print(f"refresh resp: {response.content}")
         self.assertEqual(response.status_code, 400)
 
 
