@@ -943,6 +943,10 @@ components:
         raw_sql:
           type: string
           description: Admin only. Full support of SQL when creating complex views.
+        materialized_view_raw_sql:
+          type: string
+          description: Admin only. Full support of SQL when creating complex materialized views.
+
       required: [view_name]
 
 
