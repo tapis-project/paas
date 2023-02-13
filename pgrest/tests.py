@@ -1438,33 +1438,33 @@ class ResponseTestCase(TenantTestCase):
                                     content_type='application/json')
         self.assertEqual(response.status_code, 400)
 
-    def test_aa_materialized_view_raw_sql_view_creation_refresh_deletion(self):
+    def test_materialized_view_raw_sql_view_creation_refresh_deletion(self):
         response = self.client.post(f'/v3/pgrest/manage/views', **auth_headers,
                                     data=json.dumps({'view_name': 'test_materialized_view_raw_sql',
                                                      'materialized_view_raw_sql': 'AS SELECT * FROM dev.initial_table_2;',
                                                      'comments': 'An example of creating a materialized view with raw_sql.'}),
                                     content_type='application/json')
         self.assertEqual(response.status_code, 200)
-        print()
-        print(f"creation resp: {response.json()}")
+        #print()
+        #print(f"creation resp: {response.json()}")
         view_id = response.json()["result"]["view_id"]
 
         # get it!
         response = self.client.get(f'/v3/pgrest/views/test_materialized_view_raw_sql', **auth_headers)
-        print(f"get resp: {response.json()}")
+        #print(f"get resp: {response.json()}")
         self.assertEqual(response.status_code, 200)
 
         # refresh it!
         response = self.client.get(f'/v3/pgrest/manage/views/{view_id}/refresh', **auth_headers)
-        print(f"refresh resp: {response.json()}")
+        #print(f"refresh resp: {response.json()}")
         self.assertEqual(response.status_code, 200)
 
         # delete it!
         response = self.client.delete(f'/v3/pgrest/manage/views/{view_id}', **auth_headers)
-        print(f"deletion resp: {response.json()}")
+        #print(f"deletion resp: {response.json()}")
         self.assertEqual(response.status_code, 200)
 
-    def test_aa_cannot_refresh_non_materialized_view(self):
+    def test_cannot_refresh_non_materialized_view(self):
         response = self.client.post(f'/v3/pgrest/manage/views', **auth_headers,
                                     data=json.dumps({'view_name': 'test_refresh_view', 
                                                      'root_url': 'just_a_cool_refresh_urll',
@@ -1472,13 +1472,13 @@ class ResponseTestCase(TenantTestCase):
                                                      'from_table': 'initial_table_2'}),
                                     content_type='application/json')
         self.assertEqual(response.status_code, 200)
-        print()
-        print(f"creation resp: {response.json()}")
+        #print()
+        #print(f"creation resp: {response.json()}")
         view_id = response.json()["result"]["view_id"]
 
         # Refresh! Should fail because it's not a materialized view
         response = self.client.get(f'/v3/pgrest/manage/views/{view_id}/refresh', **auth_headers)
-        print(f"refresh resp: {response.content}")
+        #print(f"refresh resp: {response.content}")
         self.assertEqual(response.status_code, 400)
 
 
