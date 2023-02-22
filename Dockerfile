@@ -1,7 +1,7 @@
 # Core image for PgREST project - Includes files for testing.
 # Image: pgrest-api/core
 
-FROM tapis/flaskbase-plugins:latest
+FROM tapis/flaskbase:latest
 
 ENV PYTHONUNBUFFERED 1
 ENV DJANGO_ENV dev
