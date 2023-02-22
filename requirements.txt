@@ -6,7 +6,8 @@ psycopg2==2.8.6
 cerberus
 postgres
 docker
-tapipy
+tapipy==1.2.20
+tapisservice==1.2.6
 uWSGI
 ipython
 jedi==0.17.2 # was required to get past issues with ipython in the manage.py shell; see:
