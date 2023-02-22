@@ -5,6 +5,7 @@
   "service_tenant_id": "admin",
   "primary_site_admin_tenant_base_url": "https://admin.develop.tapis.io",
   "test_token": "",
+  "tenants": [],
   "log_level": "DEBUG",
   "log_file": "/home/tapis/pgrest.log",
   "show_traceback": false,
