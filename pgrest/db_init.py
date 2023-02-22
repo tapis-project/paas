@@ -15,7 +15,7 @@ idx = 0
 while idx < 40:
     result = subprocess.run("python /home/tapis/manage.py makemigrations", shell=True, capture_output=True)
     if result.stderr:
-        print(f"Error running makemigrations, try {i} of 10. stderr:\n {result.stderr.decode('utf-8')}\n\n")
+        print(f"Error running makemigrations, try {idx} of 10. stderr:\n {result.stderr.decode('utf-8')}\n\n")
         idx += 1
         time.sleep(3)
         continue
