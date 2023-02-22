@@ -254,23 +254,42 @@ def grant_role(tenant, username, role):
     t.sk.grantRole(user=username, tenant=tenant, roleName=role, _tapis_set_x_headers_from_service=True)
 
 
-role_tenants = conf.tenants
+
+# Get all sites and tenants for all sites.
+SITE_TENANT_DICT = {} # {site_id1: [tenant1, tenant2, ...], site_id2: ...}
+for tenant in t.tenant_cache.tenants.values():
+    if not SITE_TENANT_DICT.get(tenant.site_id):
+        SITE_TENANT_DICT[tenant.site_id] = []
+    SITE_TENANT_DICT[tenant.site_id].append(tenant.tenant_id)
+curr_tenant_obj = t.tenant_cache.get_tenant_config(tenant_id=t.tenant_id)
+# Delete excess sites when current site is not primary. Non-primary sites will never have to manage other sites.
+if not curr_tenant_obj.site.primary:
+    SITE_TENANT_DICT = {curr_tenant_obj.site: SITE_TENANT_DICT[curr_tenant_obj.site]}
+
+
+# Get all tenants that this code should make PgREST roles for.
+role_tenants = []
+for site, tenants in SITE_TENANT_DICT.items():
+    role_tenants += tenants
 
 # make sure roles exist --
 create_roles(role_tenants)
 
-# set up project admins --
-admins = ['jstubbs', 'cgarcia']
+try:
+    # set up project admins --
+    admins = []
 
-for a in admins:
-    for tn in role_tenants:
-        grant_role(tn, a, 'PGREST_ADMIN')
+    for a in admins:
+        for tn in role_tenants:
+            grant_role(tn, a, 'PGREST_ADMIN')
 
-# additional roles by tenant
-grant_role('a2cps', 'ctjordan', 'PGREST_ADMIN')
-grant_role('a2cps', 'pscherer', 'PGREST_ADMIN')
-grant_role('a2cps', 'vaughn', 'PGREST_ADMIN')
+    # additional roles by tenant
+        grant_role('a2cps', 'ctjordan', 'PGREST_ADMIN')
+        grant_role('a2cps', 'pscherer', 'PGREST_ADMIN')
+        grant_role('a2cps', 'vaughn', 'PGREST_ADMIN')
 
-grant_role('cii', 'ctjordan', 'PGREST_ADMIN')
-grant_role('cii', 'pscherer', 'PGREST_ADMIN')
-grant_role('cii', 'waller', 'PGREST_ADMIN')
+        grant_role('cii', 'ctjordan', 'PGREST_ADMIN')
+        grant_role('cii', 'pscherer', 'PGREST_ADMIN')
+        grant_role('cii', 'waller', 'PGREST_ADMIN')
+except Exception as e:
+    logger.info("Issue setting roles, probably because you're not using 'tacc' site. This is not an issue, service should be good.")

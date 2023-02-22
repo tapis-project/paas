@@ -11,12 +11,12 @@ import subprocess
 
 # Running makemigrations.
 print("\n\n\n\n\nMigration -- Running makemigrations before app start.")
-i = 0
-while i < 40:
+idx = 0
+while idx < 40:
     result = subprocess.run("python /home/tapis/manage.py makemigrations", shell=True, capture_output=True)
     if result.stderr:
         print(f"Error running makemigrations, try {i} of 10. stderr:\n {result.stderr.decode('utf-8')}\n\n")
-        i = i + 1
+        idx += 1
         time.sleep(3)
         continue
     print("Migration -- Successfully ran makemigrations.")
