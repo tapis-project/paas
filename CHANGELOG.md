@@ -3,6 +3,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.3.0 - 2023-03-09
+### Breaking Changes:
+- No Change.
+
+### New features:
+- No Change.
+
+### Bug fixes:
+- No Change.
 
 ## 1.2.3 - 2023-02-09
 ### Breaking Changes:
