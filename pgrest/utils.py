@@ -8,6 +8,7 @@ from tapisservice import errors as common_errors
 from pgrest.__init__ import t
 from tapisservice.config import conf
 from tapisservice.logs import get_logger
+from tapipy.errors import UnauthorizedError
 
 logger = get_logger(__name__)
 
@@ -221,22 +222,28 @@ def create_roles(tenants=[]):
     Creates the basic set of roles required by PgREST in SK for a given set of tenants.
     """
     for tn in tenants:
-        t.sk.createRole(roleName='PGREST_READ',
-                        roleTenant=tn,
-                        description='Role granting read access to all tables in the PgREST API.',
-                        _tapis_set_x_headers_from_service=True)
-        t.sk.createRole(roleName='PGREST_WRITE',
-                        roleTenant=tn,
-                        description='Role granting write access to all tables in the PgREST API.',
-                        _tapis_set_x_headers_from_service=True)
-        t.sk.createRole(roleName='PGREST_ADMIN',
-                        roleTenant=tn,
-                        description='Role granting admin rights to all tables in the PgREST API.',
-                        _tapis_set_x_headers_from_service=True)
-        t.sk.createRole(roleName='PGREST_ROLE_ADMIN',
-                        roleTenant=tn,
-                        description='Role granting ability to use PgREST Role endpoints.',
-                        _tapis_set_x_headers_from_service=True)
+        try:
+            t.sk.createRole(roleName='PGREST_READ',
+                            roleTenant=tn,
+                            description='Role granting read access to all tables in the PgREST API.',
+                            _tapis_set_x_headers_from_service=True)
+            t.sk.createRole(roleName='PGREST_WRITE',
+                            roleTenant=tn,
+                            description='Role granting write access to all tables in the PgREST API.',
+                            _tapis_set_x_headers_from_service=True)
+            t.sk.createRole(roleName='PGREST_ADMIN',
+                            roleTenant=tn,
+                            description='Role granting admin rights to all tables in the PgREST API.',
+                            _tapis_set_x_headers_from_service=True)
+            t.sk.createRole(roleName='PGREST_ROLE_ADMIN',
+                            roleTenant=tn,
+                            description='Role granting ability to use PgREST Role endpoints.',
+                            _tapis_set_x_headers_from_service=True)
+        except UnauthorizedError as e:
+            logger.warning((f"Unauthorized error creating roles for tenant {tn}. PgREST probably cannot",
+                            f"act on behalf of users of this tenant. e: {e}"))
+            pass
+
         # This doesn't really belong, but we need to delete our PGREST_TEST role because the testsuite
         # creates it and uses it, but we need to delete it each run. There's no delete role endpoint
         # though. Also we need to "reserve" the role between running the tests. So we delete it now.
@@ -281,15 +288,18 @@ try:
 
     for a in admins:
         for tn in role_tenants:
-            grant_role(tn, a, 'PGREST_ADMIN')
+            try:
+                grant_role(tn, a, 'PGREST_ADMIN')
+            except:
+                pass
 
     # additional roles by tenant
-        grant_role('a2cps', 'ctjordan', 'PGREST_ADMIN')
-        grant_role('a2cps', 'pscherer', 'PGREST_ADMIN')
-        grant_role('a2cps', 'vaughn', 'PGREST_ADMIN')
+    grant_role('a2cps', 'ctjordan', 'PGREST_ADMIN')
+    grant_role('a2cps', 'pscherer', 'PGREST_ADMIN')
+    grant_role('a2cps', 'vaughn', 'PGREST_ADMIN')
 
-        grant_role('cii', 'ctjordan', 'PGREST_ADMIN')
-        grant_role('cii', 'pscherer', 'PGREST_ADMIN')
-        grant_role('cii', 'waller', 'PGREST_ADMIN')
+    grant_role('cii', 'ctjordan', 'PGREST_ADMIN')
+    grant_role('cii', 'pscherer', 'PGREST_ADMIN')
+    grant_role('cii', 'waller', 'PGREST_ADMIN')
 except Exception as e:
     logger.info("Issue setting roles, probably because you're not using 'tacc' site. This is not an issue, service should be good.")

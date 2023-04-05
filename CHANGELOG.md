@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
 - No Change.
 
 ### Bug fixes:
-- No Change.
+- Initialization creates roles, when trying to create roles for other tenants we would crash. Now we have a soft fail with better logging.
 
 ## 1.2.3 - 2023-02-09
 ### Breaking Changes:
