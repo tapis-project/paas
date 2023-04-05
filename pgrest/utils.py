@@ -281,15 +281,18 @@ try:
 
     for a in admins:
         for tn in role_tenants:
-            grant_role(tn, a, 'PGREST_ADMIN')
+            try:
+                grant_role(tn, a, 'PGREST_ADMIN')
+            except:
+                pass
 
     # additional roles by tenant
-        grant_role('a2cps', 'ctjordan', 'PGREST_ADMIN')
-        grant_role('a2cps', 'pscherer', 'PGREST_ADMIN')
-        grant_role('a2cps', 'vaughn', 'PGREST_ADMIN')
+    grant_role('a2cps', 'ctjordan', 'PGREST_ADMIN')
+    grant_role('a2cps', 'pscherer', 'PGREST_ADMIN')
+    grant_role('a2cps', 'vaughn', 'PGREST_ADMIN')
 
-        grant_role('cii', 'ctjordan', 'PGREST_ADMIN')
-        grant_role('cii', 'pscherer', 'PGREST_ADMIN')
-        grant_role('cii', 'waller', 'PGREST_ADMIN')
+    grant_role('cii', 'ctjordan', 'PGREST_ADMIN')
+    grant_role('cii', 'pscherer', 'PGREST_ADMIN')
+    grant_role('cii', 'waller', 'PGREST_ADMIN')
 except Exception as e:
     logger.info("Issue setting roles, probably because you're not using 'tacc' site. This is not an issue, service should be good.")
