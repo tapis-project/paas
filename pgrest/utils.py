@@ -8,6 +8,7 @@ from tapisservice import errors as common_errors
 from pgrest.__init__ import t
 from tapisservice.config import conf
 from tapisservice.logs import get_logger
+from tapipy.errors import UnauthorizedError
 
 logger = get_logger(__name__)
 
@@ -238,7 +239,7 @@ def create_roles(tenants=[]):
                             roleTenant=tn,
                             description='Role granting ability to use PgREST Role endpoints.',
                             _tapis_set_x_headers_from_service=True)
-        except common_errors.UnauthorizedError as e:
+        except UnauthorizedError as e:
             logger.warning(f"Unauthorized error creating roles for tenant {tn}. PgREST probably cannot",
                            f"act on behalf of users of this tenant. e: {e}")
             pass
