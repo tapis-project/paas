@@ -240,8 +240,8 @@ def create_roles(tenants=[]):
                             description='Role granting ability to use PgREST Role endpoints.',
                             _tapis_set_x_headers_from_service=True)
         except UnauthorizedError as e:
-            logger.warning(f"Unauthorized error creating roles for tenant {tn}. PgREST probably cannot",
-                           f"act on behalf of users of this tenant. e: {e}")
+            logger.warning((f"Unauthorized error creating roles for tenant {tn}. PgREST probably cannot",
+                            f"act on behalf of users of this tenant. e: {e}"))
             pass
 
         # This doesn't really belong, but we need to delete our PGREST_TEST role because the testsuite
