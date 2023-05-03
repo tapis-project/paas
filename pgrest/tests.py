@@ -343,6 +343,52 @@ class ResponseTestCase(TenantTestCase):
                                    content_type='application/json')
         self.assertEqual(response.status_code, 200)
 
+    def test_update_row_with_null_value(self):
+        # We should be able to change a row value from filled to null without issue, if it's nullable. 
+        # first, we need to create row
+        root_url = self.init_resp_1["result"]["root_url"]
+        table_name = self.init_resp_1["result"]["table_name"]
+        data = {"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}
+        response = self.client.post(f'/v3/pgrest/data/{root_url}',
+                                    data=json.dumps({"data": data}),
+                                    **auth_headers,
+                                    content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        response = self.client.get(f'/v3/pgrest/data/{root_url}', **auth_headers)
+        self.assertEqual(len(response.json()["result"]), 1)
+        self.assertEqual(response.status_code, 200)
+
+        # now, update
+        data = {"col_two": None}
+        row_id = response.json()["result"][0]['_pkid']
+        response = self.client.put(f'/v3/pgrest/data/{root_url}/{row_id}',
+                                   **auth_headers,
+                                   data=json.dumps({"data": data}),
+                                   content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+
+    def test_update_row_with_null_value_on_non_nullable_column_400(self):
+        root_url = self.init_resp_1["result"]["root_url"]
+        table_name = self.init_resp_1["result"]["table_name"]
+        data = {"col_one": "hello", "col_two": 100, "col_three": 90, "col_four": False, "col_five": "hehe"}
+        response = self.client.post(f'/v3/pgrest/data/{root_url}',
+                                    data=json.dumps({"data": data}),
+                                    **auth_headers,
+                                    content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        response = self.client.get(f'/v3/pgrest/data/{root_url}', **auth_headers)
+        self.assertEqual(len(response.json()["result"]), 1)
+        self.assertEqual(response.status_code, 200)
+
+        # now, update
+        data = {"col_four": None}
+        row_id = response.json()["result"][0]['_pkid']
+        response = self.client.put(f'/v3/pgrest/data/{root_url}/{row_id}',
+                                   **auth_headers,
+                                   data=json.dumps({"data": data}),
+                                   content_type='application/json')
+        self.assertEqual(response.status_code, 400)
+
     def test_update_row_wrong_data_type_400(self):
         # first, we need to create row
         root_url = self.init_resp_1["result"]["root_url"]
@@ -356,6 +402,7 @@ class ResponseTestCase(TenantTestCase):
         response = self.client.get(f'/v3/pgrest/data/{root_url}', **auth_headers)
         self.assertEqual(len(response.json()["result"]), 1)
         self.assertEqual(response.status_code, 200)
+
         # now, update
         data = {"col_two": "haha"}
         row_id = response.json()["result"][0]['_pkid']
@@ -388,6 +435,7 @@ class ResponseTestCase(TenantTestCase):
         response = self.client.get(f'/v3/pgrest/data/{root_url}', **auth_headers)
         self.assertEqual(len(response.json()["result"]), 1)
         self.assertEqual(response.status_code, 200)
+
         # now, update
         data = {"col_where": 30}
         row_id = response.json()["result"][0]['_pkid']
@@ -1405,17 +1453,17 @@ class ResponseTestCase(TenantTestCase):
     # Nonexistence checks
     def test_get_nonexistent_view(self):
         response = self.client.get(f'/v3/pgrest/views/this_view_does_not_exist', **auth_headers)
-        print(response)
+        #print(response)
         self.assertEqual(response.status_code, 404)
 
     def test_get_nonexistent_manage_view(self):
         response = self.client.get(f'/v3/pgrest/manage/views/22', **auth_headers)
-        print(response)
+        #print(response)
         self.assertEqual(response.status_code, 404)
 
     def test_delete_nonexistent_view(self):
         response = self.client.delete(f'/v3/pgrest/manage/views/22', **auth_headers)
-        print(response)
+        #print(response)
         self.assertEqual(response.status_code, 404)
         
     def test_raw_sql_view_creation(self):
