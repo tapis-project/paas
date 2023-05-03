@@ -3,6 +3,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.3.0 - 2023-05-03
+### Breaking Changes:
+- No Change.
+
+### New features:
+- No Change.
+
+### Bug fixes:
+- Row update with a bit broken. Users can now set row values equal to null with JSON null value.
+- Users can also now update any individual row value, previously rows with not "null" would set "required" and would mean that updates would also require said values.
+
+
 ## 1.3.0 - 2023-03-09
 ### Breaking Changes:
 - No Change.
