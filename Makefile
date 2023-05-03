@@ -22,13 +22,13 @@ build-core:
 # @echo "Now migrating"
 # @docker-compose run api python /home/tapis/manage.py migrate_schemas --shared
 
-local-deploy: build-core
+up: build-core
 	@echo "Running docker-compose up"
 	@docker-compose up -d api
 
 
 # Running the pgrest/test.py file
-test: local-deploy
+test:
 	@docker-compose run api python /home/tapis/manage.py test -v 2
 
 

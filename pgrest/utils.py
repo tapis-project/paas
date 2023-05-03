@@ -73,31 +73,9 @@ def create_validate_schema(columns, tenant, existing_enum_names):
     schema_update = dict()
     schema_create = dict()
 
-    for key, key_info in columns.items():
-        key_type = key_info["data_type"].lower()
-        info_dict = dict()
-        if key_type in ["varchar", "char"]:
-            try:
-                val_length = int(key_info["char_len"])
-                info_dict.update({"type": "string", "maxlength": val_length})
-            except KeyError:
-                raise KeyError(f"Unable to create table. {key_type} data types requires char_len field.")
-        elif key_type == "text":
-            info_dict.update({"type": "string"})
-        elif key_type == "serial":
-            info_dict.update({"type": "integer"})
-        elif key_type == "date":
-            info_dict.update({"type": "string"})
-        elif key_type == "timestamp":
-            info_dict.update({"type": "string"})
-        elif '[]' in key_type:
-            info_dict.update({"type": "list"})
-        elif key_type in existing_enum_names or f'{tenant}.{key_type}' in existing_enum_names:
-            info_dict.update({"type": "string"})
-        else:
-            info_dict.update({"type": key_type})
-        schema_update[key] = info_dict
-
+    # We once had different update and create schemas. I couldn't figure out a valid reason for this.
+    # Only difference is schema_update should never have "required" field. As users should always be able
+    # to update a row's value. 
     for key, key_info in columns.items():
         key_type = key_info["data_type"]
         info_dict = dict()
@@ -120,13 +98,17 @@ def create_validate_schema(columns, tenant, existing_enum_names):
             info_dict.update({"type": key_type})
 
         if "null" in key_info.keys():
-            if not key_info["null"]:
-                info_dict.update({"required": True,
-                                  "nullable": True})
-            else:
+            if key_info["null"]: #true
                 info_dict.update({"required": False,
                                   "nullable": True})
-        schema_create[key] = info_dict
+            else: #false
+                info_dict.update({"required": True,
+                                  "nullable": False})
+        schema_create[key] = info_dict.copy()
+
+        # Update schema should never have required fields. Users should always be able to update a row's value.
+        info_dict.update({"required": False})
+        schema_update[key] = info_dict.copy()
 
     return schema_create, schema_update
 

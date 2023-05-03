@@ -246,8 +246,10 @@ def update_row_with_pk(table_name, pk_id, data, tenant, primary_key, db_instance
     logger.info(f"Updating row with pk \'{pk_id}\' in {tenant}.{table_name}...")
     command = f"UPDATE {tenant}.{table_name} SET"
     for col in data:
-        if type(data[col]) == str:
+        if isinstance(data[col], str):
             command = f"{command} {col} = (\'{data[col]}\'), "
+        elif isinstance(data[col], type(None)):
+            command = f"{command} {col} = (NULL), "
         else:
             command = f"{command} {col} = ({data[col]}), "
     if type(pk_id) == 'int' or type(pk_id) == 'float':
@@ -277,8 +279,10 @@ def update_rows_with_where(table_name, data, tenant, db_instance, search_params=
     logger.info(f"Updating rows in {tenant}.{table_name}...")
     command = f"UPDATE {tenant}.{table_name} SET"
     for col in data:
-        if type(data[col]) == str:
+        if isinstance(data[col], str):
             command = f"{command} {col} = (\'{data[col]}\'), "
+        elif isinstance(data[col], type(None)):
+            command = f"{command} {col} = (NULL), "
         else:
             command = f"{command} {col} = ({data[col]}), "
 
