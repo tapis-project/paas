@@ -3,7 +3,57 @@
 
 All notable changes to this project will be documented in this file.
 
-## 1.3.0 - 2023-05-03
+## 1.7.0 - 2024-09-13
+
+New release
+
+### New features:
+
+- No Change.
+
+### Bug fixes:
+
+- No Change.
+
+
+## 1.6.0 - 2024-01-24
+
+New release
+
+### New features:
+
+- No Change.
+
+### Bug fixes:
+
+- No Change.
+
+## 1.5.0 - 2023-10-24
+
+New release
+
+### New features:
+
+- No Change.
+
+### Bug fixes:
+
+- No Change.
+
+
+## 1.4.0 - 2023-07-06
+
+New release
+
+### New features:
+
+- No Change.
+
+### Bug fixes:
+
+- No Change.
+
+## 1.3.1 - 2023-05-03
 ### Breaking Changes:
 - No Change.
 
