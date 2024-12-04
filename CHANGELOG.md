@@ -3,6 +3,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.8.0 - 2024-12-04
+
+New release
+
+### New features:
+
+- No Change.
+
+### Bug fixes:
+
+- No Change.
+
+
+
 ## 1.7.0 - 2024-09-13
 
 New release
