@@ -1,9 +1,11 @@
-PgREST - Postgres as a RESTful API
+PgREST - RESTful API for PostgreSQL
 ========================================
+[![GitHub tag (latest by date)](https://img.shields.io/github/v/tag/tapis-project/paas?label=git%20tag)](https://github.com/tapis-project/paas/tags)
+[![Docker Image](https://img.shields.io/docker/v/tapis/pgrest-api?label=image&sort=semver)](https://hub.docker.com/r/tapis/pgrest-api/tags)
+[![docs](https://img.shields.io/badge/docs-grey)](https://tapis.readthedocs.io/en/latest/technical/pgrest.html)
+[![live-docs](https://img.shields.io/badge/live--docs-grey)](https://tapis-project.github.io/live-docs/?service=PgREST)
+
 The PgREST service provides an friendly HTTP-based API to a managed Postgres database. As with the other Tapis v3 service, PgREST utilizes a REST architecture. The API currently features tables, views, and roles. Tables, views, and roles are created with PgREST endpoints that are described in detail in our documentation.
-  
-**PgREST Documentation:** https://tapis.readthedocs.io/en/latest/technical/pgrest.html  
-**PgREST Automated Live-Docs:** https://tapis-project.github.io/live-docs/#tag/user
 
 Once you understand PgREST, put it all to work by looking at our quick-start Jupyter notebook. This notebook contains all the code neccessary to work with PgREST, modify it to your wishes or copy and paste code snippets into whatever scripts you have.
 
