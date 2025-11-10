@@ -4,8 +4,7 @@
 All notable changes to this project will be documented in this file.
 
 
-## 1.9.0 - 2025-07-07
-
+## 25Q4.0 - 2025-10-20
 New release
 
 ### New features:
