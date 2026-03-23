@@ -4,9 +4,18 @@
 All notable changes to this project will be documented in this file.
 
 
-## 1.9.0 - 2025-07-07
+## 26Q1.0
 
-New release
+### New features:
+
+- No Change. Bump version.
+
+### Bug fixes:
+
+- No Change.
+
+
+## 25Q4.0
 
 ### New features:
 
@@ -19,8 +28,6 @@ New release
 
 ## 1.8.0 - 2024-12-04
 
-New release
-
 ### New features:
 
 - No Change.
@@ -31,8 +38,6 @@ New release
 
 
 ## 1.7.0 - 2024-09-13
-
-New release
 
 ### New features:
 

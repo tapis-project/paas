@@ -2290,6 +2290,7 @@ class RoleManagementByName(RoleSessionMixin, APIView):
     def post(self, request, *args, **kwargs):
         logger.debug("top of post /manage/roles/{role_name}")
         req_tenant = request.session['tenant_id']
+        req_username = request.session['username']
 
         # Parse out required fields.
         try:
@@ -2325,9 +2326,11 @@ class RoleManagementByName(RoleSessionMixin, APIView):
             return HttpResponseBadRequest(make_error(msg=msg))
 
         # Users are allowed to manage the PGREST_USER endpoint
+        # PGREST_ROLE_ADMIN is required to manage all other privileged roles.
+        user_sk_roles = get_user_sk_roles(req_tenant, req_username)
         privileged_roles = ["PGREST_ADMIN", "PGREST_ROLE_ADMIN", "PGREST_WRITE", "PGREST_READ"]
-        if role_name.upper() in privileged_roles:
-            msg = f"Can't manage the following privileged roles, {privileged_roles}, got {role_name}."
+        if role_name.upper() in privileged_roles and not "PGREST_ROLE_ADMIN" in user_sk_roles:
+            msg = f"Your user can't manage the following privileged roles, {privileged_roles}, got {role_name}. Your pgrest roles: { pgrest_sk_roles for role in user_sk_roles if role.startswith('PGREST_') }"
             logger.critical(msg)
             return HttpResponseBadRequest(make_error(msg=msg))
 
